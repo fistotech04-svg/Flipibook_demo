@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Restaurant Menu - A4 Landscape</title>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&display=swap" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            playfair: ['Playfair Display', 'serif'],
+            cormorant: ['Cormorant Garamond', 'serif'],
+            montserrat: ['Montserrat', 'sans-serif'],
+          },
+          colors: {
+            cream: '#faf7f2',
+            'cream-dark': '#f5f0e8',
+            gold: '#c9a962',
+            'gold-dark': '#a88b4a',
+            wine: '#722f37',
+            'wine-dark': '#5a252c',
+            charcoal: '#2d2d2d',
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 0;
+    }
+
+    .a4-landscape {
+      width: 297mm;
+      height: 210mm;
+      min-width: 297mm;
+      min-height: 210mm;
+    }
+
+    @media print {
+      body {
+        margin: 0;
+        padding: 0;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+    }
+
+    .ornament {
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 20'%3E%3Cpath d='M0 10 Q25 0 50 10 Q75 20 100 10' fill='none' stroke='%23c9a962' stroke-width='1'/%3E%3C/svg%3E") repeat-x center;
+    }
+
+    /* GIF badge pulse */
+    @keyframes gif-pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.7;
+      }
+    }
+
+    .gif-badge {
+      animation: gif-pulse 1.5s ease-in-out infinite;
+    }
+  </style>
+</head>
+
+<body class="m-0 p-0 bg-gray-300 flex items-center justify-center min-h-screen">
+
+  <div class="a4-landscape bg-cream overflow-hidden relative shadow-2xl">
+
+    <!-- Decorative Border -->
+    <div class="absolute inset-4 border-2 border-gold/30 pointer-events-none z-20"></div>
+    <div class="absolute inset-6 border border-gold/20 pointer-events-none z-20"></div>
+
+    <!-- Corner Ornaments -->
+    <svg class="absolute top-6 left-6 w-16 h-16 text-gold/40 z-20" viewBox="0 0 100 100">
+      <path d="M0 0 Q50 10 50 50 Q10 50 0 0" fill="currentColor" />
+      <circle cx="15" cy="15" r="3" fill="currentColor" />
+    </svg>
+    <svg class="absolute top-6 right-6 w-16 h-16 text-gold/40 rotate-90 z-20" viewBox="0 0 100 100">
+      <path d="M0 0 Q50 10 50 50 Q10 50 0 0" fill="currentColor" />
+      <circle cx="15" cy="15" r="3" fill="currentColor" />
+    </svg>
+    <svg class="absolute bottom-6 left-6 w-16 h-16 text-gold/40 -rotate-90 z-20" viewBox="0 0 100 100">
+      <path d="M0 0 Q50 10 50 50 Q10 50 0 0" fill="currentColor" />
+      <circle cx="15" cy="15" r="3" fill="currentColor" />
+    </svg>
+    <svg class="absolute bottom-6 right-6 w-16 h-16 text-gold/40 rotate-180 z-20" viewBox="0 0 100 100">
+      <path d="M0 0 Q50 10 50 50 Q10 50 0 0" fill="currentColor" />
+      <circle cx="15" cy="15" r="3" fill="currentColor" />
+    </svg>
+
+    <!-- Main Content -->
+    <div class="relative z-10 h-full grid grid-cols-12 gap-6 p-10">
+
+      <!-- Left Column - Images, Videos & GIFs -->
+      <div class="col-span-3 flex flex-col gap-3">
+
+        <!-- Main Video - Hero -->
+        <div class="h-36 rounded-lg overflow-hidden shadow-lg relative">
+          <video class="w-full h-full object-cover" muted loop autoplay playsinline>
+            <source src="https://www.pexels.com/download/video/5330915/" type="video/mp4">
+          </video>
+          <!-- Label -->
+          <div class="absolute bottom-2 left-2">
+            <span class="font-cormorant text-white text-sm italic bg-charcoal/50 px-2 py-0.5 rounded">Our Kitchen</span>
+          </div>
+        </div>
+
+        <!-- Main Image -->
+        <div class="flex-1 rounded-lg overflow-hidden shadow-lg relative">
+          <img src="https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400&h=400&fit=crop"
+            alt="Restaurant Ambiance"
+            class="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+          <div class="absolute bottom-2 left-2">
+            <span class="font-cormorant text-white text-xs italic bg-charcoal/50 px-2 py-0.5 rounded">Fine Dining
+              Experience</span>
+          </div>
+        </div>
+
+        <!-- Small Media Grid - Image & GIF -->
+        <div class="grid grid-cols-2 gap-2 h-20">
+          <!-- Food Image -->
+          <div class="rounded-lg overflow-hidden shadow-md">
+            <img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=150&fit=crop" alt="Dish 1"
+              class="w-full h-full object-cover hover:scale-110 transition-transform duration-300" />
+          </div>
+          <!-- Cooking GIF -->
+          <div class="rounded-lg overflow-hidden shadow-md relative">
+            <img src="https://media.giphy.com/media/l0HlTy9x8FZo0XO1i/giphy.gif" alt="Cooking Animation"
+              class="w-full h-full object-cover" />
+            <div
+              class="absolute top-1 right-1 bg-gold text-white text-[7px] px-1.5 py-0.5 rounded font-montserrat font-medium gif-badge">
+              GIF</div>
+          </div>
+        </div>
+
+        <!-- Chef Video - Small -->
+        <div class="h-16 rounded-lg overflow-hidden shadow-md relative">
+          <video class="w-full h-full object-cover" muted loop autoplay playsinline>
+            <source src="https://www.pexels.com/download/video/5498749/" type="video/mp4">
+          </video>
+          <div class="absolute bottom-1 left-1">
+            <span class="font-montserrat text-white text-[8px] bg-charcoal/60 px-1.5 py-0.5 rounded">Meet Our
+              Chef</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center Column - Header & Menu -->
+      <div class="col-span-6 flex flex-col">
+
+        <!-- Header -->
+        <div class="text-center mb-4">
+          <!-- Logo Icon -->
+          <div class="inline-flex items-center justify-center w-12 h-12 border-2 border-gold rounded-full mb-2">
+            <svg class="w-6 h-6 text-gold" fill="currentColor" viewBox="0 0 24 24">
+              <path
+                d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z" />
+            </svg>
+          </div>
+          <h1 class="font-playfair text-3xl text-charcoal font-semibold tracking-wide">La Maison D'Or</h1>
+          <div class="ornament h-4 my-1"></div>
+          <p class="font-cormorant text-base text-gold italic">Fine French Cuisine Since 1985</p>
+        </div>
+
+        <!-- Menu Grid -->
+        <div class="flex-1 grid grid-cols-2 gap-x-6 gap-y-2 px-2">
+
+          <!-- Appetizers -->
+          <div>
+            <h2 class="font-playfair text-wine text-base font-semibold mb-2 flex items-center gap-2">
+              <svg class="w-4 h-4 text-gold" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z" />
+              </svg>
+              Appetizers
+            </h2>
+            <div class="space-y-1.5">
+              <div class="flex justify-between items-baseline border-b border-dotted border-gold/30 pb-1">
+                <div>
+                  <span class="font-cormorant text-charcoal text-sm">French Onion Soup</span>
+                  <p class="font-montserrat text-[8px] text-gray-500">Gruyère cheese, crusty bread</p>
+                </div>
+                <span class="font-montserrat text-wine text-xs font-medium">$14</span>
+              </div>
+              <div class="flex justify-between items-baseline border-b border-dotted border-gold/30 pb-1">
+                <div>
+                  <span class="font-cormorant text-charcoal text-sm">Escargots de Bourgogne</span>
+                  <p class="font-montserrat text-[8px] text-gray-500">Garlic herb butter, parsley</p>
+                </div>
+                <span class="font-montserrat text-wine text-xs font-medium">$18</span>
+              </div>
+              <div class="flex justify-between items-baseline border-b border-dotted border-gold/30 pb-1">
+                <div>
+                  <span class="font-cormorant text-charcoal text-sm">Foie Gras Terrine</span>
+                  <p class="font-montserrat text-[8px] text-gray-500">Fig compote, brioche toast</p>
+                </div>
+                <span class="font-montserrat text-wine text-xs font-medium">$24</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Courses -->
+          <div>
+            <h2 class="font-playfair text-wine text-base font-semibold mb-2 flex items-center gap-2">
+              <svg class="w-4 h-4 text-gold" fill="currentColor" viewBox="0 0 24 24">
+                <path
+                  d="M8.1 13.34l2.83-2.83L3.91 3.5a4.008 4.008 0 000 5.66l4.19 4.18zm6.78-1.81c1.53.71 3.68.21 5.27-1.38 1.91-1.91 2.28-4.65.81-6.12-1.46-1.46-4.20-1.10-6.12.81-1.59 1.59-2.09 3.74-1.38 5.27L3.7 19.87l1.41 1.41L12 14.41l6.88 6.88 1.41-1.41L13.41 13l1.47-1.47z" />
+              </svg>
+              Main Courses
+            </h2>
+            <div class="space-y-1.5">
+              <div class="flex justify-between items-baseline border-b border-dotted border-gold/30 pb-1">
+                <div>
+                  <span class="font-cormorant text-charcoal text-sm">Coq au Vin</span>
+                  <p class="font-montserrat text-[8px] text-gray-500">Burgundy wine, pearl onions</p>
+                </div>
+                <span class="font-montserrat text-wine text-xs font-medium">$36</span>
+              </div>
+              <div class="flex justify-between items-baseline border-b border-dotted border-gold/30 pb-1">
+                <div>
+                  <span class="font-cormorant text-charcoal text-sm">Beef Bourguignon ⭐</span>
+                  <p class="font-montserrat text-[8px] text-gray-500">Slow-braised beef, vegetables</p>
+                </div>
+                <span class="font-montserrat text-wine text-xs font-medium">$42</span>
+              </div>
+              <div class="flex justify-between items-baseline border-b border-dotted border-gold/30 pb-1">
+                <div>
+                  <span class="font-cormorant text-charcoal text-sm">Duck Confit</span>
+                  <p class="font-montserrat text-[8px] text-gray-500">Crispy skin, orange glaze</p>
+                </div>
+                <span class="font-montserrat text-wine text-xs font-medium">$38</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Seafood -->
+          <div>
+            <h2 class="font-playfair text-wine text-base font-semibold mb-2 flex items-center gap-2">
+              <svg class="w-4 h-4 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+              From the Sea
+            </h2>
+            <div class="space-y-1.5">
+              <div class="flex justify-between items-baseline border-b border-dotted border-gold/30 pb-1">
+                <div>
+                  <span class="font-cormorant text-charcoal text-sm">Bouillabaisse</span>
+                  <p class="font-montserrat text-[8px] text-gray-500">Provençal fish stew, rouille</p>
+                </div>
+                <span class="font-montserrat text-wine text-xs font-medium">$44</span>
+              </div>
+              <div class="flex justify-between items-baseline border-b border-dotted border-gold/30 pb-1">
+                <div>
+                  <span class="font-cormorant text-charcoal text-sm">Lobster Thermidor</span>
+                  <p class="font-montserrat text-[8px] text-gray-500">Cognac cream sauce</p>
+                </div>
+                <span class="font-montserrat text-wine text-xs font-medium">$58</span>
+              </div>
+              <div class="flex justify-between items-baseline border-b border-dotted border-gold/30 pb-1">
+                <div>
+                  <span class="font-cormorant text-charcoal text-sm">Pan-Seared Salmon</span>
+                  <p class="font-montserrat text-[8px] text-gray-500">Lemon butter, asparagus</p>
+                </div>
+                <span class="font-montserrat text-wine text-xs font-medium">$34</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Desserts -->
+          <div>
+            <h2 class="font-playfair text-wine text-base font-semibold mb-2 flex items-center gap-2">
+              <svg class="w-4 h-4 text-gold" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+              </svg>
+              Desserts
+            </h2>
+            <div class="space-y-1.5">
+              <div class="flex justify-between items-baseline border-b border-dotted border-gold/30 pb-1">
+                <div>
+                  <span class="font-cormorant text-charcoal text-sm">Crème Brûlée</span>
+                  <p class="font-montserrat text-[8px] text-gray-500">Vanilla bean, caramelized sugar</p>
+                </div>
+                <span class="font-montserrat text-wine text-xs font-medium">$12</span>
+              </div>
+              <div class="flex justify-between items-baseline border-b border-dotted border-gold/30 pb-1">
+                <div>
+                  <span class="font-cormorant text-charcoal text-sm">Tarte Tatin ⭐</span>
+                  <p class="font-montserrat text-[8px] text-gray-500">Caramelized apple, crème fraîche</p>
+                </div>
+                <span class="font-montserrat text-wine text-xs font-medium">$14</span>
+              </div>
+              <div class="flex justify-between items-baseline border-b border-dotted border-gold/30 pb-1">
+                <div>
+                  <span class="font-cormorant text-charcoal text-sm">Chocolate Soufflé</span>
+                  <p class="font-montserrat text-[8px] text-gray-500">Valrhona chocolate, vanilla ice cream</p>
+                </div>
+                <span class="font-montserrat text-wine text-xs font-medium">$16</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Special Notice -->
+        <div class="mt-3 text-center">
+          <p class="font-montserrat text-[8px] text-gray-500 italic">⭐ Chef's Recommendation | All prices include taxes
+            | Gratuity not included | Ask about our tasting menu</p>
+        </div>
+      </div>
+
+      <!-- Right Column - Videos, GIFs, Wine & Contact -->
+      <div class="col-span-3 flex flex-col gap-3">
+
+        <!-- Ambiance Video -->
+        <div class="h-28 rounded-lg overflow-hidden shadow-lg relative">
+          <video class="w-full h-full object-cover" muted loop autoplay playsinline>
+            <source src="https://www.pexels.com/download/video/34769921/" type="video/mp4">
+          </video>
+          <!-- Label -->
+          <div class="absolute bottom-2 left-2">
+            <span class="font-cormorant text-white text-sm italic bg-charcoal/50 px-2 py-0.5 rounded">Restaurant
+              Ambiance</span>
+          </div>
+        </div>
+
+        <!-- Wine Selection -->
+        <div class="bg-wine/5 rounded-lg p-3 border border-wine/20">
+          <h3 class="font-playfair text-wine text-sm font-semibold mb-2 flex items-center gap-2">
+            <svg class="w-4 h-4 text-gold" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6 3l6 8 6-8H6zm6 8l-6 8h12l-6-8z" />
+            </svg>
+            Wine Selection
+          </h3>
+          <div class="space-y-1.5">
+            <div class="flex justify-between items-center">
+              <span class="font-cormorant text-charcoal text-xs">Châteauneuf-du-Pape</span>
+              <span class="font-montserrat text-wine text-[10px]">$75</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="font-cormorant text-charcoal text-xs">Chablis Premier Cru</span>
+              <span class="font-montserrat text-wine text-[10px]">$65</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="font-cormorant text-charcoal text-xs">Champagne Brut</span>
+              <span class="font-montserrat text-wine text-[10px]">$85</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Wine GIF & Video Row -->
+        <div class="grid grid-cols-2 gap-2 h-20">
+          <!-- Wine Pouring GIF -->
+          <div class="rounded-lg overflow-hidden shadow-md relative">
+            <img src="https://media.giphy.com/media/3o7TKUZfJKUKuSWTZe/giphy.gif" alt="Wine Pouring"
+              class="w-full h-full object-cover" />
+            <div
+              class="absolute top-1 right-1 bg-wine text-white text-[7px] px-1.5 py-0.5 rounded font-montserrat font-medium gif-badge">
+              GIF</div>
+          </div>
+          <!-- Wine Video -->
+          <div class="rounded-lg overflow-hidden shadow-md relative">
+            <video class="w-full h-full object-cover" muted loop autoplay playsinline>
+              <source src="https://www.pexels.com/download/video/20325482/" type="video/mp4">
+            </video>
+          </div>
+        </div>
+
+        <!-- Contact & Hours -->
+        <div class="bg-charcoal rounded-lg p-3 mt-auto">
+          <h3 class="font-playfair text-gold text-xs font-semibold mb-2">Reservations</h3>
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-2">
+              <svg class="w-3 h-3 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              </svg>
+              <span class="font-montserrat text-cream text-[9px]">(555) 123-4567</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <svg class="w-3 h-3 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span class="font-montserrat text-cream text-[9px]">123 Rue de Paris, NYC</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <svg class="w-3 h-3 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span class="font-montserrat text-cream text-[9px]">Tue-Sun 5PM - 11PM</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <svg class="w-3 h-3 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span class="font-montserrat text-cream text-[9px]">reserve@lamaisondor.com</span>
+            </div>
+          </div>
+
+          <!-- Social -->
+          <div class="flex gap-2 mt-2 pt-2 border-t border-gold/20">
+            <a href="#" class="w-5 h-5 bg-gold/20 rounded flex items-center justify-center hover:bg-gold/30 transition">
+              <svg class="w-2.5 h-2.5 text-gold" fill="currentColor" viewBox="0 0 24 24">
+                <path
+                  d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073z" />
+                <circle cx="12" cy="12" r="3.5" />
+              </svg>
+            </a>
+            <a href="#" class="w-5 h-5 bg-gold/20 rounded flex items-center justify-center hover:bg-gold/30 transition">
+              <svg class="w-2.5 h-2.5 text-gold" fill="currentColor" viewBox="0 0 24 24">
+                <path
+                  d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" />
+              </svg>
+            </a>
+            <a href="#" class="w-5 h-5 bg-gold/20 rounded flex items-center justify-center hover:bg-gold/30 transition">
+              <svg class="w-2.5 h-2.5 text-gold" fill="currentColor" viewBox="0 0 24 24">
+                <path
+                  d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z" />
+              </svg>
+            </a>
+            <a href="#" class="w-5 h-5 bg-gold/20 rounded flex items-center justify-center hover:bg-gold/30 transition">
+              <svg class="w-2.5 h-2.5 text-gold" fill="currentColor" viewBox="0 0 24 24">
+                <path
+                  d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" />
+              </svg>
+            </a>
+          </div>
+
+          <!-- QR Code -->
+          <div class="mt-2 pt-2 border-t border-gold/20 flex items-center gap-2">
+            <div class="w-10 h-10 bg-white rounded p-1">
+              <svg class="w-full h-full text-charcoal" viewBox="0 0 100 100">
+                <rect x="10" y="10" width="30" height="30" fill="currentColor" />
+                <rect x="60" y="10" width="30" height="30" fill="currentColor" />
+                <rect x="10" y="60" width="30" height="30" fill="currentColor" />
+                <rect x="20" y="20" width="10" height="10" fill="white" />
+                <rect x="70" y="20" width="10" height="10" fill="white" />
+                <rect x="20" y="70" width="10" height="10" fill="white" />
+                <rect x="50" y="50" width="10" height="10" fill="currentColor" />
+                <rect x="70" y="50" width="10" height="10" fill="currentColor" />
+                <rect x="50" y="70" width="10" height="10" fill="currentColor" />
+                <rect x="70" y="70" width="20" height="20" fill="currentColor" />
+              </svg>
+            </div>
+            <div>
+              <p class="font-montserrat text-cream text-[8px]">Scan to visit</p>
+              <p class="font-cormorant text-gold text-[10px] italic">www.lamaisondor.com</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

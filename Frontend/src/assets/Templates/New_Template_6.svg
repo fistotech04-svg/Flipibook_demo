@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 842">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8f4ee"/>
+      <stop offset="100%" stop-color="#e9f0ea"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#24463a"/>
+      <stop offset="100%" stop-color="#6d927f"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#1b2c24" flood-opacity=".15"/>
+    </filter>
+    <style>
+      .poppins { font-family: Poppins, Arial, Helvetica, sans-serif; }
+    </style>
+  </defs>
+
+  <!-- Original custom layout -->
+  <rect width="595" height="842" fill="url(#bg)"/>
+  <circle cx="550" cy="115" r="145" fill="#d9e6dc"/>
+  <circle cx="42" cy="735" r="130" fill="#f0ddc5"/>
+
+  <!-- Header -->
+  <text x="48" y="58" class="poppins" font-size="14" font-weight="500" fill="#24463a" letter-spacing="4">STUDIO EDITION</text>
+  <line x1="48" y1="78" x2="547" y2="78" stroke="#24463a" stroke-width="1" opacity=".35"/>
+
+  <!-- Main title -->
+  <text x="48" y="165" class="poppins" font-size="54" font-weight="300" fill="#18352a" letter-spacing="-1">CREATE</text>
+  <text x="48" y="220" class="poppins" font-size="54" font-weight="600" fill="#18352a" letter-spacing="-1">WITHOUT LIMITS</text>
+  <text x="50" y="257" class="poppins" font-size="15" font-weight="300" fill="#587065">
+    A fresh visual system for ideas, products and stories.
+  </text>
+
+  <!-- Abstract artwork card -->
+  <g filter="url(#shadow)">
+    <rect x="48" y="302" width="499" height="338" rx="28" fill="#18352a"/>
+    <rect x="72" y="326" width="451" height="290" rx="20" fill="#f8f4ee"/>
+  </g>
+
+  <!-- Original vector illustration -->
+  <circle cx="180" cy="470" r="92" fill="#dce8dd"/>
+  <path d="M116 498 C140 410, 210 390, 270 425 C323 456, 321 535, 258 558 C200 580, 145 556, 116 498Z" fill="url(#accent)"/>
+  <path d="M147 470 C178 430, 225 430, 258 460 C279 480, 276 518, 247 533 C211 551, 167 527, 147 470Z" fill="#f4b978"/>
+  <circle cx="231" cy="455" r="17" fill="#f8f4ee"/>
+  <path d="M182 505 L244 438" stroke="#18352a" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Geometric panels -->
+  <rect x="315" y="365" width="156" height="54" rx="27" fill="#18352a"/>
+  <text x="393" y="399" text-anchor="middle" class="poppins" font-size="13" font-weight="500" fill="#ffffff" letter-spacing="2">DESIGN</text>
+
+  <rect x="315" y="437" width="156" height="54" rx="27" fill="#dce8dd"/>
+  <text x="393" y="471" text-anchor="middle" class="poppins" font-size="13" font-weight="500" fill="#18352a" letter-spacing="2">EXPLORE</text>
+
+  <rect x="315" y="509" width="156" height="54" rx="27" fill="#f4b978"/>
+  <text x="393" y="543" text-anchor="middle" class="poppins" font-size="13" font-weight="500" fill="#18352a" letter-spacing="2">EVOLVE</text>
+
+  <!-- Bottom content -->
+  <text x="48" y="705" class="poppins" font-size="12" font-weight="500" fill="#6d927f" letter-spacing="3">01 — CREATIVE DIRECTION</text>
+  <text x="48" y="751" class="poppins" font-size="28" font-weight="300" fill="#18352a">Made for modern thinking.</text>
+
+  <g transform="translate(488 704)">
+    <circle cx="28" cy="28" r="28" fill="#18352a"/>
+    <path d="M18 28 H37 M31 21 L38 28 L31 35" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <text x="48" y="805" class="poppins" font-size="10" font-weight="400" fill="#6d7e74" letter-spacing="1.8">ORIGINAL VECTOR TEMPLATE • 2026</text>
+</svg>

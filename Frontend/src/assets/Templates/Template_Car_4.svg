@@ -1,0 +1,29 @@
+<svg width="595" height="842" viewBox="0 0 595 842" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_1021_53)">
+<rect width="595" height="842" fill="url(#paint0_linear_1021_53)"/>
+<foreignObject x="207.9" y="561.9" width="402.2" height="295.2"><div xmlns="http://www.w3.org/1999/xhtml" style="backdrop-filter:blur(7.55px);clip-path:url(#bgblur_1_1021_53_clip_path);height:100%;width:100%"></div></foreignObject><rect data-figma-bg-blur-radius="15.1" x="223" y="577" width="372" height="265" fill="white" fill-opacity="0.9"/>
+<path d="M314 652C314 651.081 313.819 650.17 313.467 649.321C313.115 648.472 312.6 647.7 311.95 647.05C311.3 646.4 310.528 645.885 309.679 645.533C308.83 645.181 307.919 645 307 645C306.081 645 305.17 645.181 304.321 645.533C303.472 645.885 302.7 646.4 302.05 647.05C301.4 647.7 300.885 648.472 300.533 649.321C300.181 650.17 300 651.081 300 652C300 653.387 300.409 654.677 301.105 655.765H301.097L307 665L312.903 655.765H312.896C313.617 654.642 314 653.335 314 652ZM307 655C306.204 655 305.441 654.684 304.879 654.121C304.316 653.559 304 652.796 304 652C304 651.204 304.316 650.441 304.879 649.879C305.441 649.316 306.204 649 307 649C307.796 649 308.559 649.316 309.121 649.879C309.684 650.441 310 651.204 310 652C310 652.796 309.684 653.559 309.121 654.121C308.559 654.684 307.796 655 307 655Z" fill="black"/>
+<text fill="black" style="white-space: pre" xml:space="preserve" font-family="Nunito Sans" font-size="16" font-weight="600" letter-spacing="0em"><tspan x="335" y="659.764">Location :</tspan></text>
+<text fill="black" style="white-space: pre" xml:space="preserve" font-family="Nunito Sans" font-size="10" font-weight="300" letter-spacing="0em"><tspan x="335" y="680.29">1234 Elm Street, Green Valley Heights,&#x2028;</tspan><tspan x="335" y="694.29">Springfield &#x2013; 56789, Country</tspan></text>
+<path d="M314.998 725H316.998C316.998 719.87 313.125 716.001 307.988 716.001V718.001C312.05 718.001 314.998 720.944 314.998 725Z" fill="black"/>
+<path d="M308 722.001C310.103 722.001 311 722.898 311 725.001H313C313 721.776 311.225 720.001 308 720.001V722.001ZM311.422 727.444C311.23 727.269 310.978 727.176 310.718 727.184C310.458 727.192 310.212 727.3 310.031 727.487L307.638 729.948C307.062 729.838 305.904 729.477 304.712 728.288C303.52 727.095 303.159 725.934 303.052 725.362L305.511 722.968C305.698 722.787 305.806 722.541 305.814 722.281C305.822 722.021 305.729 721.769 305.554 721.577L301.859 717.514C301.684 717.321 301.441 717.204 301.181 717.188C300.922 717.172 300.666 717.258 300.468 717.427L298.298 719.288C298.125 719.461 298.022 719.692 298.008 719.937C297.993 720.187 297.707 726.109 302.299 730.703C306.305 734.708 311.323 735.001 312.705 735.001C312.907 735.001 313.031 734.995 313.064 734.993C313.309 734.978 313.539 734.875 313.712 734.702L315.572 732.531C315.742 732.333 315.828 732.078 315.812 731.818C315.795 731.558 315.679 731.315 315.486 731.14L311.422 727.444Z" fill="black"/>
+<text fill="black" style="white-space: pre" xml:space="preserve" font-family="Nunito Sans" font-size="16" font-weight="600" letter-spacing="0em"><tspan x="335" y="730.764">Phone Number :</tspan></text>
+<text fill="black" style="white-space: pre" xml:space="preserve" font-family="Nunito Sans" font-size="10" font-weight="300" letter-spacing="0em"><tspan x="335" y="751.29">(555) 123-4567 | (555) 987-6543</tspan></text>
+<path d="M299 790.999C298.45 790.999 297.979 790.804 297.588 790.412C297.197 790.021 297.001 789.55 297 788.999V776.999C297 776.449 297.196 775.979 297.588 775.587C297.98 775.196 298.451 775 299 774.999H315C315.55 774.999 316.021 775.195 316.413 775.587C316.805 775.979 317.001 776.45 317 776.999V788.999C317 789.549 316.804 790.02 316.413 790.412C316.022 790.804 315.551 791 315 790.999H299ZM307 783.999L315 778.999V776.999L307 781.999L299 776.999V778.999L307 783.999Z" fill="black"/>
+<text fill="black" style="white-space: pre" xml:space="preserve" font-family="Nunito Sans" font-size="16" font-weight="600" letter-spacing="0em"><tspan x="335" y="787.764">Email Address :</tspan></text>
+<text fill="black" style="white-space: pre" xml:space="preserve" font-family="Nunito Sans" font-size="10" font-weight="300" letter-spacing="0em"><tspan x="335" y="808.29">contact@yourcompany.com</tspan></text>
+<rect x="256" y="610" width="341" height="238" stroke="#8A0307" stroke-width="2"/>
+<text fill="white" style="white-space: pre" xml:space="preserve" font-family="Impact" font-size="32" letter-spacing="0.04em"><tspan x="80" y="110.766">CONTACT US</tspan></text>
+<text fill="white" style="white-space: pre" xml:space="preserve" font-family="Nunito Sans" font-size="14" letter-spacing="0.04em"><tspan x="80" y="147.106">We&#x2019;re always happy to hear from you. </tspan><tspan x="80" y="168.106">If you have any questions about our </tspan><tspan x="80" y="189.106">products, need help with your order, or </tspan><tspan x="80" y="210.106">would like more information about our </tspan><tspan x="80" y="231.106">traditional preparation methods, </tspan><tspan x="80" y="252.106">please feel free to contact us using the </tspan><tspan x="80" y="273.106">details below.</tspan></text>
+</g>
+<defs>
+<clipPath id="bgblur_1_1021_53_clip_path" transform="translate(-207.9 -561.9)"><rect x="223" y="577" width="372" height="265"/>
+</clipPath><linearGradient id="paint0_linear_1021_53" x1="22" y1="215" x2="573" y2="627" gradientUnits="userSpaceOnUse">
+<stop stop-color="#C73538"/>
+<stop offset="1" stop-color="#8A0307"/>
+</linearGradient>
+<clipPath id="clip0_1021_53">
+<rect width="595" height="842" fill="white"/>
+</clipPath>
+</defs>
+</svg>

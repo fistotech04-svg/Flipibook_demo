@@ -1,0 +1,587 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Custom Scrollbar Global */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 100px;
+  border: 2px solid #f8fafc;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Precise Custom Scrollbar for small UI elements */
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px !important;
+  height: 4px !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #E5E7EB !important;
+  border-radius: 8px !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #4B5563 !important;
+  border-radius: 8px !important;
+  border: none !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #374151 !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:active {
+  background: #111827 !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Ensure text inside contentEditable boxes and scrollable features wrap correctly */
+.text-edit-box,
+[contenteditable="true"],
+[data-scrollable="true"],
+foreignObject div {
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  word-break: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+foreignObject {
+  overflow: visible !important;
+  clip-path: none !important;
+}
+
+foreignObject html,
+foreignObject body {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background-color: transparent !important;
+  overflow: hidden !important;
+}
+
+foreignObject * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  clip-path: none !important;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+foreignObject[data-editing="true"]>div {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  resize: none !important;
+}
+
+foreignObject[data-editing="true"]>div * {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Scrollbar styling for text boxes in the editor to match the preview style */
+.flipbook-text-scrollbar::-webkit-scrollbar,
+[data-scrollable="true"]::-webkit-scrollbar,
+[data-scrollable="true"] *::-webkit-scrollbar {
+  width: 14px !important;
+  height: 14px !important;
+  background: transparent !important;
+}
+
+.flipbook-text-scrollbar::-webkit-scrollbar-track,
+[data-scrollable="true"]::-webkit-scrollbar-track,
+[data-scrollable="true"] *::-webkit-scrollbar-track {
+  background-color: #e5e7eb !important; /* Slightly darker gray */
+  border-radius: 20px !important;
+  border: 3px solid transparent !important;
+  background-clip: padding-box !important;
+}
+
+.flipbook-text-scrollbar::-webkit-scrollbar-thumb,
+[data-scrollable="true"]::-webkit-scrollbar-thumb,
+[data-scrollable="true"] *::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-color, #4B5563) !important;
+  border-radius: 20px !important;
+  border: 3px solid transparent !important;
+  background-clip: padding-box !important;
+}
+
+.flipbook-text-scrollbar::-webkit-scrollbar-thumb:hover,
+[data-scrollable="true"]::-webkit-scrollbar-thumb:hover,
+[data-scrollable="true"] *::-webkit-scrollbar-thumb:hover {
+  background: #333333 !important;
+  border-radius: 20px !important;
+  border: 4px solid transparent !important;
+  background-clip: padding-box !important;
+}
+
+.flipbook-text-scrollbar::-webkit-scrollbar-thumb:active,
+[data-scrollable="true"]::-webkit-scrollbar-thumb:active,
+[data-scrollable="true"] *::-webkit-scrollbar-thumb:active {
+  background: #000000 !important;
+  border-radius: 20px !important;
+  border: 4px solid transparent !important;
+  background-clip: padding-box !important;
+}
+
+foreignObject:not([data-scrollable="true"]):not([data-editing="true"])>div {
+  width: 100% !important;
+  height: auto !important;
+}
+
+/* Force fixed mode text boxes to always align to the top, overriding any legacy inline flex styles */
+foreignObject[data-sizing-mode="fixed"]>div {
+  display: block !important;
+}
+
+.flipbook-text-outer,
+foreignObject[data-scrollable="true"]>div.flipbook-text-outer {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  box-sizing: border-box !important;
+  padding: 3% 2% 3% 3% !important; /* Padding scales with element size */
+  background-color: var(--bg-fill, #ffffff) !important;
+  border: calc(var(--bg-stroke-width, 2) * 1px) solid var(--bg-stroke, #d1d5db) !important;
+  border-radius: var(--bg-rx, 16px) !important;
+  position: relative;
+  overflow: hidden !important; /* Prevent viewport rounding issues */
+}
+
+.flipbook-text-viewport {
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  position: relative;
+}
+
+.flipbook-text-viewport::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 14px; /* Avoid overlapping the scrollbar */
+  height: 24px;
+  background: linear-gradient(to top, rgba(0,0,0,0.15), transparent);
+  pointer-events: none;
+  z-index: 10;
+  border-bottom-left-radius: var(--bg-rx, 16px);
+  border-bottom-right-radius: var(--bg-rx, 16px);
+}
+
+.flipbook-text-scrollbar {
+  width: 100% !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  display: block !important;
+  box-sizing: border-box !important;
+}
+
+/* Allow dragging of scrollable text boxes in editor by ignoring pointer events when not editing */
+.page-svg-container foreignObject[data-scrollable="true"]:not([data-editing="true"])>div {
+  pointer-events: none !important;
+}
+
+/* Removed duplicate scrollbar styles (now consolidated with high specificity above) */
+
+/* Firefox Fallback */
+@-moz-document url-prefix() {
+
+  .custom-scrollbar,
+  .flipbook-text-scrollbar {
+    scrollbar-width: thin !important;
+    scrollbar-color: var(--scrollbar-color, #4B5563) #E5E7EB !important;
+  }
+}
+
+foreignObject video {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  border: none !important;
+  outline: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  pointer-events: auto !important;
+}
+
+foreignObject iframe {
+  display: block !important;
+  border: none !important;
+  outline: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  pointer-events: auto !important;
+  transform-origin: 0 0 !important;
+}
+
+foreignObject[data-type="video"] {
+  overflow: hidden !important;
+  pointer-events: auto !important;
+}
+foreignObject[data-type="video"] * {
+  pointer-events: auto !important;
+}
+
+.hide-controls::-webkit-media-controls {
+  opacity: 0;
+  pointer-events: none;
+}
+
+video.hide-controls:hover::-webkit-media-controls {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 0.2s ease;
+}
+
+/* Hide Spin Buttons for Number Input */
+.no-spin::-webkit-inner-spin-button,
+.no-spin::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.no-spin {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* 3D Page Flip Utilities */
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+.perspective-3000 {
+  perspective: 3000px;
+}
+
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+/* Fix for flipbook dragging over iframes */
+.fbe-is-dragging iframe {
+  pointer-events: none !important;
+}
+
+/* Custom Fonts Loading */
+@font-face {
+  font-family: 'Designer_Signature';
+  src: url('/lib/Fonts/designer_signature/Designer_Signature.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  src: url('/lib/Fonts/Open_Sans/OpenSans-VariableFont_wdth,wght.ttf') format('truetype');
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lato';
+  src: url('/lib/Fonts/Lato/Lato-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Oswald';
+  src: url('/lib/Fonts/Oswald/Oswald-VariableFont_wght.ttf') format('truetype');
+  font-weight: 200 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Merriweather';
+  src: url('/lib/Fonts/Merriweather/Merriweather-VariableFont_opsz,wdth,wght.ttf') format('truetype');
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('/lib/Fonts/Poppins/Poppins-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('/lib/Fonts/Poppins/Poppins-Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('/lib/Fonts/Poppins/Poppins-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('/lib/Fonts/Poppins/Poppins-BoldItalic.ttf') format('truetype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Public Sans';
+  src: url('/lib/Fonts/Public_Sans/PublicSans-VariableFont_wght.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Public Sans';
+  src: url('/lib/Fonts/Public_Sans/PublicSans-Italic-VariableFont_wght.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lora';
+  src: url('/lib/Fonts/Lora/Lora-VariableFont_wght.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lora';
+  src: url('/lib/Fonts/Lora/Lora-Italic-VariableFont_wght.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cabin';
+  src: url('/lib/Fonts/Cabin/Cabin-VariableFont_wdth,wght.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cabin';
+  src: url('/lib/Fonts/Cabin/Cabin-Italic-VariableFont_wdth,wght.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Allura';
+  src: url('/lib/Fonts/Allura/Allura-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Parisienne';
+  src: url('/lib/Fonts/Parisienne/Parisienne-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Satisfy';
+  src: url('/lib/Fonts/Satisfy/Satisfy-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* ── Google Docs-style Spell & Grammar Checker Styles ── */
+.grammar-issue-word {
+  display: inline !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  color: inherit !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  cursor: pointer !important;
+  text-decoration-skip-ink: none;
+  white-space: inherit !important;
+}
+
+.grammar-issue-word.issue-spelling {
+  text-decoration: underline wavy #ea4335 !important;
+  text-decoration-thickness: 1.5px !important;
+  text-underline-offset: 3px !important;
+}
+
+.grammar-issue-word.issue-grammar {
+  text-decoration: underline wavy #1a73e8 !important;
+  text-decoration-thickness: 1.5px !important;
+  text-underline-offset: 3px !important;
+}
+
+.grammar-suggestion-popup {
+  position: fixed;
+  z-index: 999999;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #202124;
+  overflow: hidden;
+  min-width: 170px;
+  max-width: 280px;
+  pointer-events: auto;
+  user-select: none;
+  animation: docsPopupFadeIn 0.15s ease-out;
+}
+
+@keyframes docsPopupFadeIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.grammar-suggestion-header {
+  padding: 6px 12px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #f1f3f4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #5f6368;
+}
+
+.grammar-suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1a73e8;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.grammar-suggestion-item:hover {
+  background: #e8f0fe;
+}
+
+.grammar-suggestion-item .suggestion-action-label {
+  font-size: 10px;
+  color: #5f6368;
+  font-weight: 400;
+  margin-left: 8px;
+}
+
+.grammar-suggestion-footer {
+  padding: 6px 12px;
+  border-top: 1px solid #f1f3f4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.grammar-suggestion-ignore {
+  font-size: 11px;
+  color: #5f6368;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  transition: background 0.12s, color 0.12s;
+}
+
+.grammar-suggestion-ignore:hover {
+  background: #f1f3f4;
+  color: #202124;
+}
+
