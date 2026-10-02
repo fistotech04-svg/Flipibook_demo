@@ -2902,17 +2902,20 @@ const MainEditor = ({
       const centerY = e.detail.dropPoint ? e.detail.dropPoint.y : (svgH / 2);
 
       // Unique ID
-      const newId = `icon-${Date.now()}`;
+      const newId = e.detail.isShape ? `shape-${Date.now()}` : `icon-${Date.now()}`;
 
       // Create element
       const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       g.id = newId;
-      g.setAttribute('data-type', 'icon');
+      g.setAttribute('data-type', e.detail.isShape ? 'shape' : 'icon');
+      if (e.detail.isShape) {
+        g.setAttribute('data-shape-type', 'shape');
+      }
       // Place centered. Icon path is 24x24. Scaled by 0.5 = 12x12. Offset by -6 to truly center.
       g.setAttribute('transform', `translate(${centerX - 6}, ${centerY - 6}) scale(0.5)`);
-      g.setAttribute('fill', 'none');
-      g.setAttribute('stroke', '#000000');
-      g.setAttribute('stroke-width', '1');
+      g.setAttribute('fill', icon.fill !== undefined ? icon.fill : 'none');
+      g.setAttribute('stroke', icon.stroke !== undefined ? icon.stroke : '#000000');
+      g.setAttribute('stroke-width', icon.strokeWidth !== undefined ? icon.strokeWidth : '1');
       if (icon.Component) {
         // If it's a lucide icon component, we can't easily render it to a string here 
         // without react-dom/server or similar. 
@@ -13484,18 +13487,6 @@ const MainEditor = ({
                 </div>
               </div>
 
-              {/* Elements Tool */}
-              <div className="relative group/tool flex items-center">
-                <button
-                  onClick={() => setActiveTopTool('element')}
-                  className={`w-[2.1vw] h-[2.1vw] cursor-pointer rounded-[0.4vw] flex items-center justify-center transition-all ${activeTopTool === 'element' ? 'bg-[#000000] text-white' : 'hover:bg-white text-[#9EA1A7] hover:text-[#111827]'}`}
-                >
-                  <Icon icon="mynaui:component" width="1.2vw" height="1.2vw" />
-                </button>
-                <div className="absolute right-[calc(100%+0.6vw)] top-1/2 -translate-y-1/2 px-[0.6vw] py-[0.3vh] bg-gray-900/90 text-white text-[0.7vw] font-medium rounded-[0.4vw] shadow-md whitespace-nowrap opacity-0 group-hover/tool:opacity-100 transition-opacity duration-150 pointer-events-none z-50">
-                  Element
-                </div>
-              </div>
             </div>
           </div>
         )}
@@ -14013,23 +14004,41 @@ const MainEditor = ({
                 )}
               </div>
 
-              {/* Grid Tool Row */}
-              <div className="flex items-center justify-start gap-[0.3vw] cursor-pointer relative group/tool">
+              {/* Icons Tool Row */}
+              <div className="flex items-center justify-start gap-[0.3vw] mb-[0.8vh] cursor-pointer relative group/tool">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setActiveMainTool('grid');
                     closeAllDropdowns();
                   }}
-                  className={`w-[2.1vw] h-[2.1vw] flex items-center justify-center rounded-[0.4vw] transition-all cursor-pointer ${activeMainTool === 'grid' ? 'bg-[#FFFFFF] shadow-sm' : 'hover:bg-white/50'}`}
+                  className={`w-[2.1vw] h-[2.1vw] flex items-center justify-center rounded-[0.4vw] transition-all cursor-pointer ${activeMainTool === 'grid' ? 'bg-[#111827] text-white shadow-sm' : 'hover:bg-white/50 text-[#111827]'}`}
                 >
-                  <Icon icon="tabler:icons" width="1.2vw" height="1.2vw" className="text-[#111827]" />
+                  <Icon icon="tabler:icons" width="1.2vw" height="1.2vw" />
                 </button>
                 <div className="w-[0.7vw]"></div> {/* Alignment spacer */}
                 <div className="absolute right-[calc(100%+0.6vw)] top-1/2 -translate-y-1/2 px-[0.6vw] py-[0.3vh] bg-gray-900/90 text-white text-[0.7vw] font-medium rounded-[0.4vw] shadow-md whitespace-nowrap opacity-0 group-hover/tool:opacity-100 transition-opacity duration-150 pointer-events-none z-50">
-                  Elements & Icons
+                  Icons
                 </div>
               </div>
+              {/* Element Tool Row */}
+              <div className="flex items-center justify-start gap-[0.3vw] mb-[0.8vh] cursor-pointer relative group/tool">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveMainTool('element');
+                    closeAllDropdowns();
+                  }}
+                  className={`w-[2.1vw] h-[2.1vw] flex items-center justify-center rounded-[0.4vw] transition-all cursor-pointer ${activeMainTool === 'element' ? 'bg-[#111827] text-white shadow-sm' : 'hover:bg-white/50 text-[#111827]'}`}
+                >
+                  <Icon icon="mynaui:component" width="1.2vw" height="1.2vw" />
+                </button>
+                <div className="w-[0.7vw]"></div> {/* Alignment spacer */}
+                <div className="absolute right-[calc(100%+0.6vw)] top-1/2 -translate-y-1/2 px-[0.6vw] py-[0.3vh] bg-gray-900/90 text-white text-[0.7vw] font-medium rounded-[0.4vw] shadow-md whitespace-nowrap opacity-0 group-hover/tool:opacity-100 transition-opacity duration-150 pointer-events-none z-50">
+                  Elements
+                </div>
+              </div>
+
             </div>
           </div>
         )}
@@ -14266,12 +14275,13 @@ const MainEditor = ({
                                         }
                                       }));
                                       setShowHotspotPopup(false);
-                                    } else if (data.type === 'icon') {
+                                    } else if (data.type === 'icon' || data.type === 'shape') {
                                       window.dispatchEvent(new CustomEvent('add-icon-to-editor', {
                                         detail: {
                                           pageIndex: displayIndex,
                                           icon: data.icon,
-                                          dropPoint
+                                          dropPoint,
+                                          isShape: data.type === 'shape'
                                         }
                                       }));
                                     } else if (data.type === 'image' || data.type === 'upload' || data.url) {

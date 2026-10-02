@@ -3881,6 +3881,10 @@ const TemplateEditor = () => {
                   }
                 });
               }
+              if ((attr === 'rx' || attr === 'ry') && element.getAttribute('data-type') === 'shape') {
+                const rects = element.querySelectorAll('rect');
+                rects.forEach(r => r.setAttribute(attr, val));
+              }
             }
             if (attr === 'stroke-width' && val !== '0' && (element.getAttribute('stroke') === 'none' || !element.getAttribute('stroke'))) {
               element.setAttribute('stroke', '#000000');

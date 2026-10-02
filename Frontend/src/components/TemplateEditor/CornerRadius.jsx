@@ -40,13 +40,6 @@ const CornerRadius = ({
     }
     if (attr === 'data-corner-linked' && setIsRadiusLinked) {
       setIsRadiusLinked(value === 'true');
-      if (value === 'true' && setRadius) {
-        // Equalize all corners to the max radius when linking
-        setRadius(p => {
-          const maxR = Math.max(p.tl || 0, p.tr || 0, p.bl || 0, p.br || 0);
-          return { tl: maxR, tr: maxR, bl: maxR, br: maxR };
-        });
-      }
     }
   };
 
@@ -98,11 +91,7 @@ const CornerRadius = ({
                     const clamped = Math.max(0, newVal);
                     if (pseudoProps['data-corner-linked'] !== 'false') {
                       updateAttr('rx', clamped);
-                      updateAttr('ry', clamped);
-                      updateAttr('data-tl', clamped);
-                      updateAttr('data-tr', clamped);
-                      updateAttr('data-bl', clamped);
-                      updateAttr('data-br', clamped);
+
                     } else {
                       updateAttr(corner.key, clamped);
                     }
