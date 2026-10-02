@@ -122,7 +122,7 @@ const ShapeProperties = ({
     return Array.from(colors).slice(0, 12);
   }, [selectedElementProps, activePageIndex]);
 
-  const shapeType = selectedElementProps['data-shape-type'] || selectedElementProps.tagName?.toLowerCase();
+  const shapeType = selectedElementProps['data-shape-type'] || selectedElementProps.innerTagName || selectedElementProps.tagName?.toLowerCase();
 
   if (!selectedElementProps) return null;
 
@@ -485,7 +485,7 @@ const ShapeProperties = ({
         />
       </div>
 
-      {(shapeType === 'rect' || shapeType === 'rectangle' || shapeType === 'shape') && (
+      {(shapeType === 'rect' || shapeType === 'rectangle' || shapeType === 'shape' || selectedElementProps.innerTagName === 'rect') && (
         <CornerRadius
           openSubSection={openSubSection}
           setOpenSubSection={setOpenSubSection}

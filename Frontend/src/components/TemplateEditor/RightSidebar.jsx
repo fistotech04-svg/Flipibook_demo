@@ -771,6 +771,7 @@ const RightSidebar = ({
         if (el.tagName.toLowerCase() === 'g') {
            const innerShape = el.querySelector('path, polygon, rect, circle, ellipse, line');
            if (innerShape) {
+               props.innerTagName = innerShape.tagName.toLowerCase();
                Array.from(innerShape.attributes).forEach(attr => {
                  if (['data-shape-type', 'data-count', 'data-ratio', 'data-radius', 'data-cx', 'data-cy', 'data-rx', 'rx'].includes(attr.name)) {
                      props[attr.name] = attr.value;
