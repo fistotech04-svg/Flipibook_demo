@@ -12,6 +12,7 @@ import VideoEditor from './VideoEditor';
 import GifEditor from './Gif';
 import AnimationPanel from './AnimationPanel';
 import InteractionPanel from './InteractionPanel';
+import Elements from './Elements/Elements';
 import PopupTemplateSelection from './PopupTemplateSelection';
 import Model3DEditor from './Model3DEditor';
 import GroupProperties from './GroupProperties';
@@ -766,6 +767,18 @@ const RightSidebar = ({
           }
         });
 
+        // For shapes added as SVGs wrapped in a <g>, extract inner shape properties
+        if (el.tagName.toLowerCase() === 'g') {
+           const innerShape = el.querySelector('path, polygon, rect, circle, ellipse, line');
+           if (innerShape) {
+               Array.from(innerShape.attributes).forEach(attr => {
+                 if (['data-shape-type', 'data-count', 'data-ratio', 'data-radius', 'data-cx', 'data-cy', 'data-rx', 'rx'].includes(attr.name)) {
+                     props[attr.name] = attr.value;
+                 }
+               });
+           }
+        }
+
         // Add a flag for image detection
         const dataType = el.getAttribute('data-type');
         const dataName = el.getAttribute('data-name');
@@ -801,8 +814,9 @@ const RightSidebar = ({
         const isPdfBackground = lowerDataName.includes('pdf background') || lowerDataName.endsWith('-pdf') || lowerId.includes('background') || dataType === 'pdf-background';
 
         const isGif = isGifFile || lowerDataName.includes('gif') || lowerId.includes('gif') || el.getAttribute('data-is-gif-group') === 'true' || el.dataset?.mediaType === 'gif';
+        const isShape = dataType === 'shape' || el.getAttribute('data-shape-type') === 'shape';
 
-        const isUserGroup = lowerTagName === 'g' && (
+        const isUserGroup = lowerTagName === 'g' && !isShape && (
           dataType === 'group' ||
           lowerDataName === 'group' ||
           lowerId.startsWith('group-') ||
@@ -821,7 +835,7 @@ const RightSidebar = ({
 
         const isVideo = lowerTagName === 'video' || lowerTagName === 'iframe' || dataType === 'video' || lowerDataName.includes('video') || lowerId.includes('video') || (lowerTagName === 'foreignobject' && el.querySelector('video, iframe'));
         const isText = (lowerTagName === 'text' || lowerTagName === 'tspan' || (lowerTagName === 'foreignobject' && !isVideo)) || dataType === 'text' || lowerDataName.includes('text') || lowerId.includes('text');
-        const isIcon = dataType === 'icon' || dataType === 'hotspot' || lowerDataName.includes('icon') || lowerDataName.includes('hotspot') || lowerId.includes('icon') || lowerId.includes('hotspot') || lowerTagName.includes('lucide') || el.classList.contains('lucide') || el.classList.contains('iconify');
+        const isIcon = (dataType === 'icon' || dataType === 'hotspot' || lowerDataName.includes('icon') || lowerDataName.includes('hotspot') || lowerId.includes('icon') || lowerId.includes('hotspot') || lowerTagName.includes('lucide') || el.classList.contains('lucide') || el.classList.contains('iconify')) && !isShape;
 
         props.isUserGroup = isUserGroup;
         props.isImage = isImage;
@@ -829,6 +843,7 @@ const RightSidebar = ({
         props.isVideo = isVideo;
         props.isGif = isGif;
         props.isIcon = isIcon;
+        props.isShape = isShape;
         props.isPdfBackground = isPdfBackground;
 
         return props;
@@ -1228,6 +1243,10 @@ const RightSidebar = ({
                   </p>
                 </div>
               </div>
+            </div>
+          ) : activeMainTool === 'element' ? (
+            <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar p-[1.5vw]">
+              <Elements />
             </div>
           ) : (
             <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar">
@@ -1668,7 +1687,6 @@ const RightSidebar = ({
             folderName={effectiveFolder}
             flipbookName={effectiveBook}
           />
-
         ) : (
           /* Animation Mode */
           <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar p-[1.5vw]">

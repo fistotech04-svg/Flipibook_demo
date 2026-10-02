@@ -229,7 +229,20 @@ const ShapeProperties = ({
   };
 
   const handleSetIsRadiusLinked = (val) => {
-    updateElementAttribute(activePageIndex, selectedLayerId, 'data-corner-linked', val ? 'true' : 'false');
+    if (val) {
+      const maxR = Math.max(radius.tl || 0, radius.tr || 0, radius.bl || 0, radius.br || 0);
+      updateElementAttribute(activePageIndex, selectedLayerId, {
+        'data-corner-linked': 'true',
+        'data-tl': maxR.toString(),
+        'data-tr': maxR.toString(),
+        'data-bl': maxR.toString(),
+        'data-br': maxR.toString(),
+        'rx': maxR.toString(),
+        'ry': maxR.toString()
+      });
+    } else {
+      updateElementAttribute(activePageIndex, selectedLayerId, 'data-corner-linked', 'false');
+    }
   };
 
   const activeEffects = [];
@@ -472,7 +485,7 @@ const ShapeProperties = ({
         />
       </div>
 
-      {(shapeType === 'rect' || shapeType === 'rectangle') && (
+      {(shapeType === 'rect' || shapeType === 'rectangle' || shapeType === 'shape') && (
         <CornerRadius
           openSubSection={openSubSection}
           setOpenSubSection={setOpenSubSection}

@@ -26,11 +26,13 @@ const Effect = ({
     'data-effect-drop-shadow-x': effectSettings?.['Drop Shadow']?.x ?? 2,
     'data-effect-drop-shadow-y': effectSettings?.['Drop Shadow']?.y ?? 2,
     'data-effect-drop-shadow-blur': effectSettings?.['Drop Shadow']?.blur ?? (props.isShape ? 0 : 1),
+    'data-effect-drop-shadow-spread': effectSettings?.['Drop Shadow']?.spread ?? 0,
     'data-effect-inner-shadow-color': effectSettings?.['Inner Shadow']?.color ?? '#000000',
     'data-effect-inner-shadow-opacity': effectSettings?.['Inner Shadow']?.opacity ?? 35,
     'data-effect-inner-shadow-x': effectSettings?.['Inner Shadow']?.x ?? 2,
     'data-effect-inner-shadow-y': effectSettings?.['Inner Shadow']?.y ?? 2,
     'data-effect-inner-shadow-blur': effectSettings?.['Inner Shadow']?.blur ?? (props.isShape ? 0 : 1),
+    'data-effect-inner-shadow-spread': effectSettings?.['Inner Shadow']?.spread ?? 0,
     'data-effect-blur-value': effectSettings?.['Blur']?.blur ?? 0.3,
     'data-effect-blur-clip': effectSettings?.['Blur']?.clipContent ? 'true' : 'false',
   };
@@ -47,7 +49,8 @@ const Effect = ({
               opacity: 35,
               x: 2,
               y: 2,
-              blur: props.isShape ? 0 : 1
+              blur: props.isShape ? 0 : 1,
+              spread: 0
             }
           }));
         }
@@ -61,7 +64,8 @@ const Effect = ({
               opacity: 35,
               x: 2,
               y: 2,
-              blur: props.isShape ? 0 : 1
+              blur: props.isShape ? 0 : 1,
+              spread: 0
             }
           }));
         }
@@ -383,80 +387,23 @@ const Effect = ({
                   </div>
                 </div>
 
-                <div className="space-y-[0.5vw] pt-[0.5vw]">
-                  <div className="grid grid-cols-2 gap-x-[0.3vw] gap-y-[1vw]">
-                    {[
-                      { id: 'top', label: 'Top', baseId: 'y', factor: -1, default: 0 },
-                      { id: 'right', label: 'Right', baseId: 'x', factor: 1, default: 2 },
-                      { id: 'left', label: 'Left', baseId: 'x', factor: -1, default: 0 },
-                      { id: 'bottom', label: 'Bottom', baseId: 'y', factor: 1, default: 2 }
-                    ].map((row) => {
-                      let currentVal = pseudoProps[`data-effect-${activeEffectPopupId}-${row.baseId}`] ?? row.default;
-                      let displayVal = currentVal;
-
-                      if (row.id === 'top' || row.id === 'left') {
-                        displayVal = Math.max(0, -currentVal);
-                      } else if (row.id === 'bottom' || row.id === 'right') {
-                        displayVal = Math.max(0, currentVal);
-                      }
-
-                      const updateVal = (val) => {
-                        let numVal = parseInt(val);
-                        if (isNaN(numVal)) numVal = 0;
-                        numVal = Math.max(0, numVal);
-                        updateAttr(`data-effect-${activeEffectPopupId}-${row.baseId}`, (numVal * row.factor).toString());
-                      };
-
-                      return (
-                        <div key={row.id} className="flex items-center">
-                          <span
-                            className={`text-[0.8vw] font-medium text-gray-800 ${row.id === 'top' || row.id === 'left' ? 'w-[1.8vw]' : 'w-[2.8vw]'} flex-shrink-0 cursor-ew-resize select-none hover:text-indigo-600 transition-colors`}
-                            onPointerDown={(e) => {
-                              handleScrub(e, displayVal, updateVal);
-                            }}
-                          >{row.label}</span>
-                          <div className="flex items-center justify-center gap-[0.3vw]">
-                            <ChevronLeft
-                              size="1vw"
-                              className="text-gray-400 cursor-pointer hover:text-indigo-500 transition-colors flex-shrink-0"
-                              onClick={() => updateVal(displayVal - 1)}
-                            />
-                            <div
-                              className="w-[3.5vw] h-[2vw] min-w-[3vw] border border-gray-100 rounded-[0.4vw] flex items-center justify-center bg-gray-50/50 shadow-sm hover:border-indigo-200 transition-all cursor-ew-resize select-none"
-                              onPointerDown={(e) => {
-                                if (e.target.tagName === 'INPUT') return;
-                                handleScrubHelper(e, displayVal, updateVal);
-                              }}
-                            >
-                              <input
-                                type="number"
-                                value={displayVal}
-                                onChange={(e) => updateVal(e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-full text-center text-[0.8vw] font-semibold text-gray-800 outline-none no-spin bg-transparent cursor-text"
-                              />
-                            </div>
-                            <ChevronRight
-                              size="1vw"
-                              className="text-gray-400 cursor-pointer hover:text-indigo-500 transition-colors flex-shrink-0"
-                              onClick={() => updateVal(displayVal + 1)}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
+                <div className="space-y-[0.5vw]">
                   {[
-                    { id: 'blur', label: 'Blur % :', baseId: 'blur', factor: 1, default: 1 }
-                  ].map((row) => {
-                    let currentVal = pseudoProps[`data-effect-${activeEffectPopupId}-${row.baseId}`] ?? row.default;
+                    { id: 'x', label: 'X Axis :', default: 2 },
+                    { id: 'y', label: 'Y Axis :', default: 2 },
+                    { id: 'blur', label: 'Blur % :', default: 1, min: 0 },
+                    !(props.isText) ? { id: 'spread', label: 'Spread :', default: 0 } : null
+                  ].filter(Boolean).map((row) => {
+                    let currentVal = pseudoProps[`data-effect-${activeEffectPopupId}-${row.id}`] ?? row.default;
                     let displayVal = currentVal;
 
                     const updateVal = (val) => {
                       let numVal = parseInt(val);
                       if (isNaN(numVal)) numVal = 0;
-                      updateAttr(`data-effect-${activeEffectPopupId}-${row.baseId}`, (numVal * row.factor).toString());
+                      if (row.min !== undefined) {
+                        numVal = Math.max(row.min, numVal);
+                      }
+                      updateAttr(`data-effect-${activeEffectPopupId}-${row.id}`, numVal.toString());
                     };
 
                     return (
@@ -471,7 +418,7 @@ const Effect = ({
                           <ChevronLeft
                             size="1vw"
                             className="text-gray-400 cursor-pointer hover:text-indigo-500 transition-colors"
-                            onClick={() => updateVal(displayVal - 1)}
+                            onClick={() => updateVal(parseInt(displayVal) - 1)}
                           />
                           <div
                             className="w-[4.5vw] h-[2.2vw] border border-gray-100 rounded-[0.4vw] flex items-center justify-center bg-gray-50/50 shadow-sm hover:border-indigo-200 transition-all cursor-ew-resize select-none"
@@ -491,7 +438,7 @@ const Effect = ({
                           <ChevronRight
                             size="1vw"
                             className="text-gray-400 cursor-pointer hover:text-indigo-500 transition-colors"
-                            onClick={() => updateVal(displayVal + 1)}
+                            onClick={() => updateVal(parseInt(displayVal) + 1)}
                           />
                         </div>
                         <div className="w-[0.5vw]"></div>

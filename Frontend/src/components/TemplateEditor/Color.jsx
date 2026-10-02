@@ -330,7 +330,8 @@ const Color = ({
     const applyColorsToDOM = () => {
       const el = selectedElement;
       const isSvgEl = el.namespaceURI === "http://www.w3.org/2000/svg";
-      const isImage = el.tagName?.toLowerCase() === 'image' || el.tagName?.toLowerCase() === 'g';
+      const isShapeOrIcon = el.getAttribute('data-type') === 'shape' || el.getAttribute('data-shape-type') === 'shape' || el.getAttribute('data-type') === 'icon';
+      const isImage = el.tagName?.toLowerCase() === 'image' || (el.tagName?.toLowerCase() === 'g' && !isShapeOrIcon);
 
       // Apply Fill
       if (backgroundColor.fill !== 'transparent' && backgroundColor.fill !== 'none') {
@@ -630,7 +631,9 @@ const Color = ({
   useEffect(() => {
     if (openSubSection === 'color' && containerRef.current) {
       setTimeout(() => {
-        containerRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (containerRef.current) {
+          containerRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
       }, 350);
     }
   }, [openSubSection]);
