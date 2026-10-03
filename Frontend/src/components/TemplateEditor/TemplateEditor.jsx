@@ -71,10 +71,12 @@ const parseLayersFromSVG = (element) => {
         locked: child.getAttribute('data-locked') === 'true'
       };
 
-      // VIRTUAL EFFECT LAYERS FOR IMAGE/VIDEO/GIF GROUP
+      const isEmbedGroup = child.getAttribute('data-type') === 'embed-frame' || Array.from(child.children).some(c => c.getAttribute('data-type') === 'embed-frame');
+
       const isGroup = child.getAttribute('data-is-image-group') === 'true' ||
         child.getAttribute('data-is-video-group') === 'true' ||
-        child.getAttribute('data-is-gif-group') === 'true';
+        child.getAttribute('data-is-gif-group') === 'true' ||
+        isEmbedGroup;
 
       const isPdfVector = child.getAttribute('data-type') === 'pdf-vector-layer';
 
@@ -104,6 +106,9 @@ const parseLayersFromSVG = (element) => {
         } else if (child.getAttribute('data-is-gif-group') === 'true') {
           coreName = 'GIF';
           coreType = 'image';
+        } else if (isEmbedGroup) {
+          coreName = 'Embed Frame';
+          coreType = 'embed-frame';
         } else if (isText) {
           coreName = 'Text';
           coreType = 'text';
@@ -3443,6 +3448,10 @@ const TemplateEditor = () => {
 
     if (!hasDropShadow && !hasInnerShadow && !hasBlur && !hasBackgroundBlur) {
       element.removeAttribute('filter');
+      if (element.getAttribute('data-type') === 'embed-frame') {
+        const fillLayer = element.querySelector('.embed-fill-layer');
+        if (fillLayer) fillLayer.removeAttribute('filter');
+      }
       element.style.backdropFilter = '';
       return;
     }
@@ -3771,6 +3780,12 @@ const TemplateEditor = () => {
         inner.style.setProperty('filter', finalFilterUrl, 'important');
         element.removeAttribute('filter');
       }
+    } else if (element.getAttribute('data-type') === 'embed-frame') {
+      const fillLayer = element.querySelector('.embed-fill-layer');
+      if (fillLayer) {
+        fillLayer.setAttribute('filter', finalFilterUrl);
+      }
+      element.removeAttribute('filter');
     } else {
       element.setAttribute('filter', finalFilterUrl);
     }

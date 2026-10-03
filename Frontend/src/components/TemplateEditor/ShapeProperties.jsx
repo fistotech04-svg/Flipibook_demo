@@ -93,7 +93,8 @@ const ShapeProperties = ({
   activePageIndex,
   selectedLayerId,
   updateElementAttribute,
-  activeMainTool
+  activeMainTool,
+  hideCornerRadius = false
 }) => {
   const [openSubSection, setOpenSubSection] = useState('color');
 
@@ -485,7 +486,7 @@ const ShapeProperties = ({
         />
       </div>
 
-      {(shapeType === 'rect' || shapeType === 'rectangle' || shapeType === 'shape' || selectedElementProps.innerTagName === 'rect') && (
+      {!hideCornerRadius && (shapeType === 'rect' || shapeType === 'rectangle' || shapeType === 'shape' || selectedElementProps.innerTagName === 'rect') && (
         <CornerRadius
           openSubSection={openSubSection}
           setOpenSubSection={setOpenSubSection}

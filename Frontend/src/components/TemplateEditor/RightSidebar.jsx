@@ -16,6 +16,7 @@ import Elements from './Elements/Elements';
 import PopupTemplateSelection from './PopupTemplateSelection';
 import Model3DEditor from './Model3DEditor';
 import GroupProperties from './GroupProperties';
+import ThirdPartyEmbedProperties from './Elements/3rdPartyEmbedProperties';
 import ImportViaUrlModal from './ImportViaUrlModal';
 import ColorPicker, { parseGradient } from './ColorPicker';
 import MediaGalleryPopup from './MediaGalleryPopup';
@@ -837,6 +838,7 @@ const RightSidebar = ({
         const isVideo = lowerTagName === 'video' || lowerTagName === 'iframe' || dataType === 'video' || lowerDataName.includes('video') || lowerId.includes('video') || (lowerTagName === 'foreignobject' && el.querySelector('video, iframe'));
         const isText = (lowerTagName === 'text' || lowerTagName === 'tspan' || (lowerTagName === 'foreignobject' && !isVideo)) || dataType === 'text' || lowerDataName.includes('text') || lowerId.includes('text');
         const isIcon = (dataType === 'icon' || dataType === 'hotspot' || lowerDataName.includes('icon') || lowerDataName.includes('hotspot') || lowerId.includes('icon') || lowerId.includes('hotspot') || lowerTagName.includes('lucide') || el.classList.contains('lucide') || el.classList.contains('iconify')) && !isShape;
+        const isEmbed = dataType === 'embed-frame' || lowerDataName.includes('embed-frame') || lowerId.includes('embed-frame') || el.querySelector('[data-type="embed-frame"]') !== null;
 
         props.isUserGroup = isUserGroup;
         props.isImage = isImage;
@@ -845,6 +847,7 @@ const RightSidebar = ({
         props.isGif = isGif;
         props.isIcon = isIcon;
         props.isShape = isShape;
+        props.isEmbed = isEmbed;
         props.isPdfBackground = isPdfBackground;
 
         return props;
@@ -1271,7 +1274,19 @@ const RightSidebar = ({
                 <div className="flex flex-col p-[1.5vw] gap-[1.5vw]">
                   {(selectedElementProps || activeMainTool === 'grid') ? (
                     <div className="flex flex-col gap-[1.5vw]">
-                      {(selectedElementProps?.isUserGroup || (multiSelectedIds && multiSelectedIds.size > 1)) ? (
+                      {selectedElementProps?.isEmbed ? (
+                        <ThirdPartyEmbedProperties
+                          selectedElement={(() => {
+                            const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                            if (selectedLayerId) return editorDoc.getElementById(selectedLayerId);
+                            return null;
+                          })()}
+                          selectedLayerId={selectedLayerId}
+                          activePageIndex={activePageIndex}
+                          updateElementAttribute={updateElementAttribute}
+                          selectedElementProps={selectedElementProps}
+                        />
+                      ) : (selectedElementProps?.isUserGroup || (multiSelectedIds && multiSelectedIds.size > 1)) ? (
                         <GroupProperties
                           selectedElement={(() => {
                             const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
@@ -1458,6 +1473,17 @@ const RightSidebar = ({
                           flipbookName={effectiveBook}
                           flipbookVId={effectiveVId}
                           onDeleteLayer={() => deleteLayer?.(activePageIndex, selectedLayerId)}
+                        />
+                      ) : selectedElementProps?.isEmbed ? (
+                        <ThirdPartyEmbedProperties
+                          selectedElementProps={selectedElementProps}
+                          activePageIndex={activePageIndex}
+                          selectedLayerId={selectedLayerId}
+                          updateElementAttribute={updateElementAttribute}
+                          selectedElement={(() => {
+                            const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                            return editorDoc.getElementById(selectedLayerId);
+                          })()}
                         />
                       ) : selectedElementProps?.isGif ? (
                         <GifEditor
