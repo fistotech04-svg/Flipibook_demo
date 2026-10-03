@@ -41,7 +41,7 @@ const shapes = Object.keys(shapeModules).map(path => {
   const isPentagon = lowerName === 'pentagon';
   const isHexagon = lowerName === 'hexagon';
   const isPolygon = isTriangle || isPentagon || isHexagon;
-  const isRect = lowerName === 'rectangle' || lowerName === 'square' || lowerName === 'rounded rectangle';
+  const isRect = ['rectangle', 'square', 'rounded rectangle', 'pill', 'oval', 'minus'].includes(lowerName);
   
   if (isStar || isPolygon) {
     const shapeType = isStar ? 'star' : 'polygon';
@@ -51,7 +51,7 @@ const shapes = Object.keys(shapeModules).map(path => {
   } else if (isRect) {
     svgContent = svgContent.replace(/<rect/i, `<rect data-shape-type="rectangle"`);
   } else {
-    const isCircle = lowerName === 'circle' || lowerName === 'oval';
+    const isCircle = lowerName === 'circle';
     const isLine = lowerName.includes('line');
     const shapeType = isCircle ? 'ellipse' : (isLine ? 'line' : 'vector-path');
     svgContent = svgContent.replace(/<(path|circle|ellipse|line|polygon|polyline|rect)/i, `<$1 data-shape-type="${shapeType}"`);

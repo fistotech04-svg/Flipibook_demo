@@ -6121,8 +6121,9 @@ const MainEditor = ({
               const elName = el.getAttribute('data-name') || '';
               const elType = el.getAttribute('data-type') || '';
               const isLocked = el.getAttribute('data-locked') === 'true';
+              const isEmbedGroup = el.getAttribute('data-type') === 'embed-frame' || el.querySelector('[data-type="embed-frame"]') !== null;
 
-              if (!isLocked && !elName.includes('PDF Background') && !elName.includes('Overlay') && elType !== 'frame' && elType !== 'background' && el.parentNode !== svg) {
+              if (!isLocked && !isEmbedGroup && !elName.includes('PDF Background') && !elName.includes('Overlay') && elType !== 'frame' && elType !== 'background' && el.parentNode !== svg) {
                 groupsToUngroup.add(el);
               }
             }
@@ -7386,6 +7387,19 @@ const MainEditor = ({
         hotspotGroup.id = `hotspot-${Date.now()}`;
       }
       return hotspotGroup;
+    }
+
+    // Embed frames are single compound elements; drag the whole wrapper!
+    const embedFrame = current && typeof current.closest === 'function' ? current.closest('[data-type="embed-frame"]') : null;
+    if (embedFrame) {
+      const parentG = embedFrame.parentElement;
+      if (parentG && parentG.tagName?.toLowerCase() === 'g' && parentG.id) {
+        return parentG;
+      }
+      if (!embedFrame.id) {
+        embedFrame.id = `embed-frame-${Date.now()}`;
+      }
+      return embedFrame;
     }
 
     let deepestElementWithId = null;
@@ -14095,7 +14109,7 @@ const MainEditor = ({
                         const isTypeActive = activeMainTool === 'type';
 
                         const pageHtml = pages[displayIndex]?.html;
-                        const isPageEmpty = !pages[displayIndex]?.isHidden && (!pageHtml || (pages[displayIndex]?.layers?.length === 1 && (!pages[displayIndex].layers[0].children || pages[displayIndex].layers[0].children.length === 0)));
+                        const isPageEmpty = !pages[displayIndex]?.isHidden && (!pageHtml || (pages[displayIndex]?.layers?.length === 0) || (pages[displayIndex]?.layers?.length === 1 && (!pages[displayIndex].layers[0].children || pages[displayIndex].layers[0].children.length === 0) && !pages[displayIndex].layers[0].id?.includes('shape') && !pages[displayIndex].layers[0].id?.includes('video') && !pages[displayIndex].layers[0].id?.includes('image') && !pages[displayIndex].layers[0].id?.includes('embed')));
 
                         return (
                           <div
