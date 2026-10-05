@@ -17,6 +17,7 @@ import PopupTemplateSelection from './PopupTemplateSelection';
 import Model3DEditor from './Model3DEditor';
 import GroupProperties from './GroupProperties';
 import ThirdPartyEmbedProperties from './Elements/3rdPartyEmbedProperties';
+import AudioProperties from './Elements/AudioProperties';
 import ImportViaUrlModal from './ImportViaUrlModal';
 import ColorPicker, { parseGradient } from './ColorPicker';
 import MediaGalleryPopup from './MediaGalleryPopup';
@@ -816,9 +817,10 @@ const RightSidebar = ({
         const isPdfBackground = lowerDataName.includes('pdf background') || lowerDataName.endsWith('-pdf') || lowerId.includes('background') || dataType === 'pdf-background';
 
         const isGif = isGifFile || lowerDataName.includes('gif') || lowerId.includes('gif') || el.getAttribute('data-is-gif-group') === 'true' || el.dataset?.mediaType === 'gif';
+        const isAudio = dataType === 'audio' || dataType === 'audio-frame' || lowerDataName.includes('audio') || lowerId.includes('audio') || (el && el.querySelector && el.querySelector('[data-type="audio-frame"]') !== null);
         const isShape = dataType === 'shape' || el.getAttribute('data-shape-type') === 'shape';
 
-        const isUserGroup = lowerTagName === 'g' && !isShape && (
+        const isUserGroup = lowerTagName === 'g' && !isShape && !isAudio && (
           dataType === 'group' ||
           lowerDataName === 'group' ||
           lowerId.startsWith('group-') ||
@@ -849,6 +851,7 @@ const RightSidebar = ({
         props.isShape = isShape;
         props.isEmbed = isEmbed;
         props.isPdfBackground = isPdfBackground;
+        props.isAudio = isAudio;
 
         return props;
       }
@@ -1526,6 +1529,16 @@ const RightSidebar = ({
                           flipbookName={effectiveBook}
                           flipbookVId={effectiveVId}
                           onDeleteLayer={() => deleteLayer?.(activePageIndex, selectedLayerId)}
+                        />
+                      ) : selectedElementProps?.isAudio ? (
+                        <AudioProperties
+                          selectedElement={(() => {
+                            const pageContainer = document.querySelector(`.page-svg-container[data-page-index="${activePageIndex}"]`);
+                            return pageContainer?.querySelector(`[id="${selectedLayerId}"]`) || document.getElementById(selectedLayerId);
+                          })()}
+                          selectedLayerId={selectedLayerId}
+                          activePageIndex={activePageIndex}
+                          updateElementAttribute={updateElementAttribute}
                         />
                       ) : (
                         <>

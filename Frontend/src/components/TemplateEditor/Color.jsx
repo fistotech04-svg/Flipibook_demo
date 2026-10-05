@@ -198,6 +198,7 @@ const Color = ({
   sizingMode = 'auto-width',
   isScrollable = false,
   selectedElementProps = null,
+  hideStrokeAlignment = false,
   ...props
 }) => {
   const containerRef = useRef(null);
@@ -909,7 +910,7 @@ const Color = ({
                   </div>
 
                 </div>                {/* Stroke Properties */}
-                <div className={`flex flex-col gap-[0.75vw] mt-[0.75vw] ${(!backgroundColor?.bgStroke || backgroundColor?.bgStroke === 'none' || backgroundColor?.bgStroke === '#' || backgroundColor?.bgStroke === 'transparent') ? 'opacity-50' : ''}`}>
+                <div className={`flex flex-col gap-[0.75vw] mt-[0.75vw] ${(!backgroundColor?.bgStroke || backgroundColor?.bgStroke === 'none' || backgroundColor?.bgStroke === '#' || backgroundColor?.bgStroke === 'transparent') ? 'opacity-50 pointer-events-none' : ''}`}>
                   {/* Row 2: Alignment and Stroke Width */}
                   <div className="flex items-center gap-[1vw]">
                     {/* Alignment */}
@@ -1313,80 +1314,158 @@ const Color = ({
               </div>
 
               {/* Stroke Properties */}
-              <div className={`flex flex-col gap-[0.75vw] ${(!pseudoProps.stroke || pseudoProps.stroke === 'none' || pseudoProps.stroke === '#' || pseudoProps.stroke === 'transparent') ? 'opacity-50' : ''}`}>
+              <div className={`flex flex-col gap-[0.75vw] ${(!pseudoProps.stroke || pseudoProps.stroke === 'none' || pseudoProps.stroke === '#' || pseudoProps.stroke === 'transparent') ? 'opacity-50 pointer-events-none' : ''}`}>
                 {/* Row 2: Alignment and Stroke Width */}
                 <div className="flex items-center gap-[1vw]">
                   {/* Alignment */}
-                  <div className="flex-1 flex flex-col gap-[0.3vw]">
-                    <span className="text-[0.7vw] text-gray-500 font-medium">Alignment</span>
-                    <div className="relative">
-                      <div
-                        className={`h-[2vw] px-[0.5vw] border border-gray-200 rounded-[0.5vw] flex items-center justify-between bg-white ${isText ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}`}
-                        onClick={() => !isText && setIsDashPosOpen(!isDashPosOpen)}
-                      >
-                        <span className="text-[0.75vw] font-medium text-gray-700 capitalize">{pseudoProps['data-stroke-position'] || 'Center'}</span>
-                        <ChevronDown size="0.8vw" className="text-gray-400" />
+                  {!hideStrokeAlignment ? (
+                    <div className="flex-1 flex flex-col gap-[0.3vw]">
+                      <span className="text-[0.7vw] text-gray-500 font-medium">Alignment</span>
+                      <div className="relative">
+                        <div
+                          className={`h-[2vw] px-[0.5vw] border border-gray-200 rounded-[0.5vw] flex items-center justify-between bg-white ${isText ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}`}
+                          onClick={() => !isText && setIsDashPosOpen(!isDashPosOpen)}
+                        >
+                          <span className="text-[0.75vw] font-medium text-gray-700 capitalize">{pseudoProps['data-stroke-position'] || 'Center'}</span>
+                          <ChevronDown size="0.8vw" className="text-gray-400" />
+                        </div>
+                        {isDashPosOpen && (
+                          <>
+                            <div className="fixed inset-0 z-[40]" onClick={(e) => { e.stopPropagation(); setIsDashPosOpen(false); }} />
+                            <div className="absolute top-[110%] left-0 right-0 bg-white border border-gray-100 rounded-[0.5vw] shadow-xl z-50 py-1 overflow-hidden">
+                              {['Inside', 'Center', 'Outside'].map(pos => (
+                                <div
+                                  key={pos}
+                                  onClick={() => {
+                                    updateAttr('data-stroke-position', pos);
+                                    setIsDashPosOpen(false);
+                                  }}
+                                  className="px-[1vw] py-[0.4vw] text-[0.7vw] font-semibold text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 cursor-pointer"
+                                >
+                                  {pos}
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
                       </div>
-                      {isDashPosOpen && (
-                        <>
-                          <div className="fixed inset-0 z-[40]" onClick={(e) => { e.stopPropagation(); setIsDashPosOpen(false); }} />
-                          <div className="absolute top-[110%] left-0 right-0 bg-white border border-gray-100 rounded-[0.5vw] shadow-xl z-50 py-1 overflow-hidden">
-                            {['Inside', 'Center', 'Outside'].map(pos => (
-                              <div
-                                key={pos}
-                                onClick={() => {
-                                  updateAttr('data-stroke-position', pos);
-                                  setIsDashPosOpen(false);
-                                }}
-                                className="px-[1vw] py-[0.4vw] text-[0.7vw] font-semibold text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 cursor-pointer"
-                              >
-                                {pos}
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      )}
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col gap-[0.3vw]">
+                      <span className="text-[0.7vw] text-gray-500 font-medium">Stoke Width</span>
+                      <div className="flex items-center gap-[0.3vw] h-[2vw]">
+                        <button
+                          className="w-[2vw] h-full flex items-center justify-center bg-gray-100 rounded-[0.3vw] text-gray-600 hover:bg-gray-200 transition-colors"
+                          onClick={() => {
+                            const current = parseFloat(pseudoProps.strokeWidth !== undefined ? pseudoProps.strokeWidth : 0);
+                            updateAttr('stroke-width', Math.max(0, current - 1).toString());
+                          }}
+                        >
+                          <span className="text-[1vw] leading-none mb-[0.1vw]">-</span>
+                        </button>
+                        <div
+                          className="flex-grow h-full bg-white border border-gray-200 rounded-[0.5vw] flex items-center cursor-ew-resize"
+                          onPointerDown={(e) => {
+                            const current = parseFloat(pseudoProps.strokeWidth !== undefined && !isNaN(parseFloat(pseudoProps.strokeWidth)) ? pseudoProps.strokeWidth : 0);
+                            handleScrubHelper(e, current, (v) => updateAttr('stroke-width', Math.max(0, parseInt(v)).toString()));
+                          }}
+                        >
+                          <input
+                            type="number"
+                            value={pseudoProps.strokeWidth !== undefined && !isNaN(parseFloat(pseudoProps.strokeWidth)) ? parseFloat(pseudoProps.strokeWidth) : 0}
+                            onChange={(e) => updateAttr('stroke-width', e.target.value)}
+                            className="w-full h-full text-[0.75vw] font-medium outline-none text-center bg-transparent text-gray-700 no-spin cursor-ew-resize"
+                          />
+                        </div>
+                        <button
+                          className="w-[2vw] h-full flex items-center justify-center bg-gray-100 rounded-[0.3vw] text-gray-600 hover:bg-gray-200 transition-colors"
+                          onClick={() => {
+                            const current = parseFloat(pseudoProps.strokeWidth !== undefined ? pseudoProps.strokeWidth : 0);
+                            updateAttr('stroke-width', (current + 1).toString());
+                          }}
+                        >
+                          <span className="text-[1vw] leading-none mb-[0.1vw]">+</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
-                  {/* Stroke Width */}
-                  <div className="flex-1 flex flex-col gap-[0.3vw]">
-                    <span className="text-[0.7vw] text-gray-500 font-medium">Stoke Width</span>
-                    <div className="flex items-center gap-[0.3vw] h-[2vw]">
-                      <button
-                        className="w-[2vw] h-full flex items-center justify-center bg-gray-100 rounded-[0.3vw] text-gray-600 hover:bg-gray-200 transition-colors"
-                        onClick={() => {
-                          const current = parseFloat(pseudoProps.strokeWidth !== undefined ? pseudoProps.strokeWidth : 0);
-                          updateAttr('stroke-width', Math.max(0, current - 1).toString());
-                        }}
-                      >
-                        <span className="text-[1vw] leading-none mb-[0.1vw]">-</span>
-                      </button>
-                      <div
-                        className="flex-grow h-full bg-white border border-gray-200 rounded-[0.5vw] flex items-center cursor-ew-resize"
-                        onPointerDown={(e) => {
-                          const current = parseFloat(pseudoProps.strokeWidth !== undefined && !isNaN(parseFloat(pseudoProps.strokeWidth)) ? pseudoProps.strokeWidth : 0);
-                          handleScrubHelper(e, current, (v) => updateAttr('stroke-width', Math.max(0, parseInt(v)).toString()));
-                        }}
-                      >
-                        <input
-                          type="number"
-                          value={pseudoProps.strokeWidth !== undefined && !isNaN(parseFloat(pseudoProps.strokeWidth)) ? parseFloat(pseudoProps.strokeWidth) : 0}
-                          onChange={(e) => updateAttr('stroke-width', e.target.value)}
-                          className="w-full h-full text-[0.75vw] font-medium outline-none text-center bg-transparent text-gray-700 no-spin cursor-ew-resize"
-                        />
+                  {/* Stroke Width or Line Corner */}
+                  {!hideStrokeAlignment ? (
+                    <div className="flex-1 flex flex-col gap-[0.3vw]">
+                      <span className="text-[0.7vw] text-gray-500 font-medium">Stoke Width</span>
+                      <div className="flex items-center gap-[0.3vw] h-[2vw]">
+                        <button
+                          className="w-[2vw] h-full flex items-center justify-center bg-gray-100 rounded-[0.3vw] text-gray-600 hover:bg-gray-200 transition-colors"
+                          onClick={() => {
+                            const current = parseFloat(pseudoProps.strokeWidth !== undefined ? pseudoProps.strokeWidth : 0);
+                            updateAttr('stroke-width', Math.max(0, current - 1).toString());
+                          }}
+                        >
+                          <span className="text-[1vw] leading-none mb-[0.1vw]">-</span>
+                        </button>
+                        <div
+                          className="flex-grow h-full bg-white border border-gray-200 rounded-[0.5vw] flex items-center cursor-ew-resize"
+                          onPointerDown={(e) => {
+                            const current = parseFloat(pseudoProps.strokeWidth !== undefined && !isNaN(parseFloat(pseudoProps.strokeWidth)) ? pseudoProps.strokeWidth : 0);
+                            handleScrubHelper(e, current, (v) => updateAttr('stroke-width', Math.max(0, parseInt(v)).toString()));
+                          }}
+                        >
+                          <input
+                            type="number"
+                            value={pseudoProps.strokeWidth !== undefined && !isNaN(parseFloat(pseudoProps.strokeWidth)) ? parseFloat(pseudoProps.strokeWidth) : 0}
+                            onChange={(e) => updateAttr('stroke-width', e.target.value)}
+                            className="w-full h-full text-[0.75vw] font-medium outline-none text-center bg-transparent text-gray-700 no-spin cursor-ew-resize"
+                          />
+                        </div>
+                        <button
+                          className="w-[2vw] h-full flex items-center justify-center bg-gray-100 rounded-[0.3vw] text-gray-600 hover:bg-gray-200 transition-colors"
+                          onClick={() => {
+                            const current = parseFloat(pseudoProps.strokeWidth !== undefined ? pseudoProps.strokeWidth : 0);
+                            updateAttr('stroke-width', (current + 1).toString());
+                          }}
+                        >
+                          <span className="text-[1vw] leading-none mb-[0.1vw]">+</span>
+                        </button>
                       </div>
-                      <button
-                        className="w-[2vw] h-full flex items-center justify-center bg-gray-100 rounded-[0.3vw] text-gray-600 hover:bg-gray-200 transition-colors"
-                        onClick={() => {
-                          const current = parseFloat(pseudoProps.strokeWidth !== undefined ? pseudoProps.strokeWidth : 0);
-                          updateAttr('stroke-width', (current + 1).toString());
-                        }}
-                      >
-                        <span className="text-[1vw] leading-none mb-[0.1vw]">+</span>
-                      </button>
                     </div>
-                  </div>
+                  ) : (
+                    !isText ? (
+                      <div className="flex-1 flex flex-col gap-[0.3vw]">
+                        <span className="text-[0.7vw] text-gray-500 font-medium">Line Corner</span>
+                        <div className="relative">
+                          <div
+                            className={`h-[2vw] px-[0.5vw] border border-gray-200 rounded-[0.5vw] flex items-center justify-between bg-white ${isText ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}`}
+                            onClick={() => !isText && setIsStrokeStyleOpen(!isStrokeStyleOpen)}
+                          >
+                            <span className="text-[0.75vw] font-medium text-gray-700 capitalize">{(pseudoProps.strokeLinecap === 'round' || pseudoProps['stroke-linecap'] === 'round') ? 'Rounded' : 'Square'}</span>
+                            <ChevronDown size="0.8vw" className="text-gray-400" />
+                          </div>
+                          {isStrokeStyleOpen && (
+                            <>
+                              <div className="fixed inset-0 z-[40]" onClick={(e) => { e.stopPropagation(); setIsStrokeStyleOpen(false); }} />
+                              <div className="absolute bottom-[110%] left-0 right-0 bg-white border border-gray-100 rounded-[0.5vw] shadow-xl z-50 py-1 overflow-hidden">
+                                {['Square', 'Rounded'].map(corner => (
+                                  <div
+                                    key={corner}
+                                    onClick={() => {
+                                      const isRound = corner === 'Rounded';
+                                      updateAttr('stroke-linecap', isRound ? 'round' : 'butt');
+                                      updateAttr('stroke-linejoin', isRound ? 'round' : 'miter');
+                                      setIsStrokeStyleOpen(false);
+                                    }}
+                                    className="px-[1vw] py-[0.4vw] text-[0.7vw] font-semibold text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 cursor-pointer"
+                                  >
+                                    {corner}
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ) : <div className="flex-1"></div>
+                  )}
                 </div>
 
                 {/* Row 3: Line style and Dash Property */}
@@ -1488,7 +1567,7 @@ const Color = ({
                 )}
 
                 {/* Row 4: Line Corner */}
-                {!isText && (
+                {!isText && !hideStrokeAlignment && (
                 <div className="flex items-center gap-[1vw]">
                   <div className="flex-1 flex flex-col gap-[0.3vw]">
                     <span className="text-[0.7vw] text-gray-500 font-medium">Line Corner</span>

@@ -5,8 +5,8 @@ import Effect from '../Effect';
 
 const PropertySlider = ({ label, value, onChange, min = 0, max = 100, disabled = false }) => {
   return (
-    <div className={`flex items-center justify-between py-[0.4vw] ${disabled ? 'opacity-40 pointer-events-none' : ''}`}>
-      <span className="text-[0.8vw] font-semibold text-gray-700 w-[7vw]">{label}</span>
+    <div className={`flex items-center justify-between mr-[0.2vw] ml-[0.2vw] ${disabled ? 'opacity-40 pointer-events-none' : ''}`}>
+      <span className="text-[0.8vw] font-semibold text-gray-700 w-[5vw]">{label} :</span>
       <div className="flex-grow flex items-center gap-[1vw]">
         <input
           type="range"
@@ -16,20 +16,18 @@ const PropertySlider = ({ label, value, onChange, min = 0, max = 100, disabled =
           value={value || 0}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-grow h-[0.25vw] appearance-none cursor-pointer bg-gray-200 rounded-full outline-none"
+          className="flex-grow h-[0.25vw] appearance-none cursor-pointer bg-gray-200 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[0.9vw] [&::-webkit-slider-thumb]:h-[0.9vw] [&::-webkit-slider-thumb]:bg-[#544af4] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(84,74,244,0.6)]"
           style={{
-            background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((value || 0) - min) / (max - min) * 100}%, #e5e7eb ${((value || 0) - min) / (max - min) * 100}%, #e5e7eb 100%)`,
+            background: `linear-gradient(to right, #544af4 0%, #544af4 ${((value || 0) - min) / (max - min) * 100}%, #e5e7eb ${((value || 0) - min) / (max - min) * 100}%, #e5e7eb 100%)`,
           }}
         />
         <div className="w-[3.5vw] h-[1.8vw] flex items-center justify-center bg-white border border-gray-200 rounded-[0.4vw] shadow-sm">
           <input
-            type="number"
-            min={min}
-            max={max}
-            value={value || ''}
-            onChange={(e) => onChange(e.target.value)}
+            type="text"
+            value={`${value || 0} %`}
+            readOnly
             disabled={disabled}
-            className="w-full text-center text-[0.8vw] text-gray-700 font-medium outline-none bg-transparent"
+            className="w-full text-center text-[0.8vw] text-gray-700 font-medium outline-none bg-transparent cursor-default"
           />
         </div>
       </div>
@@ -46,10 +44,71 @@ const ThirdPartyEmbedProperties = ({
 }) => {
   const [embedType, setEmbedType] = useState('web-link');
   const [customCode, setCustomCode] = useState('');
+  const [webCodeType, setWebCodeType] = useState('Website');
+  const [embedSrc, setEmbedSrc] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [embedWidth, setEmbedWidth] = useState('650');
+  const [embedHeight, setEmbedHeight] = useState('400');
   const [opacity, setOpacity] = useState(100);
   const [pageZoom, setPageZoom] = useState(100);
   const [multiPageSync, setMultiPageSync] = useState(false);
   const [url, setUrl] = useState('');
+
+  React.useEffect(() => {
+    if (embedType === 'embed-code') {
+      let code = '';
+      let finalSrc = embedSrc.trim();
+      let error = '';
+
+      if (!finalSrc) {
+        setErrorMessage('');
+        setCustomCode(`<div style="display:flex; justify-content:center; align-items:center; width:100%; height:100%; background:#f3f4f6; color:#9ca3af; font-family:sans-serif; font-size:24px;">Enter ${webCodeType} URL</div>`);
+        return;
+      }
+
+      if (finalSrc) {
+        const isImage = /\.(jpeg|jpg|gif|png|svg|webp|bmp|ico)([\?#].*)?$/i.test(finalSrc);
+        const isVideo = /\.(mp4|webm|ogg|mov|avi|mkv)([\?#].*)?$/i.test(finalSrc) || /(?:youtube\.com|youtu\.be)/i.test(finalSrc) || /vimeo\.com/i.test(finalSrc);
+        
+        if (webCodeType === 'Image' && !isImage) {
+          error = 'Please enter a direct image URL (ending in .jpg, .png, etc.)';
+        } else if (webCodeType === 'Video' && !isVideo) {
+          error = 'Please enter a direct video URL (ending in .mp4, or YouTube/Vimeo link)';
+        } else if (webCodeType === 'Website' && (isImage || isVideo)) {
+          error = 'Please enter a website URL.';
+        }
+      }
+
+      setErrorMessage(error);
+
+      if (error) {
+        setCustomCode(`<div style="display:flex; justify-content:center; align-items:center; width:100%; height:100%; background:#fee2e2; color:#ef4444; font-family:sans-serif; font-size:24px; text-align:center;">Invalid ${webCodeType} URL</div>`);
+        return;
+      }
+
+      if (!finalSrc.startsWith('http://') && !finalSrc.startsWith('https://')) {
+        finalSrc = 'https://' + finalSrc;
+      }
+
+      const ytMatch = finalSrc.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+      if (ytMatch && ytMatch[1]) {
+        finalSrc = `https://www.youtube.com/embed/${ytMatch[1]}`;
+      }
+
+      if (webCodeType === 'Image') {
+        code = `<img src="${finalSrc}" width="100%" height="100%" alt="embed" style="object-fit: cover;" />`;
+      } else if (webCodeType === 'Video') {
+        if (finalSrc.includes('youtube.com/embed/')) {
+          code = `<iframe src="${finalSrc}" width="100%" height="100%" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+        } else {
+          code = `<video src="${finalSrc}" width="100%" height="100%" controls autoplay muted style="object-fit: contain;"></video>`;
+        }
+      } else if (webCodeType === 'Website') {
+        code = `<iframe src="${finalSrc}" width="100%" height="100%" frameborder="0" allowfullscreen></iframe>`;
+      }
+      setCustomCode(code);
+    }
+  }, [embedType, webCodeType, embedSrc, embedWidth, embedHeight]);
 
   React.useEffect(() => {
     if (selectedElementProps) {
@@ -62,6 +121,17 @@ const ThirdPartyEmbedProperties = ({
       }
     }
   }, [selectedElementProps?.opacity, selectedElementProps?.['data-iframe-opacity']]);
+
+  React.useEffect(() => {
+    if (selectedElementProps) {
+      if (selectedElementProps.width !== undefined) {
+        setEmbedWidth(Math.round(parseFloat(selectedElementProps.width)).toString());
+      }
+      if (selectedElementProps.height !== undefined) {
+        setEmbedHeight(Math.round(parseFloat(selectedElementProps.height)).toString());
+      }
+    }
+  }, [selectedElementProps?.width, selectedElementProps?.height]);
 
   // --- UI states for Color ---
   const [openSubSection, setOpenSubSection] = useState('color');
@@ -238,13 +308,31 @@ const ThirdPartyEmbedProperties = ({
       const currentCode = frameGroup.getAttribute('data-custom-code') || '';
       setCustomCode(currentCode);
       
+      let currentW = '650';
+      let currentH = '400';
+      const rect = frameGroup.querySelector('rect[pointer-events="all"]') || frameGroup.querySelector('rect.svg-image-stroke-overlay');
+      if (rect) {
+        currentW = Math.round(parseFloat(rect.getAttribute('width')) || 650).toString();
+        currentH = Math.round(parseFloat(rect.getAttribute('height')) || 400).toString();
+      }
+
+      const srcMatch = currentCode.match(/src="([^"]*)"/);
+      
+      if (srcMatch) setEmbedSrc(srcMatch[1]);
+      setEmbedWidth(currentW);
+      setEmbedHeight(currentH);
+      
+      if (currentCode.includes('<img')) setWebCodeType('Image');
+      else if (currentCode.includes('<video')) setWebCodeType('Video');
+      else if (currentCode.includes('<iframe')) setWebCodeType('Website');
+      
       const currentType = frameGroup.getAttribute('data-embed-type') || (currentCode ? 'embed-code' : 'web-link');
       setEmbedType(currentType);
       
       // Force pointer-events fix on existing frames
-      const rect = frameGroup.querySelector('rect[pointer-events="all"]');
-      if (rect && (currentUrl.trim() !== '' || currentCode.trim() !== '')) {
-        rect.setAttribute('pointer-events', 'none');
+      const pointerRect = frameGroup.querySelector('rect[pointer-events="all"]');
+      if (pointerRect && (currentUrl.trim() !== '' || currentCode.trim() !== '')) {
+        pointerRect.setAttribute('pointer-events', 'none');
       }
     }
   }, [selectedElement]);
@@ -259,19 +347,24 @@ const ThirdPartyEmbedProperties = ({
     const currentCode = frameGroup.getAttribute('data-custom-code') || '';
     const currentType = frameGroup.getAttribute('data-embed-type') || 'web-link';
 
-    if (url === currentUrl && customCode === currentCode && embedType === currentType) return;
+    let currentW = 400, currentH = 300;
+    const domRect = frameGroup.querySelector('rect[pointer-events="all"]') || frameGroup.querySelector('rect.svg-image-stroke-overlay');
+    if (domRect) {
+      currentW = parseFloat(domRect.getAttribute('width')) || 400;
+      currentH = parseFloat(domRect.getAttribute('height')) || 300;
+    }
+
+    const inputW = parseFloat(embedWidth) || currentW;
+    const inputH = parseFloat(embedHeight) || currentH;
+
+    if (url === currentUrl && customCode === currentCode && embedType === currentType && inputW === currentW && inputH === currentH) return;
 
     const timeoutId = setTimeout(() => {
       frameGroup.setAttribute('data-url', url);
       frameGroup.setAttribute('data-custom-code', customCode);
       frameGroup.setAttribute('data-embed-type', embedType);
 
-      let w = 400, h = 300;
-      const rect = frameGroup.querySelector('rect[pointer-events="all"]') || frameGroup.querySelector('rect.svg-image-stroke-overlay');
-      if (rect) {
-        w = parseFloat(rect.getAttribute('width')) || 400;
-        h = parseFloat(rect.getAttribute('height')) || 300;
-      }
+      let w = inputW, h = inputH;
 
       const strokeColor = frameGroup.getAttribute('data-stroke-color') || 'transparent';
       const strokeWidth = frameGroup.getAttribute('data-stroke-width') || '0';
@@ -307,7 +400,7 @@ const ThirdPartyEmbedProperties = ({
                .replace(/"/g, "&quot;")
                .replace(/'/g, "&#039;");
         };
-        const srcdocHtml = escapeHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden;}</style></head><body>${customCode}</body></html>`);
+        const srcdocHtml = escapeHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0;width:100vw;height:100vh;overflow:hidden;} video::-webkit-media-controls { zoom: 1.5; } video, iframe, img { width: 100%; height: 100%; border: none; display: block; }</style></head><body>${customCode}</body></html>`);
 
         frameGroup.innerHTML = `
           <rect class="embed-fill-layer" x="0" y="0" width="${w}" height="${h}" fill="${fillColor}" opacity="${fillOpacity}" pointer-events="none" />
@@ -319,18 +412,22 @@ const ThirdPartyEmbedProperties = ({
           <rect class="svg-image-stroke-overlay" x="0" y="0" width="${w}" height="${h}" fill="transparent" pointer-events="none" ${strokeAttrs} />
         `;
       } else {
+        const cx = (w - 300) / 2;
+        const cy = (h - 200) / 2;
         frameGroup.innerHTML = `
           <rect class="embed-fill-layer" x="0" y="0" width="${w}" height="${h}" fill="${fillColor}" opacity="${fillOpacity}" pointer-events="none" />
           <g class="embed-content-group" opacity="${iframeOpacity}" pointer-events="none">
             <rect width="${w}" height="${h}" fill="transparent" stroke="#3b82f6" stroke-width="2" stroke-dasharray="6,6" rx="8" />
-            <rect x="50" y="50" width="300" height="200" fill="#e5e7eb" rx="12" />
-            <path d="M 50 62 Q 50 50 62 50 L 338 50 Q 350 50 350 62 L 350 80 L 50 80 Z" fill="#d1d5db" />
-            <circle cx="70" cy="65" r="4" fill="#ffffff" opacity="0.8" />
-            <circle cx="85" cy="65" r="4" fill="#ffffff" opacity="0.8" />
-            <circle cx="100" cy="65" r="4" fill="#ffffff" opacity="0.8" />
-            <g transform="translate(160, 110) scale(3.5)" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.7">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+            <g transform="translate(${cx}, ${cy})">
+              <rect x="0" y="0" width="300" height="200" fill="#e5e7eb" rx="12" />
+              <path d="M 0 12 Q 0 0 12 0 L 288 0 Q 300 0 300 12 L 300 30 L 0 30 Z" fill="#d1d5db" />
+              <circle cx="20" cy="15" r="4" fill="#ffffff" opacity="0.8" />
+              <circle cx="35" cy="15" r="4" fill="#ffffff" opacity="0.8" />
+              <circle cx="50" cy="15" r="4" fill="#ffffff" opacity="0.8" />
+              <g transform="translate(110, 60) scale(3.5)" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.7">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+              </g>
             </g>
           </g>
           <rect class="svg-image-stroke-overlay" width="${w}" height="${h}" fill="transparent" pointer-events="all" ${strokeAttrs} />
@@ -353,7 +450,7 @@ const ThirdPartyEmbedProperties = ({
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [url, customCode, embedType, selectedElement, activePageIndex, selectedLayerId, updateElementAttribute]);
+  }, [url, customCode, embedType, embedWidth, embedHeight, selectedElement, activePageIndex, selectedLayerId, updateElementAttribute]);
 
   // 3. Sync fill color to DOM in real-time
   React.useEffect(() => {
@@ -453,21 +550,78 @@ const ThirdPartyEmbedProperties = ({
               className="w-[0.9vw] h-[0.9vw] text-blue-500 border-gray-300 focus:ring-blue-500"
             />
             <span className={`text-[0.8vw] ${embedType === 'embed-code' ? 'text-blue-500' : 'text-gray-600'}`}>Embed Web Code</span>
-            <Info size="0.8vw" className="text-gray-400 ml-[0.2vw]" />
           </label>
           
           {embedType === 'embed-code' && (
-            <textarea
-              placeholder="Paste the web code here"
-              value={customCode}
-              onChange={(e) => setCustomCode(e.target.value)}
-              className="w-full h-[6vw] border border-gray-200 rounded-[0.4vw] p-[0.6vw] text-[0.8vw] outline-none focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-shadow bg-white resize-none text-gray-800 placeholder-gray-400 ml-[1.3vw]"
-              style={{ width: 'calc(100% - 1.3vw)' }}
-            />
+            <div className="flex flex-col ml-[1.3vw]" style={{ width: 'calc(100% - 1.3vw)' }}>
+              <div className="flex items-center gap-[1vw] mb-[0.6vw]">
+                {['Image', 'Video', 'Website'].map((type) => (
+                  <label key={type} className="flex items-center gap-[0.3vw] cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="web-code-type" 
+                      checked={webCodeType === type}
+                      onChange={() => setWebCodeType(type)}
+                      className="w-[0.8vw] h-[0.8vw] text-blue-500 border-gray-300 focus:ring-blue-500"
+                    />
+                    <span className="text-[0.75vw] text-gray-600">{type}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex flex-col gap-[0.6vw]">
+                <div className="flex flex-col gap-[0.2vw]">
+                  <span className="text-[0.7vw] text-gray-500">Source URL</span>
+                  <div className={`flex border ${errorMessage ? 'border-red-500' : 'border-gray-200'} rounded-[0.4vw] overflow-hidden focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-shadow bg-white`}>
+                    {webCodeType === 'Website' && (
+                      <select className="bg-gray-50 border-r border-gray-200 text-gray-600 text-[0.8vw] px-[0.5vw] py-[0.4vw] outline-none appearance-none cursor-pointer">
+                        <option>https://</option>
+                        <option>http://</option>
+                      </select>
+                    )}
+                    <input
+                      type="text"
+                      placeholder={webCodeType === 'Website' ? "url" : "e.g. https://..."}
+                      value={embedSrc}
+                      onChange={(e) => setEmbedSrc(e.target.value)}
+                      className="flex-1 px-[0.6vw] py-[0.4vw] text-[0.8vw] outline-none text-gray-800 placeholder-gray-400"
+                    />
+                  </div>
+                  {errorMessage && <span className="text-red-500 text-[0.65vw] mt-[0.1vw]">{errorMessage}</span>}
+                </div>
+                <div className="flex gap-[0.5vw]">
+                  <div className="w-1/2 flex flex-col gap-[0.2vw]">
+                    <span className="text-[0.7vw] text-gray-500">Width</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. 650"
+                      value={embedWidth}
+                      onChange={(e) => setEmbedWidth(e.target.value)}
+                      className="w-full border border-gray-200 rounded-[0.4vw] p-[0.4vw] text-[0.8vw] outline-none focus:border-blue-500 bg-white"
+                    />
+                  </div>
+                  <div className="w-1/2 flex flex-col gap-[0.2vw]">
+                    <span className="text-[0.7vw] text-gray-500">Height</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. 400"
+                      value={embedHeight}
+                      onChange={(e) => setEmbedHeight(e.target.value)}
+                      className="w-full border border-gray-200 rounded-[0.4vw] p-[0.4vw] text-[0.8vw] outline-none focus:border-blue-500 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="mt-[0.6vw]">
+                <span className="text-[0.7vw] text-gray-500 mb-[0.2vw] block">Code Preview:</span>
+                <div className="w-full h-[5vw] border border-gray-200 rounded-[0.4vw] p-[0.6vw] text-[0.7vw] bg-gray-50 text-gray-500 overflow-auto whitespace-pre-wrap font-mono select-all">
+                  {customCode || 'Select a type and enter a source URL'}
+                </div>
+              </div>
+            </div>
           )}
       </div>
 
-      <div className="border-t border-gray-100 my-[1vw]"></div>
+      <div className="border-t border-gray-100 mt-[1vw]"></div>
 
       
       {/* Opacity */}
@@ -485,40 +639,46 @@ const ThirdPartyEmbedProperties = ({
         max={100}
       />
       
-      <div className="border-t border-gray-100 my-[1vw]"></div>
+      <div className="border-t border-gray-100 mt-[1vw]"></div>
 
-      <Color
-        openSubSection={openSubSection}
-        setOpenSubSection={setOpenSubSection}
-        backgroundColor={backgroundColor}
-        setBackgroundColor={handleSetBackgroundColor}
-        activeColorPicker={activeColorPicker}
-        setActiveColorPicker={setActiveColorPicker}
-        showStrokeSettings={showStrokeSettings}
-        setShowStrokeSettings={setShowStrokeSettings}
-        isStrokeStyleOpen={isStrokeStyleOpen}
-        setIsStrokeStyleOpen={setIsStrokeStyleOpen}
-        dropdownPos={dropdownPos}
-        setDropdownPos={setDropdownPos}
-        strokeSettingsPos={strokeSettingsPos}
-        setStrokeSettingsPos={setStrokeSettingsPos}
-        isDashPosOpen={isDashPosOpen}
-        setIsDashPosOpen={setIsDashPosOpen}
-        activePopup={activePopup}
-        setActivePopup={setActivePopup}
-        colorsOnPage={colorsOnPage}
-        showDetailedPicker={showDetailedPicker}
-        setShowDetailedPicker={setShowDetailedPicker}
-      />
+      <div className="flex flex-col gap-[1vw]">
+        <Color
+          openSubSection={openSubSection}
+          setOpenSubSection={setOpenSubSection}
+          backgroundColor={backgroundColor}
+          setBackgroundColor={handleSetBackgroundColor}
+          activeColorPicker={activeColorPicker}
+          setActiveColorPicker={setActiveColorPicker}
+          showStrokeSettings={showStrokeSettings}
+          setShowStrokeSettings={setShowStrokeSettings}
+          isStrokeStyleOpen={isStrokeStyleOpen}
+          setIsStrokeStyleOpen={setIsStrokeStyleOpen}
+          dropdownPos={dropdownPos}
+          setDropdownPos={setDropdownPos}
+          strokeSettingsPos={strokeSettingsPos}
+          setStrokeSettingsPos={setStrokeSettingsPos}
+          isDashPosOpen={isDashPosOpen}
+          setIsDashPosOpen={setIsDashPosOpen}
+          activePopup={activePopup}
+          setActivePopup={setActivePopup}
+          colorsOnPage={colorsOnPage}
+          showDetailedPicker={showDetailedPicker}
+          setShowDetailedPicker={setShowDetailedPicker}
+          hideFill={true}
+          hideStrokeAlignment={true}
+        />
 
-      <Effect
-        openSubSection={openSubSection}
-        setOpenSubSection={setOpenSubSection}
-        activeEffects={activeEffects}
-        setActiveEffects={handleSetActiveEffects}
-        effectSettings={effectSettings}
-        setEffectSettings={handleSetEffectSettings}
-      />
+        <Effect
+          openSubSection={openSubSection}
+          setOpenSubSection={setOpenSubSection}
+          activeEffects={activeEffects}
+          setActiveEffects={handleSetActiveEffects}
+          effectSettings={effectSettings}
+          setEffectSettings={handleSetEffectSettings}
+          hideBlur={true}
+          hideInnerShadow={true}
+        />
+      </div>
     </div>
   );
 };

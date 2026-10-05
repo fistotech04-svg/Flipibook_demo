@@ -73,10 +73,19 @@ const parseLayersFromSVG = (element) => {
 
       const isEmbedGroup = child.getAttribute('data-type') === 'embed-frame' || Array.from(child.children).some(c => c.getAttribute('data-type') === 'embed-frame');
 
+      const lowerDataName = (child.getAttribute('data-name') || id || '').toLowerCase();
+      const lowerId = (id || '').toLowerCase();
+      const isAudioFrame = child.getAttribute('data-type') === 'audio-frame' || 
+                           child.getAttribute('data-type') === 'audio' ||
+                           Array.from(child.children).some(c => c.getAttribute('data-type') === 'audio-frame' || c.getAttribute('data-type') === 'audio') || 
+                           child.getAttribute('data-interaction') === 'audio' ||
+                           lowerDataName.includes('audio') || 
+                           lowerId.includes('audio');
+
       const isGroup = child.getAttribute('data-is-image-group') === 'true' ||
         child.getAttribute('data-is-video-group') === 'true' ||
         child.getAttribute('data-is-gif-group') === 'true' ||
-        isEmbedGroup;
+        isEmbedGroup || isAudioFrame;
 
       const isPdfVector = child.getAttribute('data-type') === 'pdf-vector-layer';
 
@@ -109,6 +118,9 @@ const parseLayersFromSVG = (element) => {
         } else if (isEmbedGroup) {
           coreName = 'Embed Frame';
           coreType = 'embed-frame';
+        } else if (isAudioFrame) {
+          coreName = 'Audio';
+          coreType = 'audio-frame';
         } else if (isText) {
           coreName = 'Text';
           coreType = 'text';
