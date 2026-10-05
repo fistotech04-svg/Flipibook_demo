@@ -6,7 +6,7 @@ import {
   Layout, ArrowUp, ArrowDown, ArrowUpToLine, ArrowDownToLine,
   Ban, Trash2, FilePlus, GripVertical,
   Folder, Type, Image as ImageIcon, Square, Circle, Triangle, Star, Minus,
-  Video, ImagePlay,
+  Video, ImagePlay, Music,
   ChevronRight, ChevronDown, Eye, EyeOff, Lock, Unlock,
   Scissors, Clipboard, ArrowUpRight
 } from 'lucide-react';
@@ -225,6 +225,12 @@ const LayerItem = ({
     const isImageByName = typeLower === 'image' || nameLower.includes('image');
     if (isImageByName) {
       return <ImageIcon size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
+    }
+
+    // 4. Check Audio
+    const isAudio = typeLower === 'audio-frame' || layer['data-interaction'] === 'audio' || nameLower.includes('audio');
+    if (isAudio) {
+      return <Music size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
     }
 
     switch (typeLower) {

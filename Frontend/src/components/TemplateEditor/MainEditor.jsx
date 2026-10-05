@@ -7219,8 +7219,10 @@ const MainEditor = ({
       return [];
     }
 
-    // If this element is an image/video/gif group, it should act as a single layer (no children exposed)
-    if (el.getAttribute('data-is-image-group') || el.getAttribute('data-is-video-group') || el.getAttribute('data-is-gif-group')) {
+    // If this element is an image/video/gif group, or a compound element (audio/embed/icon), it should act as a single layer (no children exposed)
+    const dataType = el.getAttribute('data-type');
+    if (el.getAttribute('data-is-image-group') || el.getAttribute('data-is-video-group') || el.getAttribute('data-is-gif-group') ||
+        dataType === 'embed-frame' || dataType === 'audio-frame' || dataType === 'icon' || (el.querySelector && el.querySelector('[data-type="audio-frame"]'))) {
       return [];
     }
 
@@ -7400,6 +7402,19 @@ const MainEditor = ({
         embedFrame.id = `embed-frame-${Date.now()}`;
       }
       return embedFrame;
+    }
+
+    // Audio frames are single compound elements; drag the whole wrapper!
+    const audioFrame = current && typeof current.closest === 'function' ? current.closest('[data-type="audio-frame"]') : null;
+    if (audioFrame) {
+      const parentG = audioFrame.parentElement;
+      if (parentG && parentG.tagName?.toLowerCase() === 'g' && parentG.id) {
+        return parentG;
+      }
+      if (!audioFrame.id) {
+        audioFrame.id = `audio-frame-${Date.now()}`;
+      }
+      return audioFrame;
     }
 
     let deepestElementWithId = null;
@@ -8994,6 +9009,7 @@ const MainEditor = ({
 
                   const la = state.localAnchor; // anchor in <g> local space
                   const isHotspot = el.getAttribute('data-is-hotspot') === 'true';
+                  const isAudioGroup = el.getAttribute('data-type') === 'audio-frame' || el.getAttribute('data-type') === 'audio';
                   const isInteractiveButton = isHotspot && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'rect') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
 
                   // ── HOTSPOT ICON GROUP: update outer transform, NOT children ───────
@@ -9002,7 +9018,7 @@ const MainEditor = ({
                   // the group's position and size in the page change correctly.
                   // Modifying children would only scale inside the 48×48 local space while
                   // the group's outer translate+scale stays the same → no visible resize effect.
-                  if (isHotspot && !isInteractiveButton) {
+                  if ((isHotspot && !isInteractiveButton) || isAudioGroup) {
                     try {
                       // finalX/Y/W/H are in the group's LOCAL coordinate space (0–48 range).
                       // Convert them to parent-local space using matrix (local→parent mapping).
@@ -9012,10 +9028,11 @@ const MainEditor = ({
                       const newTy = Math.min(ptOrigin.y, ptCorner.y);
                       const newW  = Math.abs(ptCorner.x - ptOrigin.x);
                       const newH  = Math.abs(ptCorner.y - ptOrigin.y);
-                      // Derive scale from inner content size (48×48 canonical size)
-                      const innerSize = (state.bbox && state.bbox.width > 0) ? state.bbox.width : 48;
-                      const newSx = newW / innerSize;
-                      const newSy = newH / innerSize;
+                      // Derive scale from inner content size
+                      const innerWidth = (state.bbox && state.bbox.width > 0) ? state.bbox.width : 48;
+                      const innerHeight = (state.bbox && state.bbox.height > 0) ? state.bbox.height : 48;
+                      const newSx = newW / innerWidth;
+                      const newSy = newH / innerHeight;
                       el.setAttribute('transform', `translate(${newTx}, ${newTy}) scale(${newSx}, ${newSy})`);
                     } catch (e) { /* fallback: do nothing if matrix ops fail */ }
                     // Update overlay handles to follow the new position during drag

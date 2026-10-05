@@ -345,11 +345,20 @@ export const parseLayersFromSVG = (element) => {
       };
 
       const isEmbedGroup = child.getAttribute('data-type') === 'embed-frame' || child.querySelector('[data-type="embed-frame"]') !== null;
+      
+      const lowerDataName = (child.getAttribute('data-name') || id || '').toLowerCase();
+      const lowerId = (id || '').toLowerCase();
+      const isAudioFrame = child.getAttribute('data-type') === 'audio-frame' || 
+                           child.getAttribute('data-type') === 'audio' ||
+                           child.querySelector('[data-type="audio-frame"]') !== null || 
+                           child.getAttribute('data-interaction') === 'audio' ||
+                           lowerDataName.includes('audio') || 
+                           lowerId.includes('audio');
 
       const isGroup = child.getAttribute('data-is-image-group') === 'true' ||
         child.getAttribute('data-is-video-group') === 'true' ||
         child.getAttribute('data-is-gif-group') === 'true' ||
-        isEmbedGroup;
+        isEmbedGroup || isAudioFrame;
 
       const isPdfVector = child.getAttribute('data-type') === 'pdf-vector-layer';
 
@@ -382,6 +391,9 @@ export const parseLayersFromSVG = (element) => {
         } else if (isEmbedGroup) {
           coreName = 'Embed Frame';
           coreType = 'embed-frame';
+        } else if (isAudioFrame) {
+          coreName = 'Audio';
+          coreType = 'audio-frame';
         } else if (isText) {
           const customName = child.getAttribute('data-name');
           coreName = customName ? customName.replace(/^tpl-[a-z0-9]{4}-/, '') : 'Text';
