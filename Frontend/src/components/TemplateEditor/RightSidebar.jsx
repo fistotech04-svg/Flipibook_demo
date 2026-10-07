@@ -16,6 +16,9 @@ import PopupTemplateSelection from './PopupTemplateSelection';
 import Model3DEditor from './Model3DEditor';
 import GroupProperties from './GroupProperties';
 import ImportViaUrlModal from './ImportViaUrlModal';
+import Elements from './Elements/Elements';
+import ButtonEditor from './Elements/ButtonEditor';
+import MapEditor from './Elements/MapEditor';
 import ColorPicker, { parseGradient } from './ColorPicker';
 import MediaGalleryPopup from './MediaGalleryPopup';
 import { generateGradientString } from "../CustomizedEditor/AppearanceShared";
@@ -230,6 +233,9 @@ const RightSidebar = ({
     window.addEventListener('node-edit-mode-changed', handleNodeEditChange);
     return () => window.removeEventListener('node-edit-mode-changed', handleNodeEditChange);
   }, []);
+
+
+
   // Convert mm to pixels at 96 DPI for the input display if no element selected
   const baseWidthPx = Math.round(baseWidth * 96 / 25.4);
   const baseHeightPx = Math.round(baseHeight * 96 / 25.4);
@@ -647,7 +653,15 @@ const RightSidebar = ({
     if (page && page.html) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(page.html, 'image/svg+xml');
-      const el = doc.getElementById(selectedLayerId);
+      let el = doc.getElementById(selectedLayerId);
+      
+      const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+      const actualEl = editorDoc.getElementById(selectedLayerId);
+      
+      // Fallback to real DOM if React state (page.html) is slightly behind
+      if (!el && actualEl) {
+        el = actualEl;
+      }
 
       const rootId = doc.querySelector('svg > g')?.id;
       const overlayId = doc.querySelector('[data-name="Overlay"]')?.id;
@@ -657,8 +671,6 @@ const RightSidebar = ({
         let w = '0', h = '0', x = '0', y = '0', r = '0';
 
         // --- IMPROVED DIMENSION LOGIC: Try actual DOM first for rendered accuracy ---
-        const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
-        const actualEl = editorDoc.getElementById(selectedLayerId);
         let measuredFromDom = false;
         if (actualEl && typeof actualEl.getBBox === 'function') {
           try {
@@ -802,13 +814,19 @@ const RightSidebar = ({
 
         const isGif = isGifFile || lowerDataName.includes('gif') || lowerId.includes('gif') || el.getAttribute('data-is-gif-group') === 'true' || el.dataset?.mediaType === 'gif';
 
+        const isMap = dataType === 'map' || lowerId.includes('map');
+        if (isMap) {
+          props.isMap = true;
+          return props;
+        }
+
         const isUserGroup = lowerTagName === 'g' && (
           dataType === 'group' ||
           lowerDataName === 'group' ||
           lowerId.startsWith('group-') ||
           el.getAttribute('data-type') === 'group' ||
-          (!el.getAttribute('data-is-image-group') && !el.getAttribute('data-is-video-group') && !el.getAttribute('data-is-gif-group') && dataType !== 'icon' && lowerDataName !== 'icon' && !lowerId.includes('icon'))
-        ) && el.getAttribute('data-is-image-group') !== 'true' && el.getAttribute('data-is-video-group') !== 'true' && el.getAttribute('data-is-gif-group') !== 'true' && dataType !== 'icon' && lowerDataName !== 'icon' && !lowerId.includes('icon');
+          (!el.getAttribute('data-is-image-group') && !el.getAttribute('data-is-video-group') && !el.getAttribute('data-is-gif-group') && dataType !== 'icon' && dataType !== 'button' && lowerDataName !== 'icon' && !lowerId.includes('icon') && !lowerId.includes('button'))
+        ) && el.getAttribute('data-is-image-group') !== 'true' && el.getAttribute('data-is-video-group') !== 'true' && el.getAttribute('data-is-gif-group') !== 'true' && dataType !== 'icon' && dataType !== 'button' && lowerDataName !== 'icon' && !lowerId.includes('icon') && !lowerId.includes('button') && !isMap;
 
         const isImage = !isUserGroup && (lowerTagName.includes('image') ||
           lowerTagName === 'img' ||
@@ -817,13 +835,15 @@ const RightSidebar = ({
           lowerId.includes('image') ||
           !!(el.getAttribute('href') || el.getAttribute('xlink:href')) ||
           (lowerTagName === 'g' && hasImageChild && el.getAttribute('data-is-image-group') === 'true') ||
-          isPatternImage) && !isGif && !isPdfBackground;
-
-        const isVideo = lowerTagName === 'video' || lowerTagName === 'iframe' || dataType === 'video' || lowerDataName.includes('video') || lowerId.includes('video') || (lowerTagName === 'foreignobject' && el.querySelector('video, iframe'));
-        const isText = (lowerTagName === 'text' || lowerTagName === 'tspan' || (lowerTagName === 'foreignobject' && !isVideo)) || dataType === 'text' || lowerDataName.includes('text') || lowerId.includes('text');
+          isPatternImage) && !isGif && !isPdfBackground && !isMap;
+        const isVideo = (lowerTagName === 'video' || lowerTagName === 'iframe' || dataType === 'video' || lowerDataName.includes('video') || lowerId.includes('video') || (lowerTagName === 'foreignobject' && el.querySelector('video, iframe'))) && !isMap;
+        const isText = (lowerTagName === 'text' || lowerTagName === 'tspan' || (lowerTagName === 'foreignobject' && !isVideo && !isMap)) || dataType === 'text' || lowerDataName.includes('text') || lowerId.includes('text');
         const isIcon = dataType === 'icon' || dataType === 'hotspot' || lowerDataName.includes('icon') || lowerDataName.includes('hotspot') || lowerId.includes('icon') || lowerId.includes('hotspot') || lowerTagName.includes('lucide') || el.classList.contains('lucide') || el.classList.contains('iconify');
+        const isButton = dataType === 'button' || lowerId.includes('button');
 
         props.isUserGroup = isUserGroup;
+        props.isMap = isMap;
+        props.isButton = isButton;
         props.isImage = isImage;
         props.isText = isText;
         props.isVideo = isVideo;
@@ -1090,7 +1110,9 @@ const RightSidebar = ({
             />
           </div>
         ) : activeTopTool === 'editor' ? (
-          activeMainTool === 'upload' ? (
+          activeMainTool === 'element' ? (
+            <Elements />
+          ) : activeMainTool === 'upload' ? (
             <div className="p-[1.5vw] flex flex-col gap-[0.75vw] overflow-y-auto no-scrollbar h-full justify-between">
               {/* Top Content */}
               <div className="flex flex-col gap-[0.75vw]">
@@ -1350,6 +1372,32 @@ const RightSidebar = ({
                           flipbookName={effectiveBook}
                           flipbookVId={effectiveVId}
                           onDeleteLayer={() => deleteLayer?.(activePageIndex, selectedLayerId)}
+                        />
+                      ) : selectedElementProps?.isButton ? (
+                        <ButtonEditor
+                          selectedElement={(() => {
+                            const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                            return editorDoc.getElementById(selectedLayerId);
+                          })()}
+                          onUpdate={(newHtml) => {
+                            window.__skipCanvasUpdateForPage = activePageIndex;
+                            if (typeof newHtml === 'string') {
+                              updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', newHtml);
+                            }
+                          }}
+                        />
+                      ) : selectedElementProps?.isMap ? (
+                        <MapEditor
+                          selectedElement={(() => {
+                            const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                            return editorDoc.getElementById(selectedLayerId);
+                          })()}
+                          onUpdate={(newHtml) => {
+                            window.__skipCanvasUpdateForPage = activePageIndex;
+                            if (typeof newHtml === 'string') {
+                              updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', newHtml);
+                            }
+                          }}
                         />
                       ) : selectedElementProps?.isText ? (
                         <TextEditor

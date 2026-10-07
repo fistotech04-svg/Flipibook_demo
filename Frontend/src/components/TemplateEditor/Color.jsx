@@ -344,7 +344,7 @@ const Color = ({
           el.setAttribute('fill-opacity', (backgroundColor.fillOpacity / 100).toString());
           el.setAttribute('opacity', (backgroundColor.fillOpacity / 100).toString());
           el.style.setProperty('opacity', (backgroundColor.fillOpacity / 100).toString(), 'important');
-          if (el.tagName?.toLowerCase() === 'foreignobject' && el.firstElementChild) {
+          if (el.tagName?.toLowerCase() === 'foreignobject' && el.firstElementChild && el.firstElementChild.style) {
             el.firstElementChild.style.setProperty('opacity', (backgroundColor.fillOpacity / 100).toString(), 'important');
           }
         } else {

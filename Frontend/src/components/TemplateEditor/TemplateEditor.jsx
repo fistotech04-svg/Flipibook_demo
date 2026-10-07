@@ -3500,9 +3500,9 @@ const TemplateEditor = () => {
             inner.style.removeProperty('filter');
           }
           if (outerCssFilter.trim()) {
-            element.style.setProperty('filter', outerCssFilter.trim(), 'important');
+            if (element.style) element.style.setProperty('filter', outerCssFilter.trim(), 'important');
           } else {
-            element.style.removeProperty('filter');
+            if (element.style) element.style.removeProperty('filter');
           }
 
           if (hasClipContent) {
