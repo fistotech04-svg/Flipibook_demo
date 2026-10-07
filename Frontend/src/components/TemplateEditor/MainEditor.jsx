@@ -3343,9 +3343,55 @@ const MainEditor = ({
 
       updatePageHtml(targetPageIndex, svg.outerHTML);
     });
+
+    const handleAddElement = (e) => {
+      console.log('handleAddElement triggered', e.detail);
+      const { svgContent, pageIndex, dropPoint } = e.detail;
+      const targetPageIndex = pageIndex !== undefined ? pageIndex : activePageIndex;
+      const page = pages[targetPageIndex];
+      if (!page) return;
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(page.html || '', 'image/svg+xml');
+      const svg = doc.querySelector('svg');
+      if (!svg) return;
+
+      const elementDoc = parser.parseFromString(`<svg xmlns="http://www.w3.org/2000/svg">${svgContent}</svg>`, 'image/svg+xml');
+      const newElement = elementDoc.querySelector('g') || elementDoc.querySelector('svg').firstElementChild;
+      if (!newElement) return;
+
+      // Positioning logic if dropped
+      if (dropPoint) {
+        // Simple translation for the group if necessary, though it might already have one
+        const currentTransform = newElement.getAttribute('transform') || '';
+        newElement.setAttribute('transform', `translate(${dropPoint.x - 100}, ${dropPoint.y - 25}) ${currentTransform}`);
+      }
+
+      const targetContainer = svg.querySelector('[data-type="frame"]') || svg.querySelector('[data-name="Overlay"]') || svg;
+      targetContainer.appendChild(newElement);
+
+      updatePageHtml(targetPageIndex, svg.outerHTML);
+
+      // Select the new element
+      const newId = newElement.getAttribute('id');
+      if (newId) {
+        if (typeof setSingleSelection === 'function') {
+          setSingleSelection(newId);
+        } else {
+          if (setSelectedLayerId) setSelectedLayerId(newId);
+          selectedLayerIdRef.current = newId;
+          if (setMultiSelectedIds) setMultiSelectedIds(new Set([newId]));
+          multiSelectedIdsRef.current = new Set([newId]);
+        }
+        if (typeof setActiveMainTool === 'function') setActiveMainTool('select');
+      }
+    };
+
+    window.addEventListener('add-element-to-editor', handleAddElement);
     window.addEventListener('add-image-to-editor', handleAddImage);
     window.addEventListener('upload-video-to-editor', handleUploadVideo);
     return () => {
+      window.removeEventListener('add-element-to-editor', handleAddElement);
       window.removeEventListener('add-icon-to-editor', handleAddIcon);
       window.removeEventListener('add-hotspot-to-editor', handleAddHotspot);
       window.removeEventListener('add-image-to-editor', handleAddImage);
@@ -4675,8 +4721,8 @@ const MainEditor = ({
       if (!isFrame && !isLine) {
         let localBBox = getVisualBBox(el);
         const isHotspot = el.getAttribute('data-is-hotspot') === 'true';
-        const isInteractiveButton = isHotspot && el.querySelector('rect') !== null && (el.querySelector('text') !== null || el.querySelector('[data-type="text"]') !== null);
-        if (isHotspot && isInteractiveButton) {
+        const isInteractiveButton = (isHotspot || el.getAttribute('data-type') === 'button') && el.querySelector('rect') !== null && (el.querySelector('text') !== null || el.querySelector('[data-type="text"]') !== null);
+        if (isInteractiveButton) {
           const rectChild = el.querySelector('rect');
           if (rectChild) {
             const w = parseFloat(rectChild.getAttribute('width')) || 0;
@@ -7391,6 +7437,14 @@ const MainEditor = ({
       return hotspotGroup;
     }
 
+    // Buttons are single compound elements; drag the whole button!
+    const buttonGroup = current && typeof current.closest === 'function' ? current.closest('[data-type="button"]') : null;
+    if (buttonGroup) {
+      if (!buttonGroup.id) {
+        buttonGroup.id = `button-${Date.now()}`;
+      }
+      return buttonGroup;
+    }
     // Embed frames are single compound elements; drag the whole wrapper!
     const embedFrame = current && typeof current.closest === 'function' ? current.closest('[data-type="embed-frame"]') : null;
     if (embedFrame) {
@@ -7435,6 +7489,8 @@ const MainEditor = ({
         current.getAttribute('data-name') !== 'Overlay' &&
         current.getAttribute('data-name') !== 'Document Shield' &&
         current.getAttribute('data-type') !== 'shield' &&
+        current.parentNode?.getAttribute('data-type') !== 'button' &&
+        current.parentNode?.parentNode?.getAttribute('data-type') !== 'button' &&
         !['svg', 'defs', 'clippath', 'lineargradient', 'radialgradient', 'pattern', 'filter', 'style', 'metadata'].includes(tagName)
       ) {
         current.id = `${tagName}-${Math.random().toString(36).substr(2, 9)}`;
@@ -7463,6 +7519,8 @@ const MainEditor = ({
           // Skip inner foreignobject/video/iframe and let it traverse to the parent video group
         } else if (current.parentNode?.getAttribute('data-is-gif-group') === 'true') {
           // Skip inner gif elements and let it traverse to parent gif group
+        } else if (current.parentNode?.getAttribute('data-type') === 'button' || current.parentNode?.parentNode?.getAttribute('data-type') === 'button') {
+          // Skip inner elements of a button and let it traverse to parent button group
         } else {
           if (!deepestElementWithId) deepestElementWithId = current;
         }
@@ -8593,7 +8651,7 @@ const MainEditor = ({
             const isCtrlPressedMove = event.ctrlKey || (event.sourceEvent && event.sourceEvent.ctrlKey) || isCtrlPressedRef.current;
 
             const isHotspot = el.getAttribute('data-is-hotspot') === 'true';
-            const isInteractiveButton = isHotspot && state.childrenData && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'rect') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
+            const isInteractiveButton = (isHotspot || el.getAttribute('data-type') === 'button') && state.childrenData && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'rect') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
             const isHotspotPreset = isHotspot && !isInteractiveButton;
 
             const isInteractiveUniform = isInteractiveButton && (dir === 'n' || dir === 's');
@@ -9009,9 +9067,8 @@ const MainEditor = ({
 
                   const la = state.localAnchor; // anchor in <g> local space
                   const isHotspot = el.getAttribute('data-is-hotspot') === 'true';
+                  const isInteractiveButton = (isHotspot || el.getAttribute('data-type') === 'button') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'rect') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
                   const isAudioGroup = el.getAttribute('data-type') === 'audio-frame' || el.getAttribute('data-type') === 'audio';
-                  const isInteractiveButton = isHotspot && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'rect') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
-
                   // ── HOTSPOT ICON GROUP: update outer transform, NOT children ───────
                   // Hotspot preset icon groups have transform="translate(tx,ty) scale(s)"
                   // with 48×48 inner content. Resizing must update this outer transform so
@@ -9061,7 +9118,7 @@ const MainEditor = ({
                     const tag = child.tagName?.toLowerCase();
                     const isChildText = tag === 'text' || child.getAttribute('data-type') === 'text';
 
-                    if (isHotspot && isInteractiveButton && (isChildText || tag === 'image' || tag === 'g' || tag === 'path')) {
+                    if (isInteractiveButton && (isChildText || tag === 'image' || tag === 'g' || tag === 'path')) {
                       return; // Text and icons are positioned/scaled in the dedicated interactive button block below
                     }
 
@@ -9400,7 +9457,7 @@ const MainEditor = ({
                     }
                   });
 
-                  if (isHotspot && isInteractiveButton) {
+                  if (isInteractiveButton) {
                     const rectData = state.childrenData.find(c => c.child.tagName.toLowerCase() === 'rect');
                     const textData = state.childrenData.find(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
 
@@ -10404,10 +10461,10 @@ const MainEditor = ({
       return;
     }
 
-    if (!['select', 'upload', 'grid'].includes(activeMainTool)) return;
+    if (!['select', 'upload', 'grid', 'element'].includes(activeMainTool)) return;
 
-    // Automatically close the icon popup (which uses 'grid' tool) when interacting with the canvas
-    if (activeMainTool === 'grid' && typeof setActiveMainTool === 'function') {
+    // Automatically close panels when interacting with the canvas
+    if ((activeMainTool === 'grid' || activeMainTool === 'element') && typeof setActiveMainTool === 'function') {
       setActiveMainTool('select');
     }
 
@@ -11571,6 +11628,7 @@ const MainEditor = ({
   const enterTextEditMode = (target, clientX = null, clientY = null, selectAll = false) => {
     if (!target || !target.id) return;
     if (activeTopTool === 'interaction' || activeTopTool === 'animation') return;
+    if (target.closest('[data-type="button"]')) return;
 
     let foTarget = target;
 
@@ -12426,9 +12484,20 @@ const MainEditor = ({
           // Already uniquely selected. Enter text edit mode if text!
           console.log('[handleSvgClick] Polygon clicked for already selected item:', polySelectionId);
           const underlyingEl = svg.querySelector(`[id="${polySelectionId}"]`);
-          if (underlyingEl && (underlyingEl.tagName.toLowerCase() === 'text' || underlyingEl.tagName.toLowerCase() === 'tspan' || underlyingEl.tagName.toLowerCase() === 'foreignobject')) {
-            console.log('[handleSvgClick] Entering text edit mode for', underlyingEl);
-            enterTextEditMode(underlyingEl, e.clientX, e.clientY);
+          if (underlyingEl) {
+            const tag = underlyingEl.tagName.toLowerCase();
+            const isButton = underlyingEl.getAttribute('data-type') === 'button';
+            
+            if (tag === 'text' || tag === 'tspan' || tag === 'foreignobject') {
+              console.log('[handleSvgClick] Entering text edit mode for', underlyingEl);
+              enterTextEditMode(underlyingEl, e.clientX, e.clientY);
+            } else if (isButton) {
+              const textNode = underlyingEl.querySelector('text') || underlyingEl.querySelector('foreignobject');
+              if (textNode) {
+                console.log('[handleSvgClick] Entering text edit mode for button text', textNode);
+                enterTextEditMode(textNode, e.clientX, e.clientY);
+              }
+            }
           }
           return;
         }
@@ -12917,10 +12986,24 @@ const MainEditor = ({
       return;
     }
 
-    const isText = (['text', 'tspan'].includes(target.tagName.toLowerCase()) || target.tagName.toLowerCase() === 'foreignobject') && target.getAttribute('data-type') !== 'video' && !target.querySelector('video, iframe');
-    if (isText && target.id) {
+    let isText = (['text', 'tspan'].includes(target.tagName.toLowerCase()) || target.tagName.toLowerCase() === 'foreignobject') && target.getAttribute('data-type') !== 'video' && !target.querySelector('video, iframe');
+    let textTarget = target;
+
+    // Allow double clicking text inside grouped elements (like buttons) to edit the text directly
+    if (!isText && target.getAttribute('data-type') === 'button') {
+      const clickedTag = e.target.tagName?.toLowerCase();
+      if (['text', 'tspan', 'foreignobject'].includes(clickedTag)) {
+        isText = true;
+        textTarget = clickedTag === 'tspan' ? e.target.closest('text') : (clickedTag === 'foreignobject' ? e.target : e.target.closest('text') || e.target);
+        if (textTarget && !textTarget.id) {
+          textTarget.id = `button-text-${Date.now()}`;
+        }
+      }
+    }
+
+    if (isText && textTarget && textTarget.id) {
       if (activeTopTool !== 'interaction' && activeTopTool !== 'animation') {
-        enterTextEditMode(target, e.clientX, e.clientY);
+        enterTextEditMode(textTarget, e.clientX, e.clientY);
       }
       return;
     }
@@ -14069,7 +14152,6 @@ const MainEditor = ({
                   Elements
                 </div>
               </div>
-
             </div>
           </div>
         )}
@@ -14208,9 +14290,10 @@ const MainEditor = ({
                                     }
 
                                     let data = null;
-
+                                    console.log('Drop Event Fired! Types:', e.dataTransfer.types);
+                                    
                                     // 1. Try reading JSON data
-                                    const rawJson = e.dataTransfer.getData('application/json');
+                                    const rawJson = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('application/x-flipbook-element');
                                     if (rawJson) {
                                       try { data = JSON.parse(rawJson); } catch (_) { }
                                     }
@@ -14315,6 +14398,15 @@ const MainEditor = ({
                                           isShape: data.type === 'shape'
                                         }
                                       }));
+                                    } else if (data.type === 'button') {
+                                      console.log('Button Dropped:', data);
+                                      window.dispatchEvent(new CustomEvent('add-element-to-editor', {
+                                        detail: {
+                                          pageIndex: displayIndex,
+                                          svgContent: data.svgContent,
+                                          dropPoint
+                                        }
+                                      }));
                                     } else if (data.type === 'image' || data.type === 'upload' || data.url) {
                                       window.dispatchEvent(new CustomEvent('add-image-to-editor', {
                                         detail: {
@@ -14338,6 +14430,7 @@ const MainEditor = ({
                                           targetShapeId
                                         }
                                       }));
+
                                     } else if (data.type === 'video') {
                                       window.dispatchEvent(new CustomEvent('upload-video-to-editor', {
                                         detail: {

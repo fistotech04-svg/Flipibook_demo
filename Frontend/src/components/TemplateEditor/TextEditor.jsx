@@ -367,9 +367,9 @@ const syncTextEffect = (doc, element) => {
           inner.style.removeProperty('filter');
         }
         if (outerCssFilter.trim()) {
-          element.style.setProperty('filter', outerCssFilter.trim(), 'important');
+          if (element.style) element.style.setProperty('filter', outerCssFilter.trim(), 'important');
         } else {
-          element.style.removeProperty('filter');
+          if (element.style) element.style.removeProperty('filter');
         }
 
         if (hasClipContent) {
@@ -1187,7 +1187,7 @@ const TextEditor = ({
 
       if (styleProp || attribute === 'data-stroke-position') {
         if (liveTag === 'foreignobject') {
-          if (liveEl.firstElementChild && styleProp) {
+          if (liveEl.firstElementChild && liveEl.firstElementChild.style && styleProp) {
             let applyVal = finalVal;
             if (styleProp === 'fontFamily' && typeof applyVal === 'string' && !applyVal.includes("'") && !applyVal.includes('"')) {
               applyVal = `'${applyVal}'`;
@@ -1344,7 +1344,7 @@ const TextEditor = ({
       }
 
       // --- CUSTOM SCROLLABLE & CORNER RADIUS HANDLING ---
-      if (liveTag === 'foreignobject' && liveEl.firstElementChild) {
+      if (liveTag === 'foreignobject' && liveEl.firstElementChild && liveEl.firstElementChild.style) {
         const isCurrentlyScrollable = liveEl.getAttribute('data-scrollable') === 'true' || attribute === 'data-scrollable' && value === 'true';
 
         if (attribute === 'data-scrollable') {
@@ -1513,7 +1513,7 @@ const TextEditor = ({
           // --- LIVE DOM UPDATE ---
           if (liveEl) {
             const liveTag = liveEl.tagName.toLowerCase();
-            if (liveTag === 'foreignobject' && liveEl.firstElementChild) {
+            if (liveTag === 'foreignobject' && liveEl.firstElementChild && liveEl.firstElementChild.style) {
               const liveTarget = liveEl.querySelector('.flipbook-text-scrollbar') || liveEl.firstElementChild;
 
               if (!skipLiveUpdate) {
@@ -1839,7 +1839,7 @@ const TextEditor = ({
               }
             };
 
-            if (element.firstElementChild) {
+            if (element.firstElementChild && element.firstElementChild.style) {
               if (styleProp === 'stroke' || styleProp === 'stroke-opacity') {
                 const s = styleProp === 'stroke' ? value : (element.getAttribute('stroke') || 'none');
                 const op = styleProp === 'stroke-opacity' ? value : (element.getAttribute('stroke-opacity') || '1');
@@ -1869,7 +1869,7 @@ const TextEditor = ({
             element.setAttribute(attrName, value);
 
             if (liveEl) {
-              if (liveEl.firstElementChild) {
+              if (liveEl.firstElementChild && liveEl.firstElementChild.style) {
                 if (styleProp === 'stroke' || styleProp === 'stroke-opacity') {
                   const s = styleProp === 'stroke' ? value : (liveEl.getAttribute('stroke') || 'none');
                   const op = styleProp === 'stroke-opacity' ? value : (liveEl.getAttribute('stroke-opacity') || '1');
@@ -1902,16 +1902,16 @@ const TextEditor = ({
             // For SVG elements (text, g, etc.) set both CSS style and SVG presentation attribute
             if (styleProp === 'strokeWidth') {
               element.setAttribute('stroke-width', value);
-              element.style.setProperty('stroke-width', `${value}px`, 'important');
+              if (element.style) element.style.setProperty('stroke-width', `${value}px`, 'important');
             } else if (styleProp === 'strokeDasharray') {
               element.setAttribute('stroke-dasharray', value);
-              element.style.setProperty('stroke-dasharray', value, 'important');
+              if (element.style) element.style.setProperty('stroke-dasharray', value, 'important');
             } else if (styleProp === 'strokeLinecap' || styleProp === 'strokeLinejoin') {
               const attrName = styleProp === 'strokeLinecap' ? 'stroke-linecap' : 'stroke-linejoin';
               element.setAttribute(attrName, value);
-              element.style.setProperty(attrName, value, 'important');
+              if (element.style) element.style.setProperty(attrName, value, 'important');
             } else {
-              element.style.setProperty(styleProp, finalVal, 'important');
+              if (element.style) element.style.setProperty(styleProp, finalVal, 'important');
             }
             // Use SVG attribute name (e.g., font-size, font-family, text-anchor)
             const svgAttrName = SVG_ATTR_MAP[attribute] || attribute;
@@ -1930,23 +1930,23 @@ const TextEditor = ({
               const pos = attribute === 'data-stroke-position' ? value : (element.getAttribute('data-stroke-position') || 'Center');
               const paintOrder = pos === 'Outside' ? 'stroke fill' : 'normal';
               element.setAttribute('paint-order', paintOrder);
-              element.style.setProperty('paint-order', paintOrder, 'important');
+              if (element.style) element.style.setProperty('paint-order', paintOrder, 'important');
             }
             // Propagate to tspan children so they inherit the style
             if (tag === 'text' || tag === 'g') {
               Array.from(element.querySelectorAll('tspan, path, rect, circle, ellipse, polygon, polyline')).forEach(child => {
                 if (styleProp === 'strokeWidth') {
                   child.setAttribute('stroke-width', value);
-                  child.style.setProperty('stroke-width', `${value}px`, 'important');
+                  if (child.style) child.style.setProperty('stroke-width', `${value}px`, 'important');
                 } else if (styleProp === 'strokeDasharray') {
                   child.setAttribute('stroke-dasharray', value);
-                  child.style.setProperty('stroke-dasharray', value, 'important');
+                  if (child.style) child.style.setProperty('stroke-dasharray', value, 'important');
                 } else if (styleProp === 'strokeLinecap' || styleProp === 'strokeLinejoin') {
                   const attrName = styleProp === 'strokeLinecap' ? 'stroke-linecap' : 'stroke-linejoin';
                   child.setAttribute(attrName, value);
-                  child.style.setProperty(attrName, value, 'important');
+                  if (child.style) child.style.setProperty(attrName, value, 'important');
                 } else {
-                  child.style.setProperty(styleProp, finalVal, 'important');
+                  if (child.style) child.style.setProperty(styleProp, finalVal, 'important');
                   if (attribute === 'textAlign') {
                     child.setAttribute('text-anchor', svgAttrVal);
                   } else {
@@ -1957,7 +1957,7 @@ const TextEditor = ({
                   const pos = attribute === 'data-stroke-position' ? value : (element.getAttribute('data-stroke-position') || 'Center');
                   const paintOrder = pos === 'Outside' ? 'stroke fill' : 'normal';
                   child.setAttribute('paint-order', paintOrder);
-                  child.style.setProperty('paint-order', paintOrder, 'important');
+                  if (child.style) child.style.setProperty('paint-order', paintOrder, 'important');
                 }
               });
             }
@@ -1965,7 +1965,7 @@ const TextEditor = ({
         } else {
           element.setAttribute(attribute, value);
           if (attribute && attribute.startsWith('data-bg-')) {
-            if (element.firstElementChild) {
+            if (element.firstElementChild && element.firstElementChild.style) {
               element.firstElementChild.style.setProperty('--' + attribute.substring(5), value, 'important');
             }
           }
@@ -1977,7 +1977,7 @@ const TextEditor = ({
           }
 
           // Handle scrollable updates for virtual doc
-          if (tag === 'foreignobject' && element.firstElementChild) {
+          if (tag === 'foreignobject' && element.firstElementChild && element.firstElementChild.style) {
             const isScrollable = element.getAttribute('data-scrollable') === 'true';
             const mode = element.getAttribute('data-sizing-mode');
             if (isScrollable) {
