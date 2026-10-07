@@ -7444,6 +7444,7 @@ const MainEditor = ({
         buttonGroup.id = `button-${Date.now()}`;
       }
       return buttonGroup;
+    }
     // Embed frames are single compound elements; drag the whole wrapper!
     const embedFrame = current && typeof current.closest === 'function' ? current.closest('[data-type="embed-frame"]') : null;
     if (embedFrame) {
@@ -9068,8 +9069,6 @@ const MainEditor = ({
                   const isHotspot = el.getAttribute('data-is-hotspot') === 'true';
                   const isInteractiveButton = (isHotspot || el.getAttribute('data-type') === 'button') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'rect') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
                   const isAudioGroup = el.getAttribute('data-type') === 'audio-frame' || el.getAttribute('data-type') === 'audio';
-                  const isInteractiveButton = isHotspot && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'rect') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
-
                   // ── HOTSPOT ICON GROUP: update outer transform, NOT children ───────
                   // Hotspot preset icon groups have transform="translate(tx,ty) scale(s)"
                   // with 48×48 inner content. Resizing must update this outer transform so

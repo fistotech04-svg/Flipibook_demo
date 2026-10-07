@@ -78,7 +78,7 @@ const Elements = () => {
     const categoryTitle = sectionData.find(s => s.id === activeCategory)?.title;
 
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex-1 flex flex-col h-full p-[1.5vw]">
         <div
           className="flex items-center gap-[0.5vw] mb-[1vw] cursor-pointer hover:bg-gray-50 p-[0.5vw] rounded-[0.4vw] transition-colors -ml-[0.5vw]"
           onClick={() => setActiveCategory(null)}
@@ -94,7 +94,7 @@ const Elements = () => {
   }
 
   return (
-    <div className="flex flex-col gap-[2vw]">
+    <div className="flex-1 flex flex-col gap-[2vw] h-full overflow-y-auto no-scrollbar pb-[2vw] p-[1.5vw]">
       <div className="flex items-center gap-[0.75vw]">
         <span className="text-[1.1vw] font-semibold text-gray-900 whitespace-nowrap">Elements</span>
         <div className="h-[0.1vw] flex-1 bg-gray-200"></div>

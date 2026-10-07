@@ -19,7 +19,6 @@ import GroupProperties from './GroupProperties';
 import ThirdPartyEmbedProperties from './Elements/3rdPartyEmbedProperties';
 import AudioProperties from './Elements/AudioProperties';
 import ImportViaUrlModal from './ImportViaUrlModal';
-import Elements from './Elements/Elements';
 import ButtonEditor from './Elements/ButtonEditor';
 import MapEditor from './Elements/MapEditor';
 import ColorPicker, { parseGradient } from './ColorPicker';
@@ -838,7 +837,6 @@ const RightSidebar = ({
           return props;
         }
 
-        const isUserGroup = lowerTagName === 'g' && (
         const isUserGroup = lowerTagName === 'g' && !isShape && !isAudio && (
           dataType === 'group' ||
           lowerDataName === 'group' ||
@@ -857,13 +855,8 @@ const RightSidebar = ({
           isPatternImage) && !isGif && !isPdfBackground && !isMap;
         const isVideo = (lowerTagName === 'video' || lowerTagName === 'iframe' || dataType === 'video' || lowerDataName.includes('video') || lowerId.includes('video') || (lowerTagName === 'foreignobject' && el.querySelector('video, iframe'))) && !isMap;
         const isText = (lowerTagName === 'text' || lowerTagName === 'tspan' || (lowerTagName === 'foreignobject' && !isVideo && !isMap)) || dataType === 'text' || lowerDataName.includes('text') || lowerId.includes('text');
-        const isIcon = dataType === 'icon' || dataType === 'hotspot' || lowerDataName.includes('icon') || lowerDataName.includes('hotspot') || lowerId.includes('icon') || lowerId.includes('hotspot') || lowerTagName.includes('lucide') || el.classList.contains('lucide') || el.classList.contains('iconify');
-        const isButton = dataType === 'button' || lowerId.includes('button');
-          isPatternImage) && !isGif && !isPdfBackground;
-
-        const isVideo = lowerTagName === 'video' || lowerTagName === 'iframe' || dataType === 'video' || lowerDataName.includes('video') || lowerId.includes('video') || (lowerTagName === 'foreignobject' && el.querySelector('video, iframe'));
-        const isText = (lowerTagName === 'text' || lowerTagName === 'tspan' || (lowerTagName === 'foreignobject' && !isVideo)) || dataType === 'text' || lowerDataName.includes('text') || lowerId.includes('text');
         const isIcon = (dataType === 'icon' || dataType === 'hotspot' || lowerDataName.includes('icon') || lowerDataName.includes('hotspot') || lowerId.includes('icon') || lowerId.includes('hotspot') || lowerTagName.includes('lucide') || el.classList.contains('lucide') || el.classList.contains('iconify')) && !isShape;
+        const isButton = dataType === 'button' || lowerId.includes('button');
         const isEmbed = dataType === 'embed-frame' || lowerDataName.includes('embed-frame') || lowerId.includes('embed-frame') || el.querySelector('[data-type="embed-frame"]') !== null;
 
         props.isUserGroup = isUserGroup;
@@ -1280,9 +1273,7 @@ const RightSidebar = ({
               </div>
             </div>
           ) : activeMainTool === 'element' ? (
-            <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar p-[1.5vw]">
-              <Elements />
-            </div>
+            <Elements />
           ) : (
             <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar">
               {isPdfProject ? (
