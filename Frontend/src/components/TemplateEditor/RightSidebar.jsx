@@ -12,9 +12,12 @@ import VideoEditor from './VideoEditor';
 import GifEditor from './Gif';
 import AnimationPanel from './AnimationPanel';
 import InteractionPanel from './InteractionPanel';
+import Elements from './Elements/Elements';
 import PopupTemplateSelection from './PopupTemplateSelection';
 import Model3DEditor from './Model3DEditor';
 import GroupProperties from './GroupProperties';
+import ThirdPartyEmbedProperties from './Elements/3rdPartyEmbedProperties';
+import AudioProperties from './Elements/AudioProperties';
 import ImportViaUrlModal from './ImportViaUrlModal';
 import Elements from './Elements/Elements';
 import ButtonEditor from './Elements/ButtonEditor';
@@ -778,6 +781,19 @@ const RightSidebar = ({
           }
         });
 
+        // For shapes added as SVGs wrapped in a <g>, extract inner shape properties
+        if (el.tagName.toLowerCase() === 'g') {
+           const innerShape = el.querySelector('path, polygon, rect, circle, ellipse, line');
+           if (innerShape) {
+               props.innerTagName = innerShape.tagName.toLowerCase();
+               Array.from(innerShape.attributes).forEach(attr => {
+                 if (['data-shape-type', 'data-count', 'data-ratio', 'data-radius', 'data-cx', 'data-cy', 'data-rx', 'rx'].includes(attr.name)) {
+                     props[attr.name] = attr.value;
+                 }
+               });
+           }
+        }
+
         // Add a flag for image detection
         const dataType = el.getAttribute('data-type');
         const dataName = el.getAttribute('data-name');
@@ -813,6 +829,8 @@ const RightSidebar = ({
         const isPdfBackground = lowerDataName.includes('pdf background') || lowerDataName.endsWith('-pdf') || lowerId.includes('background') || dataType === 'pdf-background';
 
         const isGif = isGifFile || lowerDataName.includes('gif') || lowerId.includes('gif') || el.getAttribute('data-is-gif-group') === 'true' || el.dataset?.mediaType === 'gif';
+        const isAudio = dataType === 'audio' || dataType === 'audio-frame' || lowerDataName.includes('audio') || lowerId.includes('audio') || (el && el.querySelector && el.querySelector('[data-type="audio-frame"]') !== null);
+        const isShape = dataType === 'shape' || el.getAttribute('data-shape-type') === 'shape';
 
         const isMap = dataType === 'map' || lowerId.includes('map');
         if (isMap) {
@@ -821,6 +839,7 @@ const RightSidebar = ({
         }
 
         const isUserGroup = lowerTagName === 'g' && (
+        const isUserGroup = lowerTagName === 'g' && !isShape && !isAudio && (
           dataType === 'group' ||
           lowerDataName === 'group' ||
           lowerId.startsWith('group-') ||
@@ -840,6 +859,12 @@ const RightSidebar = ({
         const isText = (lowerTagName === 'text' || lowerTagName === 'tspan' || (lowerTagName === 'foreignobject' && !isVideo && !isMap)) || dataType === 'text' || lowerDataName.includes('text') || lowerId.includes('text');
         const isIcon = dataType === 'icon' || dataType === 'hotspot' || lowerDataName.includes('icon') || lowerDataName.includes('hotspot') || lowerId.includes('icon') || lowerId.includes('hotspot') || lowerTagName.includes('lucide') || el.classList.contains('lucide') || el.classList.contains('iconify');
         const isButton = dataType === 'button' || lowerId.includes('button');
+          isPatternImage) && !isGif && !isPdfBackground;
+
+        const isVideo = lowerTagName === 'video' || lowerTagName === 'iframe' || dataType === 'video' || lowerDataName.includes('video') || lowerId.includes('video') || (lowerTagName === 'foreignobject' && el.querySelector('video, iframe'));
+        const isText = (lowerTagName === 'text' || lowerTagName === 'tspan' || (lowerTagName === 'foreignobject' && !isVideo)) || dataType === 'text' || lowerDataName.includes('text') || lowerId.includes('text');
+        const isIcon = (dataType === 'icon' || dataType === 'hotspot' || lowerDataName.includes('icon') || lowerDataName.includes('hotspot') || lowerId.includes('icon') || lowerId.includes('hotspot') || lowerTagName.includes('lucide') || el.classList.contains('lucide') || el.classList.contains('iconify')) && !isShape;
+        const isEmbed = dataType === 'embed-frame' || lowerDataName.includes('embed-frame') || lowerId.includes('embed-frame') || el.querySelector('[data-type="embed-frame"]') !== null;
 
         props.isUserGroup = isUserGroup;
         props.isMap = isMap;
@@ -849,7 +874,10 @@ const RightSidebar = ({
         props.isVideo = isVideo;
         props.isGif = isGif;
         props.isIcon = isIcon;
+        props.isShape = isShape;
+        props.isEmbed = isEmbed;
         props.isPdfBackground = isPdfBackground;
+        props.isAudio = isAudio;
 
         return props;
       }
@@ -1251,6 +1279,10 @@ const RightSidebar = ({
                 </div>
               </div>
             </div>
+          ) : activeMainTool === 'element' ? (
+            <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar p-[1.5vw]">
+              <Elements />
+            </div>
           ) : (
             <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar">
               {isPdfProject ? (
@@ -1273,7 +1305,19 @@ const RightSidebar = ({
                 <div className="flex flex-col p-[1.5vw] gap-[1.5vw]">
                   {(selectedElementProps || activeMainTool === 'grid') ? (
                     <div className="flex flex-col gap-[1.5vw]">
-                      {(selectedElementProps?.isUserGroup || (multiSelectedIds && multiSelectedIds.size > 1)) ? (
+                      {selectedElementProps?.isEmbed ? (
+                        <ThirdPartyEmbedProperties
+                          selectedElement={(() => {
+                            const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                            if (selectedLayerId) return editorDoc.getElementById(selectedLayerId);
+                            return null;
+                          })()}
+                          selectedLayerId={selectedLayerId}
+                          activePageIndex={activePageIndex}
+                          updateElementAttribute={updateElementAttribute}
+                          selectedElementProps={selectedElementProps}
+                        />
+                      ) : (selectedElementProps?.isUserGroup || (multiSelectedIds && multiSelectedIds.size > 1)) ? (
                         <GroupProperties
                           selectedElement={(() => {
                             const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
@@ -1487,6 +1531,17 @@ const RightSidebar = ({
                           flipbookVId={effectiveVId}
                           onDeleteLayer={() => deleteLayer?.(activePageIndex, selectedLayerId)}
                         />
+                      ) : selectedElementProps?.isEmbed ? (
+                        <ThirdPartyEmbedProperties
+                          selectedElementProps={selectedElementProps}
+                          activePageIndex={activePageIndex}
+                          selectedLayerId={selectedLayerId}
+                          updateElementAttribute={updateElementAttribute}
+                          selectedElement={(() => {
+                            const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                            return editorDoc.getElementById(selectedLayerId);
+                          })()}
+                        />
                       ) : selectedElementProps?.isGif ? (
                         <GifEditor
                           selectedElement={(() => {
@@ -1528,6 +1583,16 @@ const RightSidebar = ({
                           flipbookName={effectiveBook}
                           flipbookVId={effectiveVId}
                           onDeleteLayer={() => deleteLayer?.(activePageIndex, selectedLayerId)}
+                        />
+                      ) : selectedElementProps?.isAudio ? (
+                        <AudioProperties
+                          selectedElement={(() => {
+                            const pageContainer = document.querySelector(`.page-svg-container[data-page-index="${activePageIndex}"]`);
+                            return pageContainer?.querySelector(`[id="${selectedLayerId}"]`) || document.getElementById(selectedLayerId);
+                          })()}
+                          selectedLayerId={selectedLayerId}
+                          activePageIndex={activePageIndex}
+                          updateElementAttribute={updateElementAttribute}
                         />
                       ) : (
                         <>
@@ -1716,7 +1781,6 @@ const RightSidebar = ({
             folderName={effectiveFolder}
             flipbookName={effectiveBook}
           />
-
         ) : (
           /* Animation Mode */
           <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar p-[1.5vw]">

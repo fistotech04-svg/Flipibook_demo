@@ -2902,17 +2902,20 @@ const MainEditor = ({
       const centerY = e.detail.dropPoint ? e.detail.dropPoint.y : (svgH / 2);
 
       // Unique ID
-      const newId = `icon-${Date.now()}`;
+      const newId = e.detail.isShape ? `shape-${Date.now()}` : `icon-${Date.now()}`;
 
       // Create element
       const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       g.id = newId;
-      g.setAttribute('data-type', 'icon');
+      g.setAttribute('data-type', e.detail.isShape ? 'shape' : 'icon');
+      if (e.detail.isShape) {
+        g.setAttribute('data-shape-type', 'shape');
+      }
       // Place centered. Icon path is 24x24. Scaled by 0.5 = 12x12. Offset by -6 to truly center.
       g.setAttribute('transform', `translate(${centerX - 6}, ${centerY - 6}) scale(0.5)`);
-      g.setAttribute('fill', 'none');
-      g.setAttribute('stroke', '#000000');
-      g.setAttribute('stroke-width', '1');
+      g.setAttribute('fill', icon.fill !== undefined ? icon.fill : 'none');
+      g.setAttribute('stroke', icon.stroke !== undefined ? icon.stroke : '#000000');
+      g.setAttribute('stroke-width', icon.strokeWidth !== undefined ? icon.strokeWidth : '1');
       if (icon.Component) {
         // If it's a lucide icon component, we can't easily render it to a string here 
         // without react-dom/server or similar. 
@@ -6164,8 +6167,9 @@ const MainEditor = ({
               const elName = el.getAttribute('data-name') || '';
               const elType = el.getAttribute('data-type') || '';
               const isLocked = el.getAttribute('data-locked') === 'true';
+              const isEmbedGroup = el.getAttribute('data-type') === 'embed-frame' || el.querySelector('[data-type="embed-frame"]') !== null;
 
-              if (!isLocked && !elName.includes('PDF Background') && !elName.includes('Overlay') && elType !== 'frame' && elType !== 'background' && el.parentNode !== svg) {
+              if (!isLocked && !isEmbedGroup && !elName.includes('PDF Background') && !elName.includes('Overlay') && elType !== 'frame' && elType !== 'background' && el.parentNode !== svg) {
                 groupsToUngroup.add(el);
               }
             }
@@ -7261,8 +7265,10 @@ const MainEditor = ({
       return [];
     }
 
-    // If this element is an image/video/gif group, it should act as a single layer (no children exposed)
-    if (el.getAttribute('data-is-image-group') || el.getAttribute('data-is-video-group') || el.getAttribute('data-is-gif-group')) {
+    // If this element is an image/video/gif group, or a compound element (audio/embed/icon), it should act as a single layer (no children exposed)
+    const dataType = el.getAttribute('data-type');
+    if (el.getAttribute('data-is-image-group') || el.getAttribute('data-is-video-group') || el.getAttribute('data-is-gif-group') ||
+        dataType === 'embed-frame' || dataType === 'audio-frame' || dataType === 'icon' || (el.querySelector && el.querySelector('[data-type="audio-frame"]'))) {
       return [];
     }
 
@@ -7438,6 +7444,30 @@ const MainEditor = ({
         buttonGroup.id = `button-${Date.now()}`;
       }
       return buttonGroup;
+    // Embed frames are single compound elements; drag the whole wrapper!
+    const embedFrame = current && typeof current.closest === 'function' ? current.closest('[data-type="embed-frame"]') : null;
+    if (embedFrame) {
+      const parentG = embedFrame.parentElement;
+      if (parentG && parentG.tagName?.toLowerCase() === 'g' && parentG.id) {
+        return parentG;
+      }
+      if (!embedFrame.id) {
+        embedFrame.id = `embed-frame-${Date.now()}`;
+      }
+      return embedFrame;
+    }
+
+    // Audio frames are single compound elements; drag the whole wrapper!
+    const audioFrame = current && typeof current.closest === 'function' ? current.closest('[data-type="audio-frame"]') : null;
+    if (audioFrame) {
+      const parentG = audioFrame.parentElement;
+      if (parentG && parentG.tagName?.toLowerCase() === 'g' && parentG.id) {
+        return parentG;
+      }
+      if (!audioFrame.id) {
+        audioFrame.id = `audio-frame-${Date.now()}`;
+      }
+      return audioFrame;
     }
 
     let deepestElementWithId = null;
@@ -9037,6 +9067,8 @@ const MainEditor = ({
                   const la = state.localAnchor; // anchor in <g> local space
                   const isHotspot = el.getAttribute('data-is-hotspot') === 'true';
                   const isInteractiveButton = (isHotspot || el.getAttribute('data-type') === 'button') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'rect') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
+                  const isAudioGroup = el.getAttribute('data-type') === 'audio-frame' || el.getAttribute('data-type') === 'audio';
+                  const isInteractiveButton = isHotspot && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'rect') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
 
                   // ── HOTSPOT ICON GROUP: update outer transform, NOT children ───────
                   // Hotspot preset icon groups have transform="translate(tx,ty) scale(s)"
@@ -9044,7 +9076,7 @@ const MainEditor = ({
                   // the group's position and size in the page change correctly.
                   // Modifying children would only scale inside the 48×48 local space while
                   // the group's outer translate+scale stays the same → no visible resize effect.
-                  if (isHotspot && !isInteractiveButton) {
+                  if ((isHotspot && !isInteractiveButton) || isAudioGroup) {
                     try {
                       // finalX/Y/W/H are in the group's LOCAL coordinate space (0–48 range).
                       // Convert them to parent-local space using matrix (local→parent mapping).
@@ -9054,10 +9086,11 @@ const MainEditor = ({
                       const newTy = Math.min(ptOrigin.y, ptCorner.y);
                       const newW  = Math.abs(ptCorner.x - ptOrigin.x);
                       const newH  = Math.abs(ptCorner.y - ptOrigin.y);
-                      // Derive scale from inner content size (48×48 canonical size)
-                      const innerSize = (state.bbox && state.bbox.width > 0) ? state.bbox.width : 48;
-                      const newSx = newW / innerSize;
-                      const newSy = newH / innerSize;
+                      // Derive scale from inner content size
+                      const innerWidth = (state.bbox && state.bbox.width > 0) ? state.bbox.width : 48;
+                      const innerHeight = (state.bbox && state.bbox.height > 0) ? state.bbox.height : 48;
+                      const newSx = newW / innerWidth;
+                      const newSy = newH / innerHeight;
                       el.setAttribute('transform', `translate(${newTx}, ${newTy}) scale(${newSx}, ${newSy})`);
                     } catch (e) { /* fallback: do nothing if matrix ops fail */ }
                     // Update overlay handles to follow the new position during drag
@@ -14086,37 +14119,34 @@ const MainEditor = ({
                 )}
               </div>
 
-              {/* Grid Tool Row */}
-              <div className="flex items-center justify-start gap-[0.3vw] cursor-pointer relative group/tool">
+              {/* Icons Tool Row */}
+              <div className="flex items-center justify-start gap-[0.3vw] mb-[0.8vh] cursor-pointer relative group/tool">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setActiveMainTool('grid');
                     closeAllDropdowns();
                   }}
-                  className={`w-[2.1vw] h-[2.1vw] flex items-center justify-center rounded-[0.4vw] transition-all cursor-pointer ${activeMainTool === 'grid' ? 'bg-[#FFFFFF] shadow-sm' : 'hover:bg-white/50'}`}
+                  className={`w-[2.1vw] h-[2.1vw] flex items-center justify-center rounded-[0.4vw] transition-all cursor-pointer ${activeMainTool === 'grid' ? 'bg-[#111827] text-white shadow-sm' : 'hover:bg-white/50 text-[#111827]'}`}
                 >
-                  <Icon icon="tabler:icons" width="1.2vw" height="1.2vw" className="text-[#111827]" />
+                  <Icon icon="tabler:icons" width="1.2vw" height="1.2vw" />
                 </button>
                 <div className="w-[0.7vw]"></div> {/* Alignment spacer */}
                 <div className="absolute right-[calc(100%+0.6vw)] top-1/2 -translate-y-1/2 px-[0.6vw] py-[0.3vh] bg-gray-900/90 text-white text-[0.7vw] font-medium rounded-[0.4vw] shadow-md whitespace-nowrap opacity-0 group-hover/tool:opacity-100 transition-opacity duration-150 pointer-events-none z-50">
-                  Elements & Icons
+                  Icons
                 </div>
               </div>
-
-              {/* Component Tool Row */}
-              <div className="flex items-center justify-start gap-[0.3vw] cursor-pointer relative group/tool">
+              {/* Element Tool Row */}
+              <div className="flex items-center justify-start gap-[0.3vw] mb-[0.8vh] cursor-pointer relative group/tool">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (typeof setActiveMainTool === 'function') {
-                      setActiveMainTool('element');
-                      closeAllDropdowns();
-                    }
+                    setActiveMainTool('element');
+                    closeAllDropdowns();
                   }}
-                  className={`w-[2.1vw] h-[2.1vw] flex items-center justify-center rounded-[0.4vw] transition-all cursor-pointer ${activeMainTool === 'element' ? 'bg-[#FFFFFF] shadow-sm' : 'hover:bg-white/50'}`}
+                  className={`w-[2.1vw] h-[2.1vw] flex items-center justify-center rounded-[0.4vw] transition-all cursor-pointer ${activeMainTool === 'element' ? 'bg-[#111827] text-white shadow-sm' : 'hover:bg-white/50 text-[#111827]'}`}
                 >
-                  <Icon icon="mynaui:component" width="1.2vw" height="1.2vw" className="text-[#111827]" />
+                  <Icon icon="mynaui:component" width="1.2vw" height="1.2vw" />
                 </button>
                 <div className="w-[0.7vw]"></div> {/* Alignment spacer */}
                 <div className="absolute right-[calc(100%+0.6vw)] top-1/2 -translate-y-1/2 px-[0.6vw] py-[0.3vh] bg-gray-900/90 text-white text-[0.7vw] font-medium rounded-[0.4vw] shadow-md whitespace-nowrap opacity-0 group-hover/tool:opacity-100 transition-opacity duration-150 pointer-events-none z-50">
@@ -14179,7 +14209,7 @@ const MainEditor = ({
                         const isTypeActive = activeMainTool === 'type';
 
                         const pageHtml = pages[displayIndex]?.html;
-                        const isPageEmpty = !pages[displayIndex]?.isHidden && (!pageHtml || (pages[displayIndex]?.layers?.length === 1 && (!pages[displayIndex].layers[0].children || pages[displayIndex].layers[0].children.length === 0)));
+                        const isPageEmpty = !pages[displayIndex]?.isHidden && (!pageHtml || (pages[displayIndex]?.layers?.length === 0) || (pages[displayIndex]?.layers?.length === 1 && (!pages[displayIndex].layers[0].children || pages[displayIndex].layers[0].children.length === 0) && !pages[displayIndex].layers[0].id?.includes('shape') && !pages[displayIndex].layers[0].id?.includes('video') && !pages[displayIndex].layers[0].id?.includes('image') && !pages[displayIndex].layers[0].id?.includes('embed')));
 
                         return (
                           <div
@@ -14360,12 +14390,13 @@ const MainEditor = ({
                                         }
                                       }));
                                       setShowHotspotPopup(false);
-                                    } else if (data.type === 'icon') {
+                                    } else if (data.type === 'icon' || data.type === 'shape') {
                                       window.dispatchEvent(new CustomEvent('add-icon-to-editor', {
                                         detail: {
                                           pageIndex: displayIndex,
                                           icon: data.icon,
-                                          dropPoint
+                                          dropPoint,
+                                          isShape: data.type === 'shape'
                                         }
                                       }));
                                     } else if (data.type === 'button') {

@@ -71,10 +71,21 @@ const parseLayersFromSVG = (element) => {
         locked: child.getAttribute('data-locked') === 'true'
       };
 
-      // VIRTUAL EFFECT LAYERS FOR IMAGE/VIDEO/GIF GROUP
+      const isEmbedGroup = child.getAttribute('data-type') === 'embed-frame' || Array.from(child.children).some(c => c.getAttribute('data-type') === 'embed-frame');
+
+      const lowerDataName = (child.getAttribute('data-name') || id || '').toLowerCase();
+      const lowerId = (id || '').toLowerCase();
+      const isAudioFrame = child.getAttribute('data-type') === 'audio-frame' || 
+                           child.getAttribute('data-type') === 'audio' ||
+                           Array.from(child.children).some(c => c.getAttribute('data-type') === 'audio-frame' || c.getAttribute('data-type') === 'audio') || 
+                           child.getAttribute('data-interaction') === 'audio' ||
+                           lowerDataName.includes('audio') || 
+                           lowerId.includes('audio');
+
       const isGroup = child.getAttribute('data-is-image-group') === 'true' ||
         child.getAttribute('data-is-video-group') === 'true' ||
-        child.getAttribute('data-is-gif-group') === 'true';
+        child.getAttribute('data-is-gif-group') === 'true' ||
+        isEmbedGroup || isAudioFrame;
 
       const isPdfVector = child.getAttribute('data-type') === 'pdf-vector-layer';
 
@@ -104,6 +115,12 @@ const parseLayersFromSVG = (element) => {
         } else if (child.getAttribute('data-is-gif-group') === 'true') {
           coreName = 'GIF';
           coreType = 'image';
+        } else if (isEmbedGroup) {
+          coreName = 'Embed Frame';
+          coreType = 'embed-frame';
+        } else if (isAudioFrame) {
+          coreName = 'Audio';
+          coreType = 'audio-frame';
         } else if (isText) {
           coreName = 'Text';
           coreType = 'text';
@@ -3443,6 +3460,10 @@ const TemplateEditor = () => {
 
     if (!hasDropShadow && !hasInnerShadow && !hasBlur && !hasBackgroundBlur) {
       element.removeAttribute('filter');
+      if (element.getAttribute('data-type') === 'embed-frame') {
+        const fillLayer = element.querySelector('.embed-fill-layer');
+        if (fillLayer) fillLayer.removeAttribute('filter');
+      }
       element.style.backdropFilter = '';
       return;
     }
@@ -3771,6 +3792,12 @@ const TemplateEditor = () => {
         inner.style.setProperty('filter', finalFilterUrl, 'important');
         element.removeAttribute('filter');
       }
+    } else if (element.getAttribute('data-type') === 'embed-frame') {
+      const fillLayer = element.querySelector('.embed-fill-layer');
+      if (fillLayer) {
+        fillLayer.setAttribute('filter', finalFilterUrl);
+      }
+      element.removeAttribute('filter');
     } else {
       element.setAttribute('filter', finalFilterUrl);
     }
@@ -3858,6 +3885,14 @@ const TemplateEditor = () => {
               element.innerHTML = val;
             } else {
               element.setAttribute(attr, val);
+              
+              if (element.tagName.toLowerCase() === 'g' && (element.getAttribute('data-type') === 'shape' || element.getAttribute('data-shape-type') === 'shape')) {
+                const inner = element.querySelector('path, polygon, rect, circle, ellipse, line');
+                if (inner && ['data-shape-type', 'data-count', 'data-ratio', 'data-radius', 'data-cx', 'data-cy', 'data-rx', 'rx', 'data-tl', 'data-tr', 'data-bl', 'data-br'].includes(attr)) {
+                  inner.setAttribute(attr, val);
+                }
+              }
+
               if ((attr === 'fill' || attr === 'stroke' || attr === 'stroke-width' || attr === 'stroke-dasharray') && element.getAttribute('data-type') === 'icon') {
                 const children = element.querySelectorAll('*');
                 children.forEach(c => {
@@ -3881,6 +3916,10 @@ const TemplateEditor = () => {
                   }
                 });
               }
+              if ((attr === 'rx' || attr === 'ry') && element.getAttribute('data-type') === 'shape') {
+                const rects = element.querySelectorAll('rect');
+                rects.forEach(r => r.setAttribute(attr, val));
+              }
             }
             if (attr === 'stroke-width' && val !== '0' && (element.getAttribute('stroke') === 'none' || !element.getAttribute('stroke'))) {
               element.setAttribute('stroke', '#000000');
@@ -3899,14 +3938,21 @@ const TemplateEditor = () => {
           // --- DYNAMIC SHAPE REDRAW (FOR POLYGON/STAR/ROUNDED RECT) ---
           const isRectCorner = ['data-tl', 'data-tr', 'data-bl', 'data-br'].includes(attr);
           if (attr === 'data-count' || attr === 'data-rx' || attr === 'data-ry' || attr === 'data-ratio' || attr === 'data-radius' || isRectCorner || attr === 'rx') {
-            const shapeType = element.getAttribute('data-shape-type') || (element.tagName === 'rect' ? 'rectangle' : null);
+            let targetShape = element;
+            if (element.tagName.toLowerCase() === 'g') {
+              const inner = element.querySelector('path, polygon, rect, circle, ellipse, line');
+              if (inner && inner.hasAttribute('data-shape-type')) {
+                targetShape = inner;
+              }
+            }
+            const shapeType = targetShape.getAttribute('data-shape-type') || (targetShape.tagName === 'rect' ? 'rectangle' : null);
 
             if (shapeType === 'polygon' || shapeType === 'star') {
-              const cx = parseFloat(element.getAttribute('data-cx') || 0);
-              const cy = parseFloat(element.getAttribute('data-cy') || 0);
-              const rx = parseFloat(element.getAttribute('data-rx') || 0);
-              const count = parseInt(element.getAttribute('data-count') || 3);
-              const cr = parseFloat(element.getAttribute('data-radius') || 0);
+              const cx = parseFloat(targetShape.getAttribute('data-cx') || 0);
+              const cy = parseFloat(targetShape.getAttribute('data-cy') || 0);
+              const rx = parseFloat(targetShape.getAttribute('data-rx') || 0);
+              const count = parseInt(targetShape.getAttribute('data-count') || 3);
+              const cr = parseFloat(targetShape.getAttribute('data-radius') || 0);
 
               const pts = [];
               if (shapeType === 'polygon') {
@@ -3915,7 +3961,7 @@ const TemplateEditor = () => {
                   pts.push({ x: cx + rx * Math.cos(angle), y: cy + rx * Math.sin(angle) });
                 }
               } else if (shapeType === 'star') {
-                const ratio = parseFloat(element.getAttribute('data-ratio') || 40) / 100;
+                const ratio = parseFloat(targetShape.getAttribute('data-ratio') || 40) / 100;
                 const ri = rx * ratio;
                 const sides = count * 2;
                 for (let i = 0; i < sides; i++) {
@@ -3947,29 +3993,29 @@ const TemplateEditor = () => {
                   pathData += ` Q ${cp.q.x} ${cp.q.y}, ${cp.p2.x} ${cp.p2.y}`;
                 });
                 pathData += " Z";
-                element.setAttribute('d', pathData);
+                targetShape.setAttribute('d', pathData);
               } else {
-                element.setAttribute('d', `M ${pts.map(p => `${p.x},${p.y}`).join(' L ')} Z`);
+                targetShape.setAttribute('d', `M ${pts.map(p => `${p.x},${p.y}`).join(' L ')} Z`);
               }
             }
             else if (shapeType === 'rectangle' && (isRectCorner || attr === 'rx') && !rectRedrawnThisBatch) {
               // All corner attrs are already written in Pass 1 — read them fresh.
               rectRedrawnThisBatch = true;
-              const x = parseFloat(element.getAttribute('x') || 0);
-              const y = parseFloat(element.getAttribute('y') || 0);
-              const w = parseFloat(element.getAttribute('width') || 0);
-              const h = parseFloat(element.getAttribute('height') || 0);
-              const defR = parseFloat(element.getAttribute('rx') || 0);
+              const x = parseFloat(targetShape.getAttribute('x') || 0);
+              const y = parseFloat(targetShape.getAttribute('y') || 0);
+              const w = parseFloat(targetShape.getAttribute('width') || 0);
+              const h = parseFloat(targetShape.getAttribute('height') || 0);
+              const defR = parseFloat(targetShape.getAttribute('rx') || 0);
 
               // Clamp each corner radius to at most half the rect's shorter dimension.
               // Without clamping, radii > w/2 or h/2 cause bezier arcs to cross,
               // producing the unwanted eye/lens shape (matching CSS border-radius behaviour).
               const maxR = Math.min(w / 2, h / 2);
               const parseR = (v, d) => (v !== null && v !== '') ? (isNaN(parseFloat(v)) ? 0 : parseFloat(v)) : d;
-              const tl = Math.min(parseR(element.getAttribute('data-tl'), defR), maxR);
-              const tr = Math.min(parseR(element.getAttribute('data-tr'), defR), maxR);
-              const bl = Math.min(parseR(element.getAttribute('data-bl'), defR), maxR);
-              const br = Math.min(parseR(element.getAttribute('data-br'), defR), maxR);
+              const tl = Math.min(parseR(targetShape.getAttribute('data-tl'), defR), maxR);
+              const tr = Math.min(parseR(targetShape.getAttribute('data-tr'), defR), maxR);
+              const bl = Math.min(parseR(targetShape.getAttribute('data-bl'), defR), maxR);
+              const br = Math.min(parseR(targetShape.getAttribute('data-br'), defR), maxR);
 
               const d = `
                     M ${x + tl},${y}
@@ -3984,14 +4030,14 @@ const TemplateEditor = () => {
                     Z
                  `.replace(/\s+/g, ' ').trim();
 
-              if (element.tagName === 'rect') {
+              if (targetShape.tagName === 'rect') {
                 const path = doc.createElementNS('http://www.w3.org/2000/svg', 'path');
-                Array.from(element.attributes).forEach(a => path.setAttribute(a.name, a.value));
+                Array.from(targetShape.attributes).forEach(a => path.setAttribute(a.name, a.value));
                 path.setAttribute('d', d);
                 path.setAttribute('data-shape-type', 'rectangle');
-                element.parentNode.replaceChild(path, element);
+                targetShape.parentNode.replaceChild(path, targetShape);
               } else {
-                element.setAttribute('d', d);
+                targetShape.setAttribute('d', d);
               }
             }
           }

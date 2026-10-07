@@ -93,7 +93,8 @@ const ShapeProperties = ({
   activePageIndex,
   selectedLayerId,
   updateElementAttribute,
-  activeMainTool
+  activeMainTool,
+  hideCornerRadius = false
 }) => {
   const [openSubSection, setOpenSubSection] = useState('color');
 
@@ -122,7 +123,7 @@ const ShapeProperties = ({
     return Array.from(colors).slice(0, 12);
   }, [selectedElementProps, activePageIndex]);
 
-  const shapeType = selectedElementProps['data-shape-type'] || selectedElementProps.tagName?.toLowerCase();
+  const shapeType = selectedElementProps['data-shape-type'] || selectedElementProps.innerTagName || selectedElementProps.tagName?.toLowerCase();
 
   if (!selectedElementProps) return null;
 
@@ -229,7 +230,20 @@ const ShapeProperties = ({
   };
 
   const handleSetIsRadiusLinked = (val) => {
-    updateElementAttribute(activePageIndex, selectedLayerId, 'data-corner-linked', val ? 'true' : 'false');
+    if (val) {
+      const maxR = Math.max(radius.tl || 0, radius.tr || 0, radius.bl || 0, radius.br || 0);
+      updateElementAttribute(activePageIndex, selectedLayerId, {
+        'data-corner-linked': 'true',
+        'data-tl': maxR.toString(),
+        'data-tr': maxR.toString(),
+        'data-bl': maxR.toString(),
+        'data-br': maxR.toString(),
+        'rx': maxR.toString(),
+        'ry': maxR.toString()
+      });
+    } else {
+      updateElementAttribute(activePageIndex, selectedLayerId, 'data-corner-linked', 'false');
+    }
   };
 
   const activeEffects = [];
@@ -472,7 +486,7 @@ const ShapeProperties = ({
         />
       </div>
 
-      {(shapeType === 'rect' || shapeType === 'rectangle') && (
+      {!hideCornerRadius && (shapeType === 'rect' || shapeType === 'rectangle' || shapeType === 'shape' || selectedElementProps.innerTagName === 'rect') && (
         <CornerRadius
           openSubSection={openSubSection}
           setOpenSubSection={setOpenSubSection}
