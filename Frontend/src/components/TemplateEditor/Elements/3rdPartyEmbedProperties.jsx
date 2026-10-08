@@ -494,8 +494,10 @@ const ThirdPartyEmbedProperties = ({
           node = node.parentElement;
         }
         if (lastSvg) {
+          const cloneSvg = lastSvg.cloneNode(true);
+          cloneSvg.querySelectorAll('[data-highlight-id], .frame-boundary').forEach(el => el.remove());
           const serializer = new XMLSerializer();
-          const html = serializer.serializeToString(lastSvg);
+          const html = serializer.serializeToString(cloneSvg);
           updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', html);
         }
       }
@@ -534,8 +536,10 @@ const ThirdPartyEmbedProperties = ({
           node = node.parentElement;
         }
         if (lastSvg) {
+          const cloneSvg = lastSvg.cloneNode(true);
+          cloneSvg.querySelectorAll('[data-highlight-id], .frame-boundary').forEach(el => el.remove());
           const serializer = new XMLSerializer();
-          const html = serializer.serializeToString(lastSvg);
+          const html = serializer.serializeToString(cloneSvg);
           updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', html);
         }
       }

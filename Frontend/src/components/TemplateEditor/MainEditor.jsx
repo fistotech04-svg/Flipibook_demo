@@ -8047,6 +8047,9 @@ const MainEditor = ({
                 const clone = el.cloneNode(true);
                 clone.id = generateId();
                 clone.removeAttribute('data-dragging');
+                clone.removeAttribute('data-selected');
+                clone.removeAttribute('data-hovered');
+                clone.querySelectorAll('[data-highlight-id], .frame-boundary, .slideshow-transition-clone').forEach(child => child.remove());
                 const elementsWithId = clone.querySelectorAll('[id]');
                 elementsWithId.forEach(child => {
                   child.id = generateId();
