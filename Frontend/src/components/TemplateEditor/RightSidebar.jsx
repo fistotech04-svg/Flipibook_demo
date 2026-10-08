@@ -17,6 +17,7 @@ import PopupTemplateSelection from './PopupTemplateSelection';
 import Model3DEditor from './Model3DEditor';
 import GroupProperties from './GroupProperties';
 import ThirdPartyEmbedProperties from './Elements/3rdPartyEmbedProperties';
+import QRCodeProperties from './Elements/QRCodeProperties';
 import AudioProperties from './Elements/AudioProperties';
 import ImportViaUrlModal from './ImportViaUrlModal';
 import ButtonEditor from './Elements/ButtonEditor';
@@ -838,6 +839,12 @@ const RightSidebar = ({
           return props;
         }
 
+        const isQRCode = dataType === 'qrcode' || lowerId.includes('qrcode');
+        if (isQRCode) {
+          props.isQRCode = true;
+          return props;
+        }
+
         const isUserGroup = lowerTagName === 'g' && !isShape && !isAudio && (
           dataType === 'group' ||
           lowerDataName === 'group' ||
@@ -1454,6 +1461,19 @@ const RightSidebar = ({
                         />
                       ) : selectedElementProps?.isMap ? (
                         <MapEditor
+                          selectedElement={(() => {
+                            const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                            return editorDoc.getElementById(selectedLayerId);
+                          })()}
+                          onUpdate={(newHtml) => {
+                            window.__skipCanvasUpdateForPage = activePageIndex;
+                            if (typeof newHtml === 'string') {
+                              updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', newHtml);
+                            }
+                          }}
+                        />
+                      ) : selectedElementProps?.isQRCode ? (
+                        <QRCodeProperties
                           selectedElement={(() => {
                             const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
                             return editorDoc.getElementById(selectedLayerId);
