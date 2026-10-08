@@ -71,7 +71,6 @@ const ThirdPartyEmbedProperties = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [embedWidth, setEmbedWidth] = useState('650');
   const [embedHeight, setEmbedHeight] = useState('400');
-  const [opacity, setOpacity] = useState(100);
   const [pageZoom, setPageZoom] = useState(100);
   const [multiPageSync, setMultiPageSync] = useState(false);
   const [url, setUrl] = useState('');
@@ -153,18 +152,6 @@ const ThirdPartyEmbedProperties = ({
     }
     setCustomCode(code);
   }, [webCodeType, embedSrc, embedWidth, embedHeight, autoplay, muted, controls, loop, startTime, endTime, fullscreen]);
-
-  React.useEffect(() => {
-    if (selectedElementProps) {
-      if (selectedElementProps['data-iframe-opacity'] !== undefined) {
-        setOpacity(Math.round(parseFloat(selectedElementProps['data-iframe-opacity']) * 100));
-      } else if (selectedElementProps.opacity !== undefined) {
-        setOpacity(Math.round(parseFloat(selectedElementProps.opacity) * 100));
-      } else {
-        setOpacity(100);
-      }
-    }
-  }, [selectedElementProps?.opacity, selectedElementProps?.['data-iframe-opacity']]);
 
   React.useEffect(() => {
     if (selectedElementProps) {
@@ -554,19 +541,7 @@ const ThirdPartyEmbedProperties = ({
       }
     }, 500);
     return () => clearTimeout(timeoutId);
-  }, [backgroundColor.fill, backgroundColor.fillOpacity, backgroundColor.stroke, backgroundColor.strokeOpacity, backgroundColor.strokeWeight, backgroundColor.strokeDashStyle, opacity, selectedElement, activePageIndex, selectedLayerId, updateElementAttribute]);
-
-  // 5. Sync iframe opacity to DOM in real-time
-  React.useEffect(() => {
-    if (!selectedElement) return;
-    const frameGroup = selectedElement.querySelector('[data-type="embed-frame"]') || (selectedElement.getAttribute('data-type') === 'embed-frame' ? selectedElement : null);
-    if (!frameGroup) return;
-
-    const innerG = frameGroup.querySelector('g.embed-content-group');
-    if (innerG) {
-      innerG.setAttribute('opacity', (opacity / 100).toString());
-    }
-  }, [opacity, selectedElement]);
+  }, [backgroundColor.fill, backgroundColor.fillOpacity, backgroundColor.stroke, backgroundColor.strokeOpacity, backgroundColor.strokeWeight, backgroundColor.strokeDashStyle, selectedElement, activePageIndex, selectedLayerId, updateElementAttribute]);
 
   return (
     <div className="flex flex-col font-sans h-full">
@@ -694,24 +669,6 @@ const ThirdPartyEmbedProperties = ({
           </div>
         </div>
       </div>
-
-      <div className="border-t border-gray-100 mt-[1vw]"></div>
-
-
-      {/* Opacity */}
-      <PropertySlider
-        label="Opacity"
-        value={opacity}
-        onChange={(val) => {
-          setOpacity(val);
-          updateElementAttribute(activePageIndex, selectedLayerId, {
-            'data-iframe-opacity': (val / 100).toString(),
-            'opacity': '1'
-          });
-        }}
-        min={0}
-        max={100}
-      />
 
       <div className="border-t border-gray-100 mt-[1vw]"></div>
 

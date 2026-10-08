@@ -517,7 +517,7 @@ const ButtonStyle = () => {
               </clipPath>
             </defs>
             <g className="btn13-preview-group cursor-pointer">
-              <g className="btn13-preview" transform-origin="center">
+              <g className="btn13-preview" transformOrigin="center">
                 <rect width="198" height="48" rx="8" fill="#4ADE80" />
                 <g clipPath="url(#clip-btn13-preview)">
                   <path d="M0,0 Q60,0 40,48 L0,48 Z" fill="rgba(255,255,255,0.2)" />
