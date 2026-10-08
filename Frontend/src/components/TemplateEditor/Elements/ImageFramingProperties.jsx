@@ -59,28 +59,12 @@ const ImageFramingProperties = ({ selectedElement, selectedLayerId, activePageIn
         const match = fill.match(/url\(#([^)]+)\)/);
         if (match && match[1]) {
           const patternId = match[1];
-          let currentImage = null;
-          
-          // Try to find if this pattern has a user-uploaded image
-          let svgRoot = selectedElement;
-          while (svgRoot && svgRoot.tagName?.toLowerCase() !== 'svg') {
-            svgRoot = svgRoot.parentElement;
-          }
-          if (svgRoot) {
-            const pattern = svgRoot.querySelector(`pattern[id="${patternId}"]`);
-            if (pattern) {
-              const imgNode = pattern.querySelector('image, img');
-              if (imgNode) {
-                currentImage = imgNode.getAttribute('href') || imgNode.getAttribute('xlink:href');
-              }
-            }
-          }
-
+          // We'll update currentImage later via a function that runs initially and on mutations
           imageSlots.push({
             id: patternId,
             path: path,
             index: idx,
-            currentImage: currentImage
+            currentImage: null
           });
 
           // Highlight overlay logic
@@ -95,6 +79,7 @@ const ImageFramingProperties = ({ selectedElement, selectedLayerId, activePageIn
               highlight.setAttribute('fill', 'none');
               highlight.setAttribute('stroke', '#2563eb');
               highlight.setAttribute('stroke-width', '2');
+              highlight.setAttribute('vector-effect', 'non-scaling-stroke');
               highlight.setAttribute('stroke-dasharray', '4,5');
               selectedElement.appendChild(highlight);
             }
@@ -161,6 +146,44 @@ const ImageFramingProperties = ({ selectedElement, selectedLayerId, activePageIn
 
     setSlots(imageSlots);
 
+    let svgRoot = selectedElement;
+    while (svgRoot && svgRoot.tagName?.toLowerCase() !== 'svg') {
+      svgRoot = svgRoot.parentElement;
+    }
+
+    const updateSlotsImages = () => {
+      if (!svgRoot) return;
+      setSlots(prevSlots => {
+        let changed = false;
+        const newSlots = prevSlots.map(slot => {
+          const pattern = svgRoot.querySelector(`pattern[id="${slot.id}"]`);
+          let currentImage = null;
+          if (pattern) {
+            const imgNode = pattern.querySelector('image, img');
+            if (imgNode) {
+              currentImage = imgNode.getAttribute('href') || imgNode.getAttribute('xlink:href');
+            }
+          }
+          if (slot.currentImage !== currentImage) {
+            changed = true;
+            return { ...slot, currentImage };
+          }
+          return slot;
+        });
+        return changed ? newSlots : prevSlots;
+      });
+    };
+
+    updateSlotsImages();
+
+    let observer = null;
+    if (svgRoot) {
+      observer = new MutationObserver(() => {
+        updateSlotsImages();
+      });
+      observer.observe(svgRoot, { childList: true, subtree: true, attributes: true, attributeFilter: ['href', 'xlink:href'] });
+    }
+
     // Load initial gap and radius from the first valid path
     if (paths.length > 0) {
       const firstPath = paths[0];
@@ -188,6 +211,7 @@ const ImageFramingProperties = ({ selectedElement, selectedLayerId, activePageIn
         path.removeEventListener('dblclick', handleDoubleClick);
         removeHighlight();
       });
+      if (observer) observer.disconnect();
       activeSlotRef.current = null;
       setActiveSlotId(null);
     };
@@ -207,12 +231,8 @@ const ImageFramingProperties = ({ selectedElement, selectedLayerId, activePageIn
     if (!file) return;
 
     const isVideo = file.type.startsWith('video/');
-    let isGif = file.type === 'image/gif';
-    if (!isGif && file.type.includes('webp')) {
-      isGif = await checkIsAnimatedWebp(file);
-    }
 
-    if (!file.type.startsWith('image/') && !isVideo && !isGif) {
+    if (!file.type.startsWith('image/') && !isVideo) {
       alert('Only Image formats are allowed for slots.');
       e.target.value = '';
       return;
@@ -484,8 +504,8 @@ const ImageFramingProperties = ({ selectedElement, selectedLayerId, activePageIn
               )}
             </span>
             <div
-              className={`border-2 border-dashed rounded-[0.5vw] flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden group ${
-                activeSlotId === slot.id ? 'ring-2 ring-offset-2 ring-blue-500 border-blue-500 ' : ''
+              className={`border border-dashed rounded-[0.5vw] flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden group ${
+                activeSlotId === slot.id ? 'ring-1 ring-offset-1 ring-blue-500 border-blue-500 ' : ''
               } ${
                 slot.currentImage 
                   ? (activeSlotId === slot.id ? 'bg-blue-50 h-[5vw]' : 'border-gray-300 hover:border-[#4c5add] bg-gray-50 h-[5vw]')

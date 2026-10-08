@@ -14372,7 +14372,10 @@ const MainEditor = ({
                                       const frame = e.target.closest('[data-type="image-frame"]');
                                       if (leaf && leaf.id && !leaf.id.includes('mask') && !leaf.id.includes('clip')) {
                                         targetShapeId = leaf.id;
-                                      } else if (frame && e.target.tagName !== 'g' && e.target.id && !e.target.id.includes('mask') && !e.target.id.includes('clip')) {
+                                      } else if (frame && e.target.tagName !== 'g' && (!e.target.id || (!e.target.id.includes('mask') && !e.target.id.includes('clip')))) {
+                                        if (!e.target.id) {
+                                          e.target.id = `frame-slot-${Math.random().toString(36).substr(2, 9)}`;
+                                        }
                                         targetShapeId = e.target.id;
                                       }
                                     }
