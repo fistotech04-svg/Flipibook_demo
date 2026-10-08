@@ -486,7 +486,7 @@ const ThirdPartyEmbedProperties = ({
         `;
       }
 
-      if (updateElementAttribute) {
+      if (updateElementAttribute && selectedElement) {
         let node = selectedElement;
         let lastSvg = null;
         while (node) {
@@ -504,7 +504,7 @@ const ThirdPartyEmbedProperties = ({
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [url, customCode, embedWidth, embedHeight, selectedElement, activePageIndex, selectedLayerId, updateElementAttribute]);
+  }, [url, customCode, embedWidth, embedHeight, activePageIndex, selectedLayerId, updateElementAttribute]); // Removed selectedElement to prevent infinite loop
 
   // 3. Sync fill color to DOM in real-time
   React.useEffect(() => {
@@ -525,8 +525,21 @@ const ThirdPartyEmbedProperties = ({
   }, [backgroundColor.fill, backgroundColor.fillOpacity, selectedElement]);
 
   // 4. Debounced __dom_sync__ update for color changes
+  const prevColorRef = React.useRef(backgroundColor);
+  
   React.useEffect(() => {
     if (!selectedElement) return;
+    
+    const bgChanged = 
+      prevColorRef.current.fill !== backgroundColor.fill ||
+      prevColorRef.current.fillOpacity !== backgroundColor.fillOpacity ||
+      prevColorRef.current.stroke !== backgroundColor.stroke ||
+      prevColorRef.current.strokeOpacity !== backgroundColor.strokeOpacity ||
+      prevColorRef.current.strokeWeight !== backgroundColor.strokeWeight ||
+      prevColorRef.current.strokeDashStyle !== backgroundColor.strokeDashStyle;
+      
+    if (!bgChanged) return;
+    
     const timeoutId = setTimeout(() => {
       if (updateElementAttribute) {
         let node = selectedElement;
@@ -541,11 +554,12 @@ const ThirdPartyEmbedProperties = ({
           const serializer = new XMLSerializer();
           const html = serializer.serializeToString(cloneSvg);
           updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', html);
+          prevColorRef.current = backgroundColor;
         }
       }
     }, 500);
     return () => clearTimeout(timeoutId);
-  }, [backgroundColor.fill, backgroundColor.fillOpacity, backgroundColor.stroke, backgroundColor.strokeOpacity, backgroundColor.strokeWeight, backgroundColor.strokeDashStyle, selectedElement, activePageIndex, selectedLayerId, updateElementAttribute]);
+  }, [backgroundColor, activePageIndex, selectedLayerId, updateElementAttribute]); // Removed selectedElement to prevent infinite loop
 
   return (
     <div className="flex flex-col font-sans h-full">
