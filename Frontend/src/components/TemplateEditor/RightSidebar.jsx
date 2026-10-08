@@ -21,6 +21,7 @@ import AudioProperties from './Elements/AudioProperties';
 import ImportViaUrlModal from './ImportViaUrlModal';
 import ButtonEditor from './Elements/ButtonEditor';
 import MapEditor from './Elements/MapEditor';
+import ImageFramingProperties from './Elements/ImageFramingProperties';
 import ColorPicker, { parseGradient } from './ColorPicker';
 import MediaGalleryPopup from './MediaGalleryPopup';
 import { generateGradientString } from "../CustomizedEditor/AppearanceShared";
@@ -857,6 +858,8 @@ const RightSidebar = ({
         const isText = (lowerTagName === 'text' || lowerTagName === 'tspan' || (lowerTagName === 'foreignobject' && !isVideo && !isMap)) || dataType === 'text' || lowerDataName.includes('text') || lowerId.includes('text');
         const isIcon = (dataType === 'icon' || dataType === 'hotspot' || lowerDataName.includes('icon') || lowerDataName.includes('hotspot') || lowerId.includes('icon') || lowerId.includes('hotspot') || lowerTagName.includes('lucide') || el.classList.contains('lucide') || el.classList.contains('iconify')) && !isShape;
         const isButton = dataType === 'button' || lowerId.includes('button');
+        const isActuallyImage = lowerTagName === 'image' || lowerTagName === 'img' || el.hasAttribute('href') || el.hasAttribute('xlink:href');
+        const isImageFrame = !isActuallyImage && (dataType === 'image-frame' || el.getAttribute('data-type') === 'image-frame' || lowerDataName.includes('image-frame') || lowerId.includes('image-frame') || (el.closest && el.closest('[data-type="image-frame"]') !== null));
         const isEmbed = dataType === 'embed-frame' || lowerDataName.includes('embed-frame') || lowerId.includes('embed-frame') || el.querySelector('[data-type="embed-frame"]') !== null;
 
         props.isUserGroup = isUserGroup;
@@ -869,6 +872,7 @@ const RightSidebar = ({
         props.isIcon = isIcon;
         props.isShape = isShape;
         props.isEmbed = isEmbed;
+        props.isImageFrame = isImageFrame;
         props.isPdfBackground = isPdfBackground;
         props.isAudio = isAudio;
 
@@ -1304,6 +1308,29 @@ const RightSidebar = ({
                             return null;
                           })()}
                           selectedLayerId={selectedLayerId}
+                          activePageIndex={activePageIndex}
+                          updateElementAttribute={updateElementAttribute}
+                          selectedElementProps={selectedElementProps}
+                        />
+                      ) : selectedElementProps?.isImageFrame ? (
+                        <ImageFramingProperties
+                          selectedElement={(() => {
+                            const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                            if (selectedLayerId) {
+                              const el = editorDoc.getElementById(selectedLayerId);
+                              return el?.closest('[data-type="image-frame"]') || el;
+                            }
+                            return null;
+                          })()}
+                          selectedLayerId={(() => {
+                             const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                             if (selectedLayerId) {
+                               const el = editorDoc.getElementById(selectedLayerId);
+                               const parent = el?.closest('[data-type="image-frame"]');
+                               return parent ? parent.id : selectedLayerId;
+                             }
+                             return selectedLayerId;
+                          })()}
                           activePageIndex={activePageIndex}
                           updateElementAttribute={updateElementAttribute}
                           selectedElementProps={selectedElementProps}

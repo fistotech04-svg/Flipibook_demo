@@ -6697,6 +6697,78 @@ const MainEditor = ({
         const shapeEl = svg.querySelector(`[id="${targetShapeId}"]`);
         if (shapeEl) {
           try {
+            const frame = shapeEl.closest('[data-type="image-frame"]');
+            const fillAttr = shapeEl.getAttribute('fill');
+            if (frame && fillAttr && fillAttr.startsWith('url(#pattern')) {
+              const match = fillAttr.match(/url\(#([^)]+)\)/);
+              if (match && match[1]) {
+                const patternId = match[1];
+                const pattern = frame.querySelector(`pattern[id="${patternId}"]`);
+                if (pattern) {
+                  let imageNode = pattern.querySelector('image, img');
+                  const useNode = pattern.querySelector('use');
+                  
+                  // Compute the correct matrix to cover the slot (object-fit: cover equivalent in objectBoundingBox space)
+                  let bbox = { width: 100, height: 100 };
+                  try {
+                    bbox = shapeEl.getBBox();
+                  } catch(e) {}
+                  if (bbox.width === 0 || bbox.height === 0) bbox = { width: 100, height: 100 };
+
+                  const slotW = bbox.width;
+                  const slotH = bbox.height;
+                  const imgW = imgWidth || 100;
+                  const imgH = imgHeight || 100;
+
+                  const scale = Math.max(slotW / imgW, slotH / imgH);
+                  const finalW = imgW * scale;
+                  const finalH = imgH * scale;
+
+                  const scaleX_obb = scale / slotW;
+                  const scaleY_obb = scale / slotH;
+
+                  const tx_user = (slotW - finalW) / 2;
+                  const ty_user = (slotH - finalH) / 2;
+
+                  const tx_obb = tx_user / slotW;
+                  const ty_obb = ty_user / slotH;
+
+                  if (!imageNode && useNode) {
+                    imageNode = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+                    pattern.removeChild(useNode);
+                    pattern.appendChild(imageNode);
+                  } else if (!imageNode) {
+                    imageNode = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+                    pattern.appendChild(imageNode);
+                  }
+
+                  imageNode.setAttribute('width', imgW);
+                  imageNode.setAttribute('height', imgH);
+                  imageNode.removeAttribute('preserveAspectRatio');
+                  imageNode.setAttribute('transform', `matrix(${scaleX_obb} 0 0 ${scaleY_obb} ${tx_obb} ${ty_obb})`);
+                  
+                  imageNode.setAttribute('href', dataUrl);
+                  imageNode.setAttribute('xlink:href', dataUrl);
+                  imageNode.setAttribute('data-target-shape', shapeEl.id);
+                  // We DO NOT add class image-frame-image, to prevent direct selection if not desired
+                  // or actually, if we want them to select it, we would. But getDraggableElement skips the frame
+                  // if it hits an image! Wait! If it's inside a <pattern>, getDraggableElement will NEVER hit it!
+                  // Because the pattern is in <defs> and not part of the rendering tree hit test. The user clicks the <rect> that uses the pattern!
+                  // So getDraggableElement will hit the <rect>, and promote it to the image-frame!
+                  
+                  if (updatePageHtml) saveModifiedPageHtml(pageIdx, svg);
+                  
+                  // Keep the frame selected
+                  if (typeof setSingleSelection === 'function') {
+                    setSingleSelection(frame.id);
+                  } else {
+                    if (setSelectedLayerId) setSelectedLayerId(frame.id);
+                  }
+                  return; // Stop here, don't do the clipping logic
+                }
+              }
+            }
+
             // Check if it already has a fill, to store it
             if (!shapeEl.hasAttribute('data-original-fill')) {
               shapeEl.setAttribute('data-original-fill', shapeEl.getAttribute('fill') || '#d0ccff');
@@ -7456,6 +7528,15 @@ const MainEditor = ({
         embedFrame.id = `embed-frame-${Date.now()}`;
       }
       return embedFrame;
+    }
+
+    // Image frames are single compound elements; drag the whole wrapper!
+    const imageFrame = current && typeof current.closest === 'function' ? current.closest('[data-type="image-frame"]') : null;
+    if (imageFrame && current.tagName?.toLowerCase() !== 'image' && current.tagName?.toLowerCase() !== 'img') {
+      if (!imageFrame.id) {
+        imageFrame.id = `image-frame-${Date.now()}`;
+      }
+      return imageFrame;
     }
 
     // Audio frames are single compound elements; drag the whole wrapper!
@@ -12961,7 +13042,8 @@ const MainEditor = ({
     if (!isModuleWithoutPenEdit && target && !['text', 'tspan', 'foreignobject'].includes(target.tagName?.toLowerCase())) {
       const tag = target.tagName?.toLowerCase();
       const dataType = target.getAttribute('data-type') || '';
-      const isVectorOrPath = (
+      const isElementShapeOrIcon = target.closest('g[data-type="shape"]') !== null || target.closest('g[data-type="icon"]') !== null;
+      const isVectorOrPath = !isElementShapeOrIcon && (
         tag === 'path' ||
         dataType === 'vector-path' ||
         dataType === 'shape' ||
@@ -14284,8 +14366,11 @@ const MainEditor = ({
                                     let targetShapeId = undefined;
                                     if (e.target) {
                                       const leaf = e.target.closest('[data-type="shape"], [data-type="vector-path"], [data-shape-type]');
+                                      const frame = e.target.closest('[data-type="image-frame"]');
                                       if (leaf && leaf.id && !leaf.id.includes('mask') && !leaf.id.includes('clip')) {
                                         targetShapeId = leaf.id;
+                                      } else if (frame && e.target.tagName !== 'g' && e.target.id && !e.target.id.includes('mask') && !e.target.id.includes('clip')) {
+                                        targetShapeId = e.target.id;
                                       }
                                     }
 
@@ -14398,8 +14483,8 @@ const MainEditor = ({
                                           isShape: data.type === 'shape'
                                         }
                                       }));
-                                    } else if (data.type === 'button') {
-                                      console.log('Button Dropped:', data);
+                                    } else if (['button', 'image-frame', 'map'].includes(data.type)) {
+                                      console.log(`${data.type} Dropped:`, data);
                                       window.dispatchEvent(new CustomEvent('add-element-to-editor', {
                                         detail: {
                                           pageIndex: displayIndex,

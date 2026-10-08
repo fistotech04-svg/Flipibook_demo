@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Replace, Heart, Info } from 'lucide-react';
+import { Replace, Heart, Info, Copy } from 'lucide-react';
 import Color from '../Color';
 import Effect from '../Effect';
 
@@ -35,6 +35,20 @@ const PropertySlider = ({ label, value, onChange, min = 0, max = 100, disabled =
   );
 };
 
+const ToggleButton = ({ label, checked, onChange }) => (
+  <div className="flex items-center justify-between w-full mt-[0.5vw]">
+    <span className="text-[0.75vw] text-gray-700">{label}</span>
+    <button
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-[1.2vw] w-[2.2vw] items-center rounded-full transition-colors ${checked ? 'bg-blue-500' : 'bg-gray-200'}`}
+    >
+      <span
+        className={`inline-block h-[0.9vw] w-[0.9vw] transform rounded-full bg-white transition-transform ${checked ? 'translate-x-[1.1vw]' : 'translate-x-[0.15vw]'}`}
+      />
+    </button>
+  </div>
+);
+
 const ThirdPartyEmbedProperties = ({
   selectedElementProps,
   activePageIndex,
@@ -44,83 +58,100 @@ const ThirdPartyEmbedProperties = ({
 }) => {
   const [embedType, setEmbedType] = useState('web-link');
   const [customCode, setCustomCode] = useState('');
-  const [webCodeType, setWebCodeType] = useState('Website');
-  const [embedSrc, setEmbedSrc] = useState('');
+  const [webCodeType, setWebCodeType] = useState('Embed Code');
+  const [sources, setSources] = useState({
+    'Embed Code': '',
+    'URL Link': ''
+  });
+  const embedSrc = sources[webCodeType] || '';
+
+  const handleSetEmbedSrc = (val) => {
+    setSources(prev => ({ ...prev, [webCodeType]: val }));
+  };
   const [errorMessage, setErrorMessage] = useState('');
   const [embedWidth, setEmbedWidth] = useState('650');
   const [embedHeight, setEmbedHeight] = useState('400');
-  const [opacity, setOpacity] = useState(100);
   const [pageZoom, setPageZoom] = useState(100);
   const [multiPageSync, setMultiPageSync] = useState(false);
   const [url, setUrl] = useState('');
 
+  const [autoplay, setAutoplay] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [controls, setControls] = useState(true);
+  const [loop, setLoop] = useState(false);
+  const [startTime, setStartTime] = useState(0);
+  const [endTime, setEndTime] = useState(0);
+  const [fullscreen, setFullscreen] = useState(true);
+
+  const isYouTube = (embedSrc.includes('youtube.com') || embedSrc.includes('youtu.be'));
+
   React.useEffect(() => {
-    if (embedType === 'embed-code') {
-      let code = '';
-      let finalSrc = embedSrc.trim();
-      let error = '';
+    let code = '';
+    let finalSrc = embedSrc.trim();
+    let error = '';
 
-      if (!finalSrc) {
-        setErrorMessage('');
-        setCustomCode(`<div style="display:flex; justify-content:center; align-items:center; width:100%; height:100%; background:#f3f4f6; color:#9ca3af; font-family:sans-serif; font-size:24px;">Enter ${webCodeType} URL</div>`);
-        return;
+    if (!finalSrc) {
+      setErrorMessage('');
+      setCustomCode(`<div style="display:flex; justify-content:center; align-items:center; width:100%; height:100%; background:#f3f4f6; color:#9ca3af; font-family:sans-serif; font-size:24px; text-align:center;">Enter ${webCodeType === 'Embed Code' ? 'Code' : webCodeType + ' URL'}</div>`);
+      return;
+    }
+
+    if (finalSrc && webCodeType !== 'Embed Code') {
+      const isImage = /\.(jpeg|jpg|gif|png|svg|webp|bmp|ico)([\?#].*)?$/i.test(finalSrc);
+      const isVideo = /\.(mp4|webm|ogg|mov|avi|mkv)([\?#].*)?$/i.test(finalSrc) || /(?:youtube\.com|youtu\.be)/i.test(finalSrc) || /vimeo\.com/i.test(finalSrc);
+      
+      if (isImage || isVideo) {
+        error = 'Image and video links are not allowed.';
       }
+    }
 
-      if (finalSrc) {
-        const isImage = /\.(jpeg|jpg|gif|png|svg|webp|bmp|ico)([\?#].*)?$/i.test(finalSrc);
-        const isVideo = /\.(mp4|webm|ogg|mov|avi|mkv)([\?#].*)?$/i.test(finalSrc) || /(?:youtube\.com|youtu\.be)/i.test(finalSrc) || /vimeo\.com/i.test(finalSrc);
-        
-        if (webCodeType === 'Image' && !isImage) {
-          error = 'Please enter a direct image URL (ending in .jpg, .png, etc.)';
-        } else if (webCodeType === 'Video' && !isVideo) {
-          error = 'Please enter a direct video URL (ending in .mp4, or YouTube/Vimeo link)';
-        } else if (webCodeType === 'Website' && (isImage || isVideo)) {
-          error = 'Please enter a website URL.';
-        }
-      }
+    setErrorMessage(error);
 
-      setErrorMessage(error);
+    if (error) {
+      setCustomCode(`<div style="display:flex; justify-content:center; align-items:center; width:100%; height:100%; background:#fee2e2; color:#ef4444; font-family:sans-serif; font-size:24px; text-align:center;">Invalid ${webCodeType} URL</div>`);
+      return;
+    }
 
-      if (error) {
-        setCustomCode(`<div style="display:flex; justify-content:center; align-items:center; width:100%; height:100%; background:#fee2e2; color:#ef4444; font-family:sans-serif; font-size:24px; text-align:center;">Invalid ${webCodeType} URL</div>`);
-        return;
-      }
-
-      if (!finalSrc.startsWith('http://') && !finalSrc.startsWith('https://')) {
+    if (webCodeType !== 'Embed Code') {
+      if (!finalSrc.startsWith('http://') && !finalSrc.startsWith('https://') && !finalSrc.startsWith('<')) {
         finalSrc = 'https://' + finalSrc;
       }
 
       const ytMatch = finalSrc.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+      const isImage = /\.(jpeg|jpg|gif|png|svg|webp|bmp|ico)([\?#].*)?$/i.test(finalSrc);
+      const isGenericVideo = /\.(mp4|webm|ogg|mov|avi|mkv)([\?#].*)?$/i.test(finalSrc);
+      
       if (ytMatch && ytMatch[1]) {
         finalSrc = `https://www.youtube.com/embed/${ytMatch[1]}`;
-      }
-
-      if (webCodeType === 'Image') {
-        code = `<img src="${finalSrc}" width="100%" height="100%" alt="embed" style="object-fit: cover;" />`;
-      } else if (webCodeType === 'Video') {
-        if (finalSrc.includes('youtube.com/embed/')) {
-          code = `<iframe src="${finalSrc}" width="100%" height="100%" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
-        } else {
-          code = `<video src="${finalSrc}" width="100%" height="100%" controls autoplay muted style="object-fit: contain;"></video>`;
+        const queryParams = new URLSearchParams();
+        if (autoplay) queryParams.append('autoplay', '1');
+        if (muted) queryParams.append('mute', '1');
+        if (!controls) queryParams.append('controls', '0');
+        if (loop) {
+          queryParams.append('loop', '1');
+          queryParams.append('playlist', ytMatch[1]);
         }
-      } else if (webCodeType === 'Website') {
+        if (startTime > 0) queryParams.append('start', startTime);
+        if (endTime > 0) queryParams.append('end', endTime);
+        if (!fullscreen) queryParams.append('fs', '0');
+        
+        const queryString = queryParams.toString();
+        const srcWithParams = queryString ? `${finalSrc}?${queryString}` : finalSrc;
+        const allowAttr = `accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture${autoplay ? '; autoplay' : ''}`;
+        
+        code = `<iframe src="${srcWithParams}" width="100%" height="100%" frameborder="0" allow="${allowAttr}" ${fullscreen ? 'allowfullscreen' : ''} ${muted ? 'muted' : ''}></iframe>`;
+      } else if (isGenericVideo) {
+        code = `<video src="${finalSrc}" width="100%" height="100%" ${controls ? 'controls' : ''} ${autoplay ? 'autoplay' : ''} ${muted ? 'muted' : ''} ${loop ? 'loop' : ''} style="object-fit: contain;"></video>`;
+      } else if (isImage) {
+        code = `<img src="${finalSrc}" width="100%" height="100%" alt="embed" style="object-fit: cover;" />`;
+      } else {
         code = `<iframe src="${finalSrc}" width="100%" height="100%" frameborder="0" allowfullscreen></iframe>`;
       }
-      setCustomCode(code);
+    } else {
+      code = finalSrc;
     }
-  }, [embedType, webCodeType, embedSrc, embedWidth, embedHeight]);
-
-  React.useEffect(() => {
-    if (selectedElementProps) {
-      if (selectedElementProps['data-iframe-opacity'] !== undefined) {
-        setOpacity(Math.round(parseFloat(selectedElementProps['data-iframe-opacity']) * 100));
-      } else if (selectedElementProps.opacity !== undefined) {
-        setOpacity(Math.round(parseFloat(selectedElementProps.opacity) * 100));
-      } else {
-        setOpacity(100);
-      }
-    }
-  }, [selectedElementProps?.opacity, selectedElementProps?.['data-iframe-opacity']]);
+    setCustomCode(code);
+  }, [webCodeType, embedSrc, embedWidth, embedHeight, autoplay, muted, controls, loop, startTime, endTime, fullscreen]);
 
   React.useEffect(() => {
     if (selectedElementProps) {
@@ -304,10 +335,10 @@ const ThirdPartyEmbedProperties = ({
     if (frameGroup) {
       const currentUrl = frameGroup.getAttribute('data-url') || '';
       setUrl(currentUrl);
-      
+
       const currentCode = frameGroup.getAttribute('data-custom-code') || '';
       setCustomCode(currentCode);
-      
+
       let currentW = '650';
       let currentH = '400';
       const rect = frameGroup.querySelector('rect[pointer-events="all"]') || frameGroup.querySelector('rect.svg-image-stroke-overlay');
@@ -317,18 +348,55 @@ const ThirdPartyEmbedProperties = ({
       }
 
       const srcMatch = currentCode.match(/src="([^"]*)"/);
-      
-      if (srcMatch) setEmbedSrc(srcMatch[1]);
+      let parsedSrc = '';
+      if (srcMatch && !currentCode.startsWith('<iframe srcdoc')) {
+        parsedSrc = srcMatch[1];
+      } else {
+        parsedSrc = currentCode;
+      }
+
       setEmbedWidth(currentW);
       setEmbedHeight(currentH);
-      
-      if (currentCode.includes('<img')) setWebCodeType('Image');
-      else if (currentCode.includes('<video')) setWebCodeType('Video');
-      else if (currentCode.includes('<iframe')) setWebCodeType('Website');
-      
-      const currentType = frameGroup.getAttribute('data-embed-type') || (currentCode ? 'embed-code' : 'web-link');
-      setEmbedType(currentType);
-      
+
+      let detectedType = 'Embed Code';
+      if (currentCode.trim() !== '' && !currentCode.startsWith('<iframe srcdoc')) {
+        if (!currentCode.includes('<img') && !currentCode.includes('<video') && !currentCode.includes('<iframe')) {
+           detectedType = 'Embed Code';
+        } else {
+           detectedType = 'URL Link';
+        }
+      }
+
+      if (detectedType === 'URL Link') {
+        if (currentCode.includes('youtube.com/embed/')) {
+          try {
+            const srcUrlString = parsedSrc.replace(/&amp;/g, '&');
+            const urlObj = new URL(srcUrlString);
+            setAutoplay(urlObj.searchParams.get('autoplay') === '1');
+            setMuted(urlObj.searchParams.get('mute') === '1');
+            setControls(urlObj.searchParams.get('controls') !== '0');
+            setLoop(urlObj.searchParams.get('loop') === '1');
+            setStartTime(parseInt(urlObj.searchParams.get('start') || '0', 10));
+            setEndTime(parseInt(urlObj.searchParams.get('end') || '0', 10));
+            if (urlObj.searchParams.has('fs')) {
+              setFullscreen(urlObj.searchParams.get('fs') !== '0');
+            } else {
+              setFullscreen(currentCode.includes('allowfullscreen'));
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        } else if (currentCode.includes('<video')) {
+          setAutoplay(currentCode.includes('autoplay'));
+          setMuted(currentCode.includes('muted'));
+          setControls(currentCode.includes('controls'));
+          setLoop(currentCode.includes('loop'));
+        }
+      }
+
+      setWebCodeType(detectedType);
+      setSources(prev => ({ ...prev, [detectedType]: detectedType === 'Embed Code' ? currentCode : (currentCode.includes('youtube.com/embed/') ? parsedSrc.split('?')[0].replace('https://www.youtube.com/embed/', 'https://www.youtube.com/watch?v=') : parsedSrc) }));
+
       // Force pointer-events fix on existing frames
       const pointerRect = frameGroup.querySelector('rect[pointer-events="all"]');
       if (pointerRect && (currentUrl.trim() !== '' || currentCode.trim() !== '')) {
@@ -345,7 +413,6 @@ const ThirdPartyEmbedProperties = ({
 
     const currentUrl = frameGroup.getAttribute('data-url') || '';
     const currentCode = frameGroup.getAttribute('data-custom-code') || '';
-    const currentType = frameGroup.getAttribute('data-embed-type') || 'web-link';
 
     let currentW = 400, currentH = 300;
     const domRect = frameGroup.querySelector('rect[pointer-events="all"]') || frameGroup.querySelector('rect.svg-image-stroke-overlay');
@@ -357,12 +424,12 @@ const ThirdPartyEmbedProperties = ({
     const inputW = parseFloat(embedWidth) || currentW;
     const inputH = parseFloat(embedHeight) || currentH;
 
-    if (url === currentUrl && customCode === currentCode && embedType === currentType && inputW === currentW && inputH === currentH) return;
+    if (customCode === currentCode && inputW === currentW && inputH === currentH) return;
 
     const timeoutId = setTimeout(() => {
       frameGroup.setAttribute('data-url', url);
       frameGroup.setAttribute('data-custom-code', customCode);
-      frameGroup.setAttribute('data-embed-type', embedType);
+      frameGroup.setAttribute('data-embed-type', 'embed-code');
 
       let w = inputW, h = inputH;
 
@@ -376,29 +443,14 @@ const ThirdPartyEmbedProperties = ({
       const fillOpacity = frameGroup.getAttribute('data-fill-opacity') || '1';
       const iframeOpacity = frameGroup.getAttribute('data-iframe-opacity') ?? frameGroup.getAttribute('opacity') ?? '1';
 
-      if (embedType === 'web-link' && url.trim() !== '') {
-        let fullUrl = url.trim();
-        if (!fullUrl.startsWith('http://') && !fullUrl.startsWith('https://')) {
-          fullUrl = 'https://' + fullUrl;
-        }
-
-        frameGroup.innerHTML = `
-          <rect class="embed-fill-layer" x="0" y="0" width="${w}" height="${h}" fill="${fillColor}" opacity="${fillOpacity}" pointer-events="none" />
-          <g class="embed-content-group" opacity="${iframeOpacity}" pointer-events="none">
-            <foreignObject x="0" y="0" width="${w}" height="${h}" pointer-events="all">
-              <iframe src="${fullUrl}" width="100%" height="100%" style="border:none; background:transparent;" scrolling="auto" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowtransparency="true"></iframe>
-            </foreignObject>
-          </g>
-          <rect class="svg-image-stroke-overlay" x="0" y="0" width="${w}" height="${h}" fill="transparent" pointer-events="none" ${strokeAttrs} />
-        `;
-      } else if (embedType === 'embed-code' && customCode.trim() !== '') {
+      if (customCode.trim() !== '') {
         const escapeHtml = (unsafe) => {
           return unsafe
-               .replace(/&/g, "&amp;")
-               .replace(/</g, "&lt;")
-               .replace(/>/g, "&gt;")
-               .replace(/"/g, "&quot;")
-               .replace(/'/g, "&#039;");
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
         };
         const srcdocHtml = escapeHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;padding:0;width:100vw;height:100vh;overflow:hidden;} video::-webkit-media-controls { zoom: 1.5; } video, iframe, img { width: 100%; height: 100%; border: none; display: block; }</style></head><body>${customCode}</body></html>`);
 
@@ -450,7 +502,7 @@ const ThirdPartyEmbedProperties = ({
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [url, customCode, embedType, embedWidth, embedHeight, selectedElement, activePageIndex, selectedLayerId, updateElementAttribute]);
+  }, [url, customCode, embedWidth, embedHeight, selectedElement, activePageIndex, selectedLayerId, updateElementAttribute]);
 
   // 3. Sync fill color to DOM in real-time
   React.useEffect(() => {
@@ -463,7 +515,7 @@ const ThirdPartyEmbedProperties = ({
       fillRect.setAttribute('fill', backgroundColor.fill);
       fillRect.setAttribute('opacity', (backgroundColor.fillOpacity / 100).toString());
     }
-    
+
     // Clean up legacy fill applied to the group which obscures the iframe
     if (frameGroup.hasAttribute('fill')) {
       frameGroup.removeAttribute('fill');
@@ -489,159 +541,138 @@ const ThirdPartyEmbedProperties = ({
       }
     }, 500);
     return () => clearTimeout(timeoutId);
-  }, [backgroundColor.fill, backgroundColor.fillOpacity, backgroundColor.stroke, backgroundColor.strokeOpacity, backgroundColor.strokeWeight, backgroundColor.strokeDashStyle, opacity, selectedElement, activePageIndex, selectedLayerId, updateElementAttribute]);
-
-  // 5. Sync iframe opacity to DOM in real-time
-  React.useEffect(() => {
-    if (!selectedElement) return;
-    const frameGroup = selectedElement.querySelector('[data-type="embed-frame"]') || (selectedElement.getAttribute('data-type') === 'embed-frame' ? selectedElement : null);
-    if (!frameGroup) return;
-
-    const innerG = frameGroup.querySelector('g.embed-content-group');
-    if (innerG) {
-      innerG.setAttribute('opacity', (opacity / 100).toString());
-    }
-  }, [opacity, selectedElement]);
+  }, [backgroundColor.fill, backgroundColor.fillOpacity, backgroundColor.stroke, backgroundColor.strokeOpacity, backgroundColor.strokeWeight, backgroundColor.strokeDashStyle, selectedElement, activePageIndex, selectedLayerId, updateElementAttribute]);
 
   return (
     <div className="flex flex-col font-sans h-full">
-     
+
 
       {/* Web Settings */}
       <div className="flex items-center gap-[0.5vw]">
         <span className="text-[0.9vw] font-semibold text-gray-900 whitespace-nowrap">3rd Party Embed Properties</span>
         <div className="h-[0.0925vw] bg-gray-200 flex-1" > </div>
       </div>
-      
-        <div className="flex flex-col gap-[0.8vw] mt-[2vw]">
-          <label className="flex items-center gap-[0.4vw] cursor-pointer">
-            <input 
-              type="radio" 
-              name="embed-type" 
-              checked={embedType === 'web-link'}
-              onChange={() => setEmbedType('web-link')}
-              className="w-[0.9vw] h-[0.9vw] text-blue-500 border-gray-300 focus:ring-blue-500"
-            />
-            <span className={`text-[0.8vw] ${embedType === 'web-link' ? 'text-blue-500' : 'text-gray-600'}`}>Web Link</span>
-          </label>
-          
-          {embedType === 'web-link' && (
-            <div className="flex border border-gray-200 rounded-[0.4vw] overflow-hidden focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-shadow bg-white ml-[1.3vw]">
-              <select className="bg-gray-50 border-r border-gray-200 text-gray-600 text-[0.8vw] px-[0.5vw] py-[0.4vw] outline-none appearance-none cursor-pointer">
-                <option>https://</option>
-                <option>http://</option>
-              </select>
-              <input 
-                type="text" 
-                placeholder="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                className="flex-1 px-[0.6vw] py-[0.4vw] text-[0.8vw] outline-none text-gray-800 placeholder-gray-400"
-              />
+
+      <div className="flex flex-col gap-[0.8vw] mt-[2vw] px-[1.3vw]">
+        <div className="flex flex-col" style={{ width: '100%' }}>
+          <div className="flex items-center gap-[0.7vw] mb-[0.6vw]">
+            {['Embed Code', 'URL Link'].map((type) => (
+              <label key={type} className="flex items-center gap-[0.3vw] cursor-pointer">
+                <input
+                  type="radio"
+                  name="web-code-type"
+                  checked={webCodeType === type}
+                  onChange={() => {
+                    setWebCodeType(type);
+                    setErrorMessage('');
+                  }}
+                  className="w-[0.8vw] h-[0.8vw] text-blue-500 border-gray-300 focus:ring-blue-500"
+                />
+                <span className="text-[0.75vw] text-gray-600">{type}</span>
+              </label>
+            ))}
+          </div>
+          <div className="flex flex-col gap-[0.6vw]">
+            <div className="flex flex-col gap-[0.2vw]">
+              <span className="text-[0.7vw] text-gray-500">{webCodeType === 'Embed Code' ? 'Code' : 'Source URL'}</span>
+
+              {webCodeType === 'Embed Code' ? (
+                <textarea
+                  placeholder="Paste HTML code here"
+                  value={embedSrc}
+                  onChange={(e) => handleSetEmbedSrc(e.target.value)}
+                  className={`w-full border ${errorMessage ? 'border-red-500' : 'border-gray-200'} rounded-[0.4vw] p-[0.6vw] text-[0.8vw] outline-none focus:border-blue-500 bg-white h-[6vw] resize-none`}
+                />
+              ) : (
+                <div className={`flex border ${errorMessage ? 'border-red-500' : 'border-gray-200'} rounded-[0.4vw] overflow-hidden focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-shadow bg-white`}>
+                  <input
+                    type="text"
+                    placeholder={webCodeType === 'URL Link' ? "e.g. https://..." : "e.g. https://..."}
+                    value={embedSrc}
+                    onChange={(e) => handleSetEmbedSrc(e.target.value)}
+                    className="flex-1 px-[0.6vw] py-[0.4vw] text-[0.8vw] outline-none text-gray-800 placeholder-gray-400 bg-transparent"
+                  />
+                  {webCodeType === 'URL Link' && (
+                    <button 
+                      onClick={() => navigator.clipboard.writeText(embedSrc.startsWith('http') ? embedSrc : 'https://' + embedSrc)} 
+                      className="px-[0.5vw] flex items-center justify-center text-gray-500 hover:text-blue-500 transition-colors bg-gray-50 border-l border-gray-200"
+                      title="Copy Link"
+                    >
+                      <Copy size={14} />
+                    </button>
+                  )}
+                </div>
+              )}
+              {errorMessage && <span className="text-red-500 text-[0.65vw] mt-[0.1vw]">{errorMessage}</span>}
             </div>
-          )}
-          
-          <label className="flex items-center gap-[0.4vw] cursor-pointer mt-[0.2vw]">
-            <input 
-              type="radio" 
-              name="embed-type" 
-              checked={embedType === 'embed-code'}
-              onChange={() => setEmbedType('embed-code')}
-              className="w-[0.9vw] h-[0.9vw] text-blue-500 border-gray-300 focus:ring-blue-500"
-            />
-            <span className={`text-[0.8vw] ${embedType === 'embed-code' ? 'text-blue-500' : 'text-gray-600'}`}>Embed Web Code</span>
-          </label>
-          
-          {embedType === 'embed-code' && (
-            <div className="flex flex-col ml-[1.3vw]" style={{ width: 'calc(100% - 1.3vw)' }}>
-              <div className="flex items-center gap-[1vw] mb-[0.6vw]">
-                {['Image', 'Video', 'Website'].map((type) => (
-                  <label key={type} className="flex items-center gap-[0.3vw] cursor-pointer">
-                    <input 
-                      type="radio" 
-                      name="web-code-type" 
-                      checked={webCodeType === type}
-                      onChange={() => setWebCodeType(type)}
-                      className="w-[0.8vw] h-[0.8vw] text-blue-500 border-gray-300 focus:ring-blue-500"
-                    />
-                    <span className="text-[0.75vw] text-gray-600">{type}</span>
-                  </label>
-                ))}
-              </div>
-              <div className="flex flex-col gap-[0.6vw]">
-                <div className="flex flex-col gap-[0.2vw]">
-                  <span className="text-[0.7vw] text-gray-500">Source URL</span>
-                  <div className={`flex border ${errorMessage ? 'border-red-500' : 'border-gray-200'} rounded-[0.4vw] overflow-hidden focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-shadow bg-white`}>
-                    {webCodeType === 'Website' && (
-                      <select className="bg-gray-50 border-r border-gray-200 text-gray-600 text-[0.8vw] px-[0.5vw] py-[0.4vw] outline-none appearance-none cursor-pointer">
-                        <option>https://</option>
-                        <option>http://</option>
-                      </select>
-                    )}
-                    <input
-                      type="text"
-                      placeholder={webCodeType === 'Website' ? "url" : "e.g. https://..."}
-                      value={embedSrc}
-                      onChange={(e) => setEmbedSrc(e.target.value)}
-                      className="flex-1 px-[0.6vw] py-[0.4vw] text-[0.8vw] outline-none text-gray-800 placeholder-gray-400"
-                    />
-                  </div>
-                  {errorMessage && <span className="text-red-500 text-[0.65vw] mt-[0.1vw]">{errorMessage}</span>}
+            {webCodeType !== 'Embed Code' && (
+              <div className="flex gap-[0.5vw]">
+                <div className="w-1/2 flex flex-col gap-[0.2vw]">
+                  <span className="text-[0.7vw] text-gray-500">Width</span>
+                  <input
+                    type="text"
+                    value="100%"
+                    readOnly
+                    className="w-full border border-gray-200 rounded-[0.4vw] p-[0.4vw] text-[0.8vw] outline-none bg-gray-50 text-gray-500 cursor-not-allowed"
+                  />
                 </div>
-                <div className="flex gap-[0.5vw]">
-                  <div className="w-1/2 flex flex-col gap-[0.2vw]">
-                    <span className="text-[0.7vw] text-gray-500">Width</span>
-                    <input
-                      type="text"
-                      placeholder="e.g. 650"
-                      value={embedWidth}
-                      onChange={(e) => setEmbedWidth(e.target.value)}
-                      className="w-full border border-gray-200 rounded-[0.4vw] p-[0.4vw] text-[0.8vw] outline-none focus:border-blue-500 bg-white"
-                    />
-                  </div>
-                  <div className="w-1/2 flex flex-col gap-[0.2vw]">
-                    <span className="text-[0.7vw] text-gray-500">Height</span>
-                    <input
-                      type="text"
-                      placeholder="e.g. 400"
-                      value={embedHeight}
-                      onChange={(e) => setEmbedHeight(e.target.value)}
-                      className="w-full border border-gray-200 rounded-[0.4vw] p-[0.4vw] text-[0.8vw] outline-none focus:border-blue-500 bg-white"
-                    />
-                  </div>
+                <div className="w-1/2 flex flex-col gap-[0.2vw]">
+                  <span className="text-[0.7vw] text-gray-500">Height</span>
+                  <input
+                    type="text"
+                    value="100%"
+                    readOnly
+                    className="w-full border border-gray-200 rounded-[0.4vw] p-[0.4vw] text-[0.8vw] outline-none bg-gray-50 text-gray-500 cursor-not-allowed"
+                  />
                 </div>
               </div>
-              <div className="mt-[0.6vw]">
-                <span className="text-[0.7vw] text-gray-500 mb-[0.2vw] block">Code Preview:</span>
-                <div className="w-full h-[5vw] border border-gray-200 rounded-[0.4vw] p-[0.6vw] text-[0.7vw] bg-gray-50 text-gray-500 overflow-auto whitespace-pre-wrap font-mono select-all">
-                  {customCode || 'Select a type and enter a source URL'}
+            )}
+            
+            {isYouTube && (
+              <div className="flex flex-col mt-[0.5vw]">
+                <ToggleButton label="Autoplay" checked={autoplay} onChange={setAutoplay} />
+                <ToggleButton label="Muted" checked={muted} onChange={setMuted} />
+                <ToggleButton label="Controls" checked={controls} onChange={setControls} />
+                <ToggleButton label="Loop" checked={loop} onChange={setLoop} />
+                
+                <div className="flex items-center justify-between w-full mt-[0.5vw]">
+                  <span className="text-[0.75vw] text-gray-700">Start Time</span>
+                  <div className="flex items-center gap-[0.2vw]">
+                    <input
+                      type="number"
+                      min="0"
+                      value={startTime}
+                      onChange={(e) => setStartTime(parseInt(e.target.value) || 0)}
+                      className="w-[3.5vw] border border-gray-200 rounded-[0.4vw] p-[0.2vw] text-[0.8vw] text-center outline-none focus:border-blue-500 bg-white"
+                    />
+                    <span className="text-[0.7vw] text-gray-500">sec</span>
+                  </div>
                 </div>
+                
+                <div className="flex items-center justify-between w-full mt-[0.5vw]">
+                  <span className="text-[0.75vw] text-gray-700">End Time</span>
+                  <div className="flex items-center gap-[0.2vw]">
+                    <input
+                      type="number"
+                      min="0"
+                      value={endTime}
+                      onChange={(e) => setEndTime(parseInt(e.target.value) || 0)}
+                      className="w-[3.5vw] border border-gray-200 rounded-[0.4vw] p-[0.2vw] text-[0.8vw] text-center outline-none focus:border-blue-500 bg-white"
+                    />
+                    <span className="text-[0.7vw] text-gray-500">sec</span>
+                  </div>
+                </div>
+                
+                <ToggleButton label="Fullscreen" checked={fullscreen} onChange={setFullscreen} />
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="border-t border-gray-100 mt-[1vw]"></div>
 
-      
-      {/* Opacity */}
-      <PropertySlider 
-        label="Opacity"
-        value={opacity}
-        onChange={(val) => {
-          setOpacity(val);
-          updateElementAttribute(activePageIndex, selectedLayerId, { 
-            'data-iframe-opacity': (val / 100).toString(),
-            'opacity': '1' 
-          });
-        }}
-        min={0}
-        max={100}
-      />
-      
-      <div className="border-t border-gray-100 mt-[1vw]"></div>
-
-      <div className="flex flex-col gap-[1vw]">
+      <div className="flex flex-col gap-[0.7vw]">
         <Color
           openSubSection={openSubSection}
           setOpenSubSection={setOpenSubSection}
