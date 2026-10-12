@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'react';
-const Grid5Layout = lazy(() => import('../../Layouts/Grid5Layout'));
+import Grid5Layout from '../../Layouts/Grid5Layout';
 import { Icon } from '@iconify/react';
 import { motion, AnimatePresence } from 'framer-motion';
 

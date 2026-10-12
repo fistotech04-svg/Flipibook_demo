@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'rea
 import { Icon } from '@iconify/react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const Grid3Layout = lazy(() => import('../../Layouts/Grid3Layout'));
+import Grid3Layout from '../../Layouts/Grid3Layout';
 
 
 import Sound from '../../popups/Sound';

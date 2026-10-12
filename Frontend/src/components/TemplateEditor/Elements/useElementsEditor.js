@@ -1,4 +1,7 @@
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
+import { NavIconRenderer } from '../../CustomizedEditor/popups/NavIconStylesPopup';
+import { DotRenderer } from '../../CustomizedEditor/popups/DotStylesPopup';
 
 /**
  * Inserts and positions a generic SVG element (Button, Map, Image Frame, QR Code, etc.) into the page canvas.
@@ -262,7 +265,7 @@ export const fillElementShapeWithPattern = ({
  */
 export const handleElementsDropData = (data, displayIndex, dropPoint) => {
   if (!data) return false;
-  if (['button', 'image-frame', 'map', 'qrcode'].includes(data.type)) {
+  if (['button', 'text', 'slideshow', 'image-frame', 'map', 'qrcode'].includes(data.type)) {
     console.log(`${data.type} Dropped:`, data);
     window.dispatchEvent(new CustomEvent('add-element-to-editor', {
       detail: {
@@ -314,7 +317,859 @@ export const isAudioGroup = (el) => {
 };
 
 /**
- * Hook to register window event listeners that execute adding Elements into MainEditor.
+ * Resolves compound Elements (Buttons, Embed frames, Image frames, Audio frames)
+ * so clicking inside them drags or selects the compound parent unit.
+ */
+export const getElementCompoundTarget = (current) => {
+  if (!current || typeof current.closest !== 'function') return null;
+
+  // Buttons are single compound elements; drag the whole button!
+  const buttonGroup = current.closest('[data-type="button"]');
+  if (buttonGroup) {
+    if (!buttonGroup.id) {
+      buttonGroup.id = `button-${Date.now()}`;
+    }
+    return buttonGroup;
+  }
+
+  // Embed frames are single compound elements; drag the whole wrapper!
+  const embedFrame = current.closest('[data-type="embed-frame"]');
+  if (embedFrame) {
+    const parentG = embedFrame.parentElement;
+    if (parentG && parentG.tagName?.toLowerCase() === 'g' && parentG.id) {
+      return parentG;
+    }
+    if (!embedFrame.id) {
+      embedFrame.id = `embed-frame-${Date.now()}`;
+    }
+    return embedFrame;
+  }
+
+  // Image frames are single compound elements; drag the whole wrapper!
+  const imageFrame = current.closest('[data-type="image-frame"]');
+  if (imageFrame && current.tagName?.toLowerCase() !== 'image' && current.tagName?.toLowerCase() !== 'img') {
+    if (!imageFrame.id) {
+      imageFrame.id = `image-frame-${Date.now()}`;
+    }
+    return imageFrame;
+  }
+
+  // Audio frames are single compound elements; drag the whole wrapper!
+  const audioFrame = current.closest('[data-type="audio-frame"]');
+  if (audioFrame) {
+    const parentG = audioFrame.parentElement;
+    if (parentG && parentG.tagName?.toLowerCase() === 'g' && parentG.id) {
+      return parentG;
+    }
+    if (!audioFrame.id) {
+      audioFrame.id = `audio-frame-${Date.now()}`;
+    }
+    return audioFrame;
+  }
+
+  return null;
+};
+
+/**
+ * Detects whether a drop target is an Element Shape or Image Frame slot,
+ * and extracts the target id for pattern or media replacement.
+ */
+export const getTargetElementShapeOrFrameId = (target) => {
+  if (!target || typeof target.closest !== 'function') return undefined;
+
+  const shapeLeaf = target.closest('[data-is-element-shape="true"]');
+  const frameLeaf = target.closest('[data-type="image-frame"]');
+
+  if (shapeLeaf) {
+    const shapeGroup = shapeLeaf.closest('[data-type="shape"]');
+    if (shapeGroup && shapeGroup.id) {
+      return shapeGroup.id;
+    } else if (shapeLeaf.id && !shapeLeaf.id.includes('mask') && !shapeLeaf.id.includes('clip')) {
+      return shapeLeaf.id;
+    }
+  } else if (frameLeaf && frameLeaf.id) {
+    let specificSlot = null;
+    const highlight = frameLeaf.querySelector('[data-highlight-id]');
+    if (highlight) {
+      const patternId = highlight.getAttribute('data-highlight-id').replace('highlight-', '');
+      specificSlot = frameLeaf.querySelector(`[data-pattern-id="${patternId}"]`);
+    }
+
+    if (!specificSlot && target && ['path', 'rect', 'circle', 'ellipse', 'polygon'].includes(target.tagName.toLowerCase())) {
+      specificSlot = target;
+    }
+
+    if (specificSlot) {
+      if (!specificSlot.id) specificSlot.id = `inner-slot-${Date.now()}`;
+      return specificSlot.id;
+    } else {
+      return frameLeaf.id;
+    }
+  }
+
+  return undefined;
+};
+
+/**
+ * Handles proportional resizing and alignment of interactive Buttons
+ * including text size, icon offset, hover slide rects, ribbon polygons, and clipPaths.
+ */
+export const resizeInteractiveButton = ({
+  el,
+  state
+}) => {
+  if (!el || !state?.childrenData) return;
+  const rectData = state.childrenData.find(c => c.child.tagName.toLowerCase() === 'rect');
+  const textData = state.childrenData.find(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
+
+  if (!rectData || !textData) return;
+
+  const rectEl = rectData.child;
+  const textEl = textData.child;
+
+  const rectX = parseFloat(rectEl.getAttribute('x')) || 0;
+  const rectY = parseFloat(rectEl.getAttribute('y')) || 0;
+  const rectW = parseFloat(rectEl.getAttribute('width')) || 0;
+  const rectH = parseFloat(rectEl.getAttribute('height')) || 0;
+
+  const initRectW = rectData.initialRect?.width || rectData.bound?.width || 80;
+  const initRectH = rectData.initialRect?.height || rectData.bound?.height || 32;
+
+  // Scale factor based on button height change (proportional scaling)
+  const scaleRatio = initRectH > 0 ? (rectH / initRectH) : 1;
+
+  // Update rect border radius rx proportionally
+  const baseRx = rectData.initialRect?.rx ?? parseFloat(rectEl.getAttribute('data-base-rx') || rectEl.getAttribute('rx') || '4');
+  const newRx = Math.max(0, Math.min(rectW / 2, rectH / 2, Math.round(baseRx * scaleRatio * 10) / 10));
+  rectEl.setAttribute('rx', newRx);
+
+  // Update text font-size proportionally with button scale
+  const baseFontSize = textData.initialFontSize || parseFloat(textEl.getAttribute('data-base-font-size') || textEl.getAttribute('font-size') || '14');
+  let newFontSize = Math.max(6, Math.round(baseFontSize * scaleRatio * 10) / 10);
+
+  // Check if button has an icon (only hotspots have icons in interactive buttons)
+  const isHotspotBtn = el.getAttribute('data-is-hotspot') === 'true';
+  const iconImg = isHotspotBtn ? el.querySelector('image') : null;
+  const iconG = isHotspotBtn ? el.querySelector('g:not(defs g):not(.button-hover-slide-group)') : null;
+  const iconPath = isHotspotBtn ? el.querySelector('path') : null;
+  const hasIcon = isHotspotBtn && !!(iconImg || iconG || iconPath);
+
+  const label = textEl.textContent || '';
+  // Prevent font size from overflowing button width if narrowed
+  if (label.length > 0 && rectW > 0) {
+    const availableWidth = Math.max(8, rectW - (hasIcon ? 18 * scaleRatio : 12));
+    const maxFontForWidth = availableWidth / (label.length * 0.55);
+    if (maxFontForWidth > 0 && newFontSize > maxFontForWidth) {
+      newFontSize = Math.max(5, Math.round(maxFontForWidth * 10) / 10);
+    }
+  }
+
+  textEl.setAttribute('font-size', newFontSize);
+  textEl.style.fontSize = `${newFontSize}px`;
+  textEl.removeAttribute('transform');
+  textEl.querySelectorAll('tspan').forEach(ts => {
+    ts.removeAttribute('x');
+    ts.removeAttribute('y');
+    ts.removeAttribute('font-size');
+    ts.style.removeProperty('font-size');
+  });
+
+  if (hasIcon) {
+    const iconSize = Math.max(6, Math.round(14 * scaleRatio));
+    const gap = Math.max(2, Math.round(5 * scaleRatio));
+
+    let textWidth = 0;
+    try {
+      textWidth = textEl.getBBox().width;
+    } catch (e) { }
+    if (!textWidth || textWidth <= 0) {
+      textWidth = label.length * (newFontSize * 0.55);
+    }
+
+    let isEndPlacement = false;
+    if (iconImg) {
+      const imgX = parseFloat(iconImg.getAttribute('x') || '0');
+      const tX = parseFloat(textEl.getAttribute('x') || '0');
+      if (imgX > tX) isEndPlacement = true;
+    } else if (iconG) {
+      const gT = iconG.getAttribute('transform') || '';
+      const m = gT.match(/translate\(([-\d.]+)/);
+      if (m && parseFloat(m[1]) > (initRectW / 2)) isEndPlacement = true;
+    }
+
+    const contentWidth = iconSize + gap + textWidth;
+    const startX = rectX + (rectW - contentWidth) / 2;
+
+    let iconX, textX;
+    if (isEndPlacement) {
+      textX = startX + textWidth / 2;
+      iconX = startX + textWidth + gap;
+    } else {
+      iconX = startX;
+      textX = startX + iconSize + gap + textWidth / 2;
+    }
+
+    if (iconImg) {
+      iconImg.setAttribute('x', iconX);
+      iconImg.setAttribute('y', rectY + (rectH - iconSize) / 2);
+      iconImg.setAttribute('width', iconSize);
+      iconImg.setAttribute('height', iconSize);
+      iconImg.removeAttribute('transform');
+    } else if (iconG) {
+      iconG.setAttribute('transform', `translate(${iconX - 20 * scaleRatio}, ${rectY + (rectH - 32 * scaleRatio) / 2}) scale(${scaleRatio})`);
+    }
+
+    textEl.setAttribute('x', textX);
+    textEl.setAttribute('y', rectY + rectH / 2);
+    textEl.setAttribute('dominant-baseline', 'central');
+    textEl.setAttribute('text-anchor', 'middle');
+    textEl.style.textAnchor = 'middle';
+    textEl.style.dominantBaseline = 'central';
+  } else {
+    // No icon: center text directly in rect
+    textEl.setAttribute('x', rectX + rectW / 2);
+    textEl.setAttribute('y', rectY + rectH / 2);
+    textEl.setAttribute('dominant-baseline', 'middle');
+    textEl.setAttribute('text-anchor', 'middle');
+    textEl.style.textAnchor = 'middle';
+    textEl.style.dominantBaseline = 'middle';
+  }
+
+  // Synchronize slide group, slide rect, border rect, clip path, and ribbon polygons
+  const slideGroup = el.querySelector('.button-hover-slide-group');
+  if (slideGroup) {
+    slideGroup.removeAttribute('transform');
+  }
+  const slideRect = el.querySelector('.button-hover-slide-rect');
+  if (slideRect) {
+    slideRect.setAttribute('x', rectX);
+    slideRect.setAttribute('y', rectY);
+    slideRect.setAttribute('width', rectW);
+    slideRect.setAttribute('height', rectH);
+  }
+  const borderRect = el.querySelector('rect.btn-border');
+  if (borderRect) {
+    borderRect.setAttribute('x', rectX);
+    borderRect.setAttribute('y', rectY);
+    borderRect.setAttribute('width', rectW);
+    borderRect.setAttribute('height', rectH);
+    borderRect.setAttribute('rx', newRx);
+  }
+  const mainPoly = el.querySelector('.btn-main-poly');
+  const accentLeft = el.querySelector('.btn-accent-left');
+  const accentRight = el.querySelector('.btn-accent-right');
+  if (mainPoly || accentLeft || accentRight) {
+    const slantDx = Math.round(rectH * 0.22);
+    if (mainPoly) {
+      mainPoly.removeAttribute('transform');
+      mainPoly.setAttribute('points', `${rectX},${rectY} ${rectX + rectW - slantDx},${rectY} ${rectX + rectW},${rectY + rectH} ${rectX + slantDx},${rectY + rectH}`);
+    }
+    if (accentLeft) {
+      accentLeft.removeAttribute('transform');
+      accentLeft.setAttribute('points', `${rectX},${rectY + rectH} ${rectX + slantDx},${rectY + rectH} ${rectX + slantDx / 2},${rectY + rectH / 2}`);
+    }
+    if (accentRight) {
+      accentRight.removeAttribute('transform');
+      accentRight.setAttribute('points', `${rectX + rectW - slantDx},${rectY} ${rectX + rectW},${rectY} ${rectX + rectW - slantDx / 2},${rectY + rectH / 2}`);
+    }
+  }
+  const svgRoot = el.closest('svg');
+  const clipId = `clip-${el.id}`;
+  if (svgRoot) {
+    const clipRect = svgRoot.querySelector(`#${clipId} rect`);
+    if (clipRect) {
+      clipRect.setAttribute('x', rectX);
+      clipRect.setAttribute('y', rectY);
+      clipRect.setAttribute('width', rectW);
+      clipRect.setAttribute('height', rectH);
+    }
+    const clipPoly = svgRoot.querySelector(`#${clipId} polygon`);
+    if (clipPoly) {
+      const slantDx = Math.round(rectH * 0.22);
+      clipPoly.setAttribute('points', `${rectX},${rectY} ${rectX + rectW},${rectY} ${rectX + rectW - slantDx / 2},${rectY + rectH / 2} ${rectX + rectW},${rectY + rectH} ${rectX},${rectY + rectH} ${rectX + slantDx / 2},${rectY + rectH / 2}`);
+    }
+  }
+};
+
+/**
+ * Handles outer transform scaling for Audio frames (audio-frame)
+ * without distorting inner controls.
+ */
+export const resizeAudioGroup = ({
+  el,
+  state,
+  matrix,
+  finalX,
+  finalY,
+  finalWidth,
+  finalHeight,
+  drawOverlayHighlight,
+  currentFrameIdRef
+}) => {
+  try {
+    const ptOrigin = new DOMPoint(finalX, finalY).matrixTransform(matrix);
+    const ptCorner = new DOMPoint(finalX + finalWidth, finalY + finalHeight).matrixTransform(matrix);
+    const newTx = Math.min(ptOrigin.x, ptCorner.x);
+    const newTy = Math.min(ptOrigin.y, ptCorner.y);
+    const newW = Math.abs(ptCorner.x - ptOrigin.x);
+    const newH = Math.abs(ptCorner.y - ptOrigin.y);
+    const innerWidth = (state.bbox && state.bbox.width > 0) ? state.bbox.width : 48;
+    const innerHeight = (state.bbox && state.bbox.height > 0) ? state.bbox.height : 48;
+    const newSx = newW / innerWidth;
+    const newSy = newH / innerHeight;
+    el.setAttribute('transform', `translate(${newTx}, ${newTy}) scale(${newSx}, ${newSy})`);
+  } catch (e) { }
+
+  if (typeof drawOverlayHighlight === 'function') {
+    const highlightType = (currentFrameIdRef?.current && el.id !== currentFrameIdRef.current) ? 'child-selected' : 'selected';
+    drawOverlayHighlight(el, highlightType);
+  }
+};
+
+/**
+ * Global Slideshow UI, Runner, and Click Manager hooks.
+ * Completely orchestrates slideshow lifecycle on canvas.
+ */
+export const useSlideshowManager = ({ getVisualBBox } = {}) => {
+  // 1. UI Manager: Maintains pagination dots and hover navigation arrows
+  useEffect(() => {
+    const renderOverlays = () => {
+      const slideshows = document.querySelectorAll('[data-is-slideshow="true"]');
+      slideshows.forEach(el => {
+        if (el._slideshowManual) {
+          const existing = el._globalSsOverlay;
+          if (existing) {
+            existing.remove();
+            delete el._globalSsOverlay;
+          }
+          return;
+        }
+
+        const dataStr = el.getAttribute('data-slideshow');
+        if (!dataStr) return;
+        let data;
+        try { data = JSON.parse(dataStr); } catch (e) { return; }
+
+        const settings = data.settings || {};
+        const images = data.images || [];
+        if (images.length < 2) return;
+
+        const activeIndex = parseInt(el.getAttribute('data-active-index') || '0');
+        const pageContainer = el.closest('.page-svg-container');
+        if (!pageContainer) return;
+
+        let overlay = el._globalSsOverlay;
+        if (!overlay || !pageContainer.contains(overlay)) {
+          overlay = document.createElement('div');
+          overlay.className = 'global-ss-overlay';
+          Object.assign(overlay.style, {
+            position: 'absolute',
+            pointerEvents: 'none',
+            zIndex: '9998',
+          });
+          pageContainer.style.position = 'relative';
+          if (pageContainer.style.overflow !== 'visible') {
+            pageContainer.style.overflow = 'visible';
+          }
+          pageContainer.appendChild(overlay);
+          el._globalSsOverlay = overlay;
+
+          let leaveTimeout = null;
+          const handleEnter = () => {
+            if (leaveTimeout) clearTimeout(leaveTimeout);
+            overlay.querySelectorAll('.editor-ss-nav').forEach(btn => {
+              btn.style.opacity = '1';
+              btn.style.pointerEvents = 'auto';
+            });
+            el._isHovering = true;
+          };
+          const handleLeave = () => {
+            leaveTimeout = setTimeout(() => {
+              overlay.querySelectorAll('.editor-ss-nav').forEach(btn => {
+                btn.style.opacity = '0';
+                btn.style.pointerEvents = 'none';
+              });
+              el._isHovering = false;
+            }, 50);
+          };
+
+          overlay.addEventListener('mouseenter', handleEnter);
+          overlay.addEventListener('mouseleave', handleLeave);
+          el.addEventListener('mouseenter', handleEnter);
+          el.addEventListener('mouseleave', handleLeave);
+
+          overlay._cleanupHover = () => {
+            if (leaveTimeout) clearTimeout(leaveTimeout);
+            overlay.removeEventListener('mouseenter', handleEnter);
+            overlay.removeEventListener('mouseleave', handleLeave);
+            el.removeEventListener('mouseenter', handleEnter);
+            el.removeEventListener('mouseleave', handleLeave);
+          };
+        }
+
+        const containerRect = pageContainer.getBoundingClientRect();
+        let elRect;
+        try {
+          const bbox = typeof getVisualBBox === 'function' ? getVisualBBox(el) : el.getBBox();
+          const ctm = el.getScreenCTM();
+          const pt = el.ownerSVGElement.createSVGPoint();
+          const corners = [
+            { x: bbox.x, y: bbox.y },
+            { x: bbox.x + bbox.width, y: bbox.y },
+            { x: bbox.x, y: bbox.y + bbox.height },
+            { x: bbox.x + bbox.width, y: bbox.y + bbox.height }
+          ];
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          for (let c of corners) {
+            pt.x = c.x; pt.y = c.y;
+            const mapped = pt.matrixTransform(ctm);
+            if (mapped.x < minX) minX = mapped.x;
+            if (mapped.y < minY) minY = mapped.y;
+            if (mapped.x > maxX) maxX = mapped.x;
+            if (mapped.y > maxY) maxY = mapped.y;
+          }
+          elRect = { left: minX, top: minY, right: maxX, bottom: maxY, width: maxX - minX, height: maxY - minY };
+        } catch (e) {
+          elRect = el.getBoundingClientRect();
+        }
+
+        const scaleX = containerRect.width / (pageContainer.offsetWidth || 1);
+        const scaleY = containerRect.height / (pageContainer.offsetHeight || 1);
+        const localLeft = (elRect.left - containerRect.left) / scaleX;
+        const localTop = (elRect.top - containerRect.top) / scaleY;
+        const localWidth = elRect.width / scaleX;
+        const localHeight = elRect.height / scaleY;
+
+        overlay.style.left = localLeft + 'px';
+        overlay.style.top = localTop + 'px';
+        overlay.style.width = localWidth + 'px';
+        overlay.style.height = localHeight + 'px';
+
+        const scaleFactor = Math.max(0.4, Math.min(1.8, localWidth / 300));
+        const { dotColor = '#000000', navIconColor = '#000000', showDots = true, showArrows = true, showNav = true } = settings;
+
+        const signature = JSON.stringify({
+          imagesCount: images.length,
+          scaleFactor: scaleFactor.toFixed(2),
+          dotColor, navIconColor, showDots, showArrows, showNav
+        });
+
+        if (overlay.dataset.signature !== signature) {
+          overlay.dataset.signature = signature;
+          overlay.innerHTML = '';
+
+          const showNavArrows = showArrows !== false && showNav !== false;
+          if (showNavArrows) {
+            ['prev', 'next'].forEach(type => {
+              const btn = document.createElement('button');
+              btn.className = 'editor-ss-nav editor-ss-nav-' + type;
+              const size = 48 * scaleFactor;
+              const offset = 12 * scaleFactor;
+              Object.assign(btn.style, {
+                position: 'absolute',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                [type === 'prev' ? 'left' : 'right']: offset + 'px',
+                zIndex: '10',
+                background: 'transparent',
+                border: 'none',
+                borderRadius: '50%',
+                width: size + 'px',
+                height: size + 'px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: 'none',
+                padding: '0',
+                pointerEvents: 'none',
+                opacity: '0',
+                transition: 'transform 0.15s, opacity 0.2s',
+              });
+              const svgSize = 32 * scaleFactor;
+
+              const iconContainer = document.createElement('div');
+              Object.assign(iconContainer.style, {
+                width: svgSize + 'px',
+                height: svgSize + 'px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              });
+              btn.appendChild(iconContainer);
+
+              const root = createRoot(iconContainer);
+              const iconKey = type === 'prev' ? 'left' : 'right';
+              const styleId = settings.navStyle || 1;
+              root.render(NavIconRenderer({ styleId, size: svgSize + 'px', color: navIconColor })[iconKey]);
+
+              btn._reactRoot = root;
+              btn.addEventListener('mouseleave', () => btn.style.transform = `translateY(-50%)`);
+              btn.addEventListener('mousedown', e => { e.stopPropagation(); e.preventDefault(); });
+              btn.addEventListener('click', e => {
+                e.stopPropagation(); e.preventDefault();
+                let next = type === 'prev' ? parseInt(el.getAttribute('data-active-index') || '0') - 1 : parseInt(el.getAttribute('data-active-index') || '0') + 1;
+                if (next < 0) next = images.length - 1;
+                if (next >= images.length) next = 0;
+                el.setAttribute('data-active-index', next.toString());
+                el._lastSlideTime = Date.now();
+
+                const evt = new CustomEvent('force-slideshow-advance', { detail: { el, nextIndex: next } });
+                window.dispatchEvent(evt);
+              });
+              overlay.appendChild(btn);
+            });
+          }
+
+          if (showDots) {
+            let dotsWrap = overlay.querySelector('.editor-ss-dots-wrap');
+            if (!dotsWrap) {
+              dotsWrap = document.createElement('div');
+              dotsWrap.className = 'editor-ss-dots-wrap';
+              Object.assign(dotsWrap.style, {
+                position: 'absolute',
+                bottom: (8 * scaleFactor) + 'px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                display: 'flex',
+                gap: (5 * scaleFactor) + 'px',
+                alignItems: 'center',
+                pointerEvents: 'auto',
+              });
+              overlay.appendChild(dotsWrap);
+            }
+
+            if (!dotsWrap._reactRoot) {
+              dotsWrap._reactRoot = createRoot(dotsWrap);
+            }
+
+            const dotStyleId = settings.dotStyle || 1;
+            const dotsSig = `${dotStyleId}-${activeIndex}-${images.length}-${dotColor}-${scaleFactor.toFixed(2)}`;
+
+            if (dotsWrap._lastSig !== dotsSig) {
+              dotsWrap._lastSig = dotsSig;
+              dotsWrap._reactRoot.render(
+                React.createElement(DotRenderer, {
+                  styleId: dotStyleId,
+                  size: `${Math.max(6, 8 * scaleFactor)}px`,
+                  color: dotColor || '#000000',
+                  activeIndex: activeIndex,
+                  count: images.length,
+                  onDotClick: (e, i) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const current = parseInt(el.getAttribute('data-active-index') || '0');
+                    if (i === current) return;
+                    el.setAttribute('data-active-index', i.toString());
+                    el._lastSlideTime = Date.now();
+
+                    const evt = new CustomEvent('force-slideshow-advance', { detail: { el, nextIndex: i } });
+                    window.dispatchEvent(evt);
+                  }
+                })
+              );
+            }
+          }
+        }
+
+        const isHovering = el._isHovering === true;
+        overlay.querySelectorAll('.editor-ss-nav').forEach(btn => {
+          btn.style.opacity = isHovering ? '1' : '0';
+          btn.style.pointerEvents = isHovering ? 'auto' : 'none';
+        });
+      });
+
+      document.querySelectorAll('.global-ss-overlay').forEach(overlay => {
+        const found = Array.from(slideshows).some(el => el._globalSsOverlay === overlay);
+        if (!found) {
+          if (overlay._cleanupHover) overlay._cleanupHover();
+          overlay.remove();
+        }
+      });
+    };
+
+    const interval = setInterval(renderOverlays, 200);
+
+    const handleForceAdvance = (e) => {
+      const { el, nextIndex } = e.detail;
+      if (!el) return;
+      try {
+        const dataStr = el.getAttribute('data-slideshow');
+        if (!dataStr) return;
+        const data = JSON.parse(dataStr);
+        const images = data.images || [];
+        const url = images[nextIndex]?.url;
+        if (!url) return;
+
+        const _findImgInPattern = (node) => {
+          const fill = node.getAttribute?.('fill') || '';
+          if (fill?.startsWith('url(#')) {
+            const patternId = fill.match(/url\(#([^)]+)\)/)?.[1];
+            if (patternId) {
+              const ownerSvg = node.closest('svg');
+              const pattern = ownerSvg?.querySelector(`[id="${patternId}"]`);
+              if (pattern) {
+                const img = pattern.querySelector('image');
+                if (img) return img;
+                const useEl = pattern.querySelector('use');
+                if (useEl) {
+                  const refId = (useEl.getAttribute('href') || useEl.getAttribute('xlink:href'))?.replace('#', '');
+                  if (refId) return ownerSvg?.querySelector(`[id="${refId}"]`) || null;
+                }
+              }
+            }
+          }
+          return null;
+        };
+        let imgEl = null;
+        const elTag = el.tagName?.toLowerCase();
+        if (elTag === 'image' || elTag === 'img') imgEl = el;
+        else {
+          imgEl = _findImgInPattern(el) || el.querySelector('image') || el.querySelector('img');
+          if (!imgEl) {
+            const childrenWithPatterns = el.querySelectorAll('[fill^="url(#"]');
+            for (const child of Array.from(childrenWithPatterns)) {
+              const t = _findImgInPattern(child);
+              if (t) { imgEl = t; break; }
+            }
+          }
+          if (!imgEl) imgEl = el;
+        }
+
+        if (!imgEl) return;
+        const imgTag2 = imgEl.tagName?.toLowerCase();
+        if (imgTag2 === 'image') {
+          imgEl.setAttribute('href', url);
+          try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (err) { }
+        } else if (imgTag2 === 'img') {
+          imgEl.src = url;
+        } else {
+          imgEl.style.backgroundImage = `url("${url}")`;
+        }
+        renderOverlays();
+      } catch (err) { }
+    };
+
+    window.addEventListener('force-slideshow-advance', handleForceAdvance);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('force-slideshow-advance', handleForceAdvance);
+      document.querySelectorAll('.global-ss-overlay').forEach(overlay => {
+        if (overlay._cleanupHover) overlay._cleanupHover();
+        overlay.remove();
+      });
+    };
+  }, [getVisualBBox]);
+
+  // 2. Global Slideshow Runner: Auto-advances slideshows even when unselected
+  useEffect(() => {
+    const globalSlideshowInterval = setInterval(() => {
+      const slideshows = document.querySelectorAll('[data-is-slideshow="true"]');
+      slideshows.forEach(el => {
+        if (el._slideshowManual ||
+          el._isHovering === true ||
+          el.matches(':hover') ||
+          (el._globalSsOverlay && el._globalSsOverlay.querySelector(':hover'))) return;
+
+        try {
+          const dataStr = el.getAttribute('data-slideshow');
+          if (!dataStr) return;
+          const data = JSON.parse(dataStr);
+          const settings = data.settings || {};
+
+          if (!settings.autoPlay && !settings.autoSlide) return;
+
+          const images = data.images || [];
+          if (images.length <= 1) return;
+
+          const speed = (settings.speed || 3) * 1000;
+          const now = Date.now();
+          const lastTime = el._lastSlideTime || 0;
+
+          if (now - lastTime >= speed) {
+            let currentIndex = parseInt(el.getAttribute('data-active-index') || '0');
+            let nextIndex = (currentIndex + 1) % images.length;
+
+            if (nextIndex === 0 && settings.infiniteLoop === false && currentIndex !== 0) return;
+
+            el.setAttribute('data-active-index', nextIndex.toString());
+            el._lastSlideTime = now;
+
+            const _findImgInPattern = (node) => {
+              const fill = node.getAttribute?.('fill') || '';
+              if (fill?.startsWith('url(#')) {
+                const patternId = fill.match(/url\(#([^)]+)\)/)?.[1];
+                if (patternId) {
+                  const ownerSvg = node.closest('svg');
+                  const pattern = ownerSvg?.querySelector(`[id="${patternId}"]`);
+                  if (pattern) {
+                    const img = pattern.querySelector('image');
+                    if (img) return img;
+                    const useEl = pattern.querySelector('use');
+                    if (useEl) {
+                      const refId = (useEl.getAttribute('href') || useEl.getAttribute('xlink:href'))?.replace('#', '');
+                      if (refId) return ownerSvg?.querySelector(`[id="${refId}"]`) || null;
+                    }
+                  }
+                }
+              }
+              return null;
+            };
+
+            let imgEl = null;
+            const elTag = el.tagName?.toLowerCase();
+            if (elTag === 'image' || elTag === 'img') {
+              imgEl = el;
+            } else {
+              imgEl = _findImgInPattern(el);
+              if (!imgEl) imgEl = el.querySelector('image') || el.querySelector('img');
+              if (!imgEl) {
+                const childrenWithPatterns = el.querySelectorAll('[fill^="url(#"]');
+                for (const child of Array.from(childrenWithPatterns)) {
+                  const t = _findImgInPattern(child);
+                  if (t) { imgEl = t; break; }
+                }
+              }
+              if (!imgEl) imgEl = el;
+            }
+
+            const url = images[nextIndex]?.url;
+            if (url && imgEl) {
+              const imgTag = imgEl.tagName?.toLowerCase();
+              if (imgTag === 'image') {
+                imgEl.setAttribute('href', url);
+                try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (e) { }
+              } else if (imgTag === 'img') {
+                imgEl.src = url;
+              } else {
+                imgEl.style.backgroundImage = `url("${url}")`;
+              }
+            }
+          }
+        } catch (e) { }
+      });
+
+      if (!document.querySelector('.editor-ss-overlay')) {
+        document.querySelectorAll('[data-is-slideshow="true"]').forEach(el => {
+          el._slideshowManual = false;
+        });
+      }
+    }, 50);
+
+    return () => clearInterval(globalSlideshowInterval);
+  }, []);
+
+  // 3. Manual Click Handler: Advances unselected slideshows on click
+  useEffect(() => {
+    const findImgInPattern = (node) => {
+      const fill = node.getAttribute?.('fill') || '';
+      if (fill?.startsWith('url(#')) {
+        const patternId = fill.match(/url\(#([^)]+)\)/)?.[1];
+        if (patternId) {
+          const ownerSvg = node.closest('svg');
+          const pattern = ownerSvg?.querySelector(`[id="${patternId}"]`);
+          if (pattern) {
+            const img = pattern.querySelector('image');
+            if (img) return img;
+            const useEl = pattern.querySelector('use');
+            if (useEl) {
+              const refId = (useEl.getAttribute('href') || useEl.getAttribute('xlink:href'))?.replace('#', '');
+              if (refId) return ownerSvg?.querySelector(`[id="${refId}"]`) || null;
+            }
+          }
+        }
+      }
+      return null;
+    };
+
+    const resolveImgEl = (el) => {
+      const tag = el.tagName?.toLowerCase();
+      if (tag === 'image' || tag === 'img') return el;
+      let img = findImgInPattern(el);
+      if (!img) img = el.querySelector('image') || el.querySelector('img');
+      if (!img) {
+        const childrenWithPatterns = el.querySelectorAll('[fill^="url(#"]');
+        for (const child of Array.from(childrenWithPatterns)) {
+          const t = findImgInPattern(child);
+          if (t) { img = t; break; }
+        }
+      }
+      return img || el;
+    };
+
+    let mdX = 0, mdY = 0;
+
+    const advanceSlideshow = (slideshowEl) => {
+      try {
+        const dataStr = slideshowEl.getAttribute('data-slideshow');
+        if (!dataStr) return;
+        const data = JSON.parse(dataStr);
+        const images = data.images || [];
+        if (images.length <= 1) return;
+
+        const settings = data.settings || {};
+        const infiniteLoop = settings.infiniteLoop !== false;
+
+        let currentIndex = parseInt(slideshowEl.getAttribute('data-active-index') || '0');
+        let nextIndex = currentIndex + 1;
+        if (nextIndex >= images.length) nextIndex = infiniteLoop ? 0 : images.length - 1;
+        if (nextIndex === currentIndex) return;
+
+        const url = images[nextIndex]?.url;
+        if (!url) return;
+
+        const imgEl = resolveImgEl(slideshowEl);
+        const imgTag = imgEl.tagName?.toLowerCase();
+        if (imgTag === 'image') {
+          imgEl.setAttribute('href', url);
+          try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (err) { }
+        } else if (imgTag === 'img') {
+          imgEl.src = url;
+        } else {
+          imgEl.style.backgroundImage = `url("${url}")`;
+        }
+
+        slideshowEl.setAttribute('data-active-index', nextIndex.toString());
+        slideshowEl._lastSlideTime = Date.now();
+      } catch (err) { }
+    };
+
+    const handleMouseDown = (e) => {
+      mdX = e.clientX;
+      mdY = e.clientY;
+    };
+
+    const handleMouseUp = (e) => {
+      if (Math.abs(e.clientX - mdX) > 5 || Math.abs(e.clientY - mdY) > 5) return;
+
+      let node = e.target;
+      let slideshowEl = null;
+      while (node && node.nodeType === 1) {
+        if (node.getAttribute?.('data-is-slideshow') === 'true') {
+          slideshowEl = node;
+          break;
+        }
+        node = node.parentNode;
+      }
+      if (!slideshowEl) return;
+      if (slideshowEl._slideshowManual) return;
+
+      advanceSlideshow(slideshowEl);
+    };
+
+    document.addEventListener('mousedown', handleMouseDown, true);
+    document.addEventListener('mouseup', handleMouseUp, true);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown, true);
+      document.removeEventListener('mouseup', handleMouseUp, true);
+    };
+  }, []);
+};
+
+/**
+ * Hook to register window event listeners that execute adding Elements into MainEditor,
+ * and seamlessly attaches Slideshow managers.
  */
 export const useElementsEditor = ({
   pages,
@@ -326,8 +1181,12 @@ export const useElementsEditor = ({
   multiSelectedIdsRef,
   setSingleSelection,
   setActiveMainTool,
-  drawOverlayHighlight
+  drawOverlayHighlight,
+  getVisualBBox
 }) => {
+  // Mount the global slideshow subsystem
+  useSlideshowManager({ getVisualBBox });
+
   useEffect(() => {
     const onAddElement = (e) => {
       handleAddElementToSvg({

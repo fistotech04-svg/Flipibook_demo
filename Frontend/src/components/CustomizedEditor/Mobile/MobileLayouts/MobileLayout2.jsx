@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'rea
 import { Icon } from '@iconify/react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const Grid2Layout = lazy(() => import('../../Layouts/Grid2Layout'));
+import Grid2Layout from '../../Layouts/Grid2Layout';
 
 
 
