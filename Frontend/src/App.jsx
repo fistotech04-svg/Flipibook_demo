@@ -23,6 +23,7 @@ import About from './pages/About';
 import Explore from './pages/Explore';
 import Template from './pages/Template';
 import ContactUs from './pages/ContactUs';
+import Converter from './pages/Converter.jsx';
 import Unauthorized from './pages/Unauthorized';
 import NotFound from './pages/NotFound';
 import Editor from './Modules/Editer';
@@ -120,6 +121,7 @@ function App() {
               </Route>
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<ContactUs />} />
+              <Route path="/converter" element={<Converter />} />
             </Route>
 
             {/* Catch-all route for wrong URLs */}
