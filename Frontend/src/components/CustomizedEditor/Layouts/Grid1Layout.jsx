@@ -2,7 +2,7 @@ import React, { useState, useEffect, lazy, Suspense, useRef, useMemo, useCallbac
 import { Icon } from '@iconify/react';
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import Sound from '../popups/Sound';
-const MobileLayout1 = lazy(() => import('../Mobile/MobileLayouts/MobileLayout1'));
+import MobileLayout1 from '../Mobile/MobileLayouts/MobileLayout1';
 
 
 const PageThumbnail = React.memo(({ html, index, scale = 0.15, baseWidth = 400, baseHeight = 566 }) => {

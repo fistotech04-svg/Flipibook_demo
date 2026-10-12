@@ -133,9 +133,7 @@ const ShapeProperties = ({
 
   // --- DERIVED STATE ---
   const backgroundColor = {
-    fill: selectedElementProps['data-masked-image-url'] 
-      ? (selectedElementProps['data-original-fill'] || '#d0ccff') 
-      : (selectedElementProps.fill || '#000000'),
+    fill: selectedElementProps.fill || '#000000',
     fillOpacity: selectedElementProps.opacity ? parseFloat(selectedElementProps.opacity) * 100 : 100,
     stroke: selectedElementProps.stroke || 'none',
     strokeOpacity: selectedElementProps['stroke-opacity'] ? parseFloat(selectedElementProps['stroke-opacity']) * 100 : 100,
@@ -163,11 +161,7 @@ const ShapeProperties = ({
 
     const updates = {};
     if (backgroundColor.fill !== next.fill) {
-      if (selectedElementProps['data-masked-image-url']) {
-        updates['data-original-fill'] = next.fill;
-      } else {
-        updates['fill'] = next.fill;
-      }
+      updates['fill'] = next.fill;
     }
     if (backgroundColor.fillOpacity !== next.fillOpacity) updates['opacity'] = (next.fillOpacity / 100).toString();
     if (backgroundColor.stroke !== next.stroke) updates['stroke'] = next.stroke;
@@ -422,40 +416,6 @@ const ShapeProperties = ({
             onChange={(val) => updateAttr('data-radius', val)}
             max={50}
           />
-        </div>
-      )}
-
-      {selectedElementProps['data-masked-image-url'] && (
-        <div className="px-[0.2vw] py-[0.5vw]">
-          <button
-            onClick={() => {
-              updateElementAttribute(activePageIndex, selectedLayerId, {
-                'data-masked-image-url': null,
-                'data-masked-image-type': null,
-                'fill': selectedElementProps['data-original-fill'] || '#d0ccff'
-              });
-              try {
-                const safeShapeId = (selectedLayerId || 'unknown').replace(/[^a-zA-Z0-9-_]/g, '_');
-                const imageId = `masked-img-${safeShapeId}`;
-                const clipId = `clip-shape-${safeShapeId}`;
-                
-                const svg = document.getElementById('main-flipbook-editor')?.contentDocument?.querySelector('svg') || document.querySelector('.flipbook-page-container svg');
-                if (svg) {
-                  const imgEl = svg.querySelector(`image[id="${imageId}"]`);
-                  if (imgEl) imgEl.remove();
-                  
-                  const clipEl = svg.querySelector(`clipPath[id="${clipId}"]`);
-                  if (clipEl) clipEl.remove();
-                }
-              } catch (e) {
-                console.error('Error removing masked image elements:', e);
-              }
-            }}
-            className="w-full flex items-center justify-center gap-[0.5vw] py-[0.4vw] text-[0.85vw] font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded border border-red-200 transition-colors"
-          >
-            <Icon icon="lucide:image-minus" width="1.1vw" height="1.1vw" />
-            Remove Image Mask
-          </button>
         </div>
       )}
 

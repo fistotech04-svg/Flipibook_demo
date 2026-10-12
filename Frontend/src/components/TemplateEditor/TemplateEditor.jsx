@@ -3816,7 +3816,8 @@ const TemplateEditor = () => {
   const updateElementAttribute = (pageIndex, elementId, attribute, value) => {
     saveToHistory();
     // Special case: ImageEditor serializes the whole SVG and passes it directly
-    if (attribute === '__dom_sync__') {
+    const domSyncHtml = attribute === '__dom_sync__' ? value : (typeof attribute === 'object' && attribute !== null && attribute['__dom_sync__'] ? attribute['__dom_sync__'] : null);
+    if (domSyncHtml !== null) {
       const safeParseSVG = (htmlStr) => {
         let safeStr = htmlStr;
         if (!safeStr.includes('xmlns:xlink=')) {
@@ -3836,15 +3837,15 @@ const TemplateEditor = () => {
         if (!page) return updated;
 
         let newLayers = page.layers;
-        if (value) {
-          const doc = safeParseSVG(value);
+        if (domSyncHtml) {
+          const doc = safeParseSVG(domSyncHtml);
           const svgEl = doc.querySelector('svg');
           if (svgEl) {
             newLayers = parseLayersFromSVG(svgEl);
           }
         }
 
-        updated[pageIndex] = { ...page, html: value, layers: newLayers };
+        updated[pageIndex] = { ...page, html: domSyncHtml, layers: newLayers };
         return updated;
       });
       return;
@@ -3865,7 +3866,7 @@ const TemplateEditor = () => {
       }
       if (element) {
         const updates = (typeof attribute === 'object' && attribute !== null)
-          ? Object.entries(attribute)
+          ? Object.entries(attribute).filter(([k]) => k !== '__dom_sync__')
           : [[attribute, value]];
 
         // ── Pass 1: Write all attribute values onto the element first ──────────
