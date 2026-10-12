@@ -121,4 +121,5 @@ const Elements = () => {
   );
 };
 
+export * from './useElementsEditor';
 export default Elements;

@@ -46,15 +46,15 @@ const shapes = Object.keys(shapeModules).map(path => {
   if (isStar || isPolygon) {
     const shapeType = isStar ? 'star' : 'polygon';
     const count = isStar ? 5 : (isTriangle ? 3 : (isPentagon ? 5 : 6));
-    const extraAttrs = ` data-shape-type="${shapeType}" data-count="${count}" data-radius="0" data-cx="${cx}" data-cy="${cy}" data-rx="${rx}"` + (isStar ? ' data-ratio="40"' : '');
+    const extraAttrs = ` data-shape-type="${shapeType}" data-count="${count}" data-radius="0" data-cx="${cx}" data-cy="${cy}" data-rx="${rx}" data-is-element-shape="true"` + (isStar ? ' data-ratio="40"' : '');
     svgContent = svgContent.replace(/<(path|polygon)/i, `<$1${extraAttrs}`);
   } else if (isRect) {
-    svgContent = svgContent.replace(/<rect/i, `<rect data-shape-type="rectangle"`);
+    svgContent = svgContent.replace(/<rect/i, `<rect data-shape-type="rectangle" data-is-element-shape="true"`);
   } else {
     const isCircle = lowerName === 'circle';
     const isLine = lowerName.includes('line');
     const shapeType = isCircle ? 'ellipse' : (isLine ? 'line' : 'vector-path');
-    svgContent = svgContent.replace(/<(path|circle|ellipse|line|polygon|polyline|rect)/i, `<$1 data-shape-type="${shapeType}"`);
+    svgContent = svgContent.replace(/<(path|circle|ellipse|line|polygon|polyline|rect)/i, `<$1 data-shape-type="${shapeType}" data-is-element-shape="true"`);
   }
   
   return {

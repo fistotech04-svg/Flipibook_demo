@@ -1163,14 +1163,7 @@ const ImageFramingProperties = ({ selectedElement, selectedLayerId, activePageIn
             max={50} 
           />
         )}
-        <PropertySlider 
-          label="Padding" 
-          value={framePadding} 
-          onChange={(val) => updateFramePadding(val, true)} 
-          onPointerUp={syncDomChanges}
-          min={0} 
-          max={50} 
-        />
+
         {slots.some(s => s.path.tagName.toLowerCase() === 'rect') && (
           <PropertySlider 
             label="Corner Radius" 

@@ -22,6 +22,12 @@ import { generateHotspotSVG } from './HotspotCustomizationPopup';
 import { CropController, isElementCropped } from './Crop';
 import { useToast } from '../CustomToast';
 import { checkSpellingAndGrammar, getSpellingSuggestions } from './spellGrammarChecker';
+import {
+  useElementsEditor,
+  handleElementsDropData,
+  fillElementShapeWithPattern,
+  isElementShape as checkIsElementShape
+} from './Elements/Elements';
 
 const PENCIL_CURSOR = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24'><g fill='none' fill-rule='evenodd'><path d='m12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035q-.016-.005-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.017-.018m.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093q.019.005.029-.008l.004-.014l-.034-.614q-.005-.018-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01z' /><path fill='%23000' d='M20.131 3.16a3 3 0 0 0-4.242 0l-.707.708l4.95 4.95l.706-.707a3 3 0 0 0 0-4.243l-.707-.707Zm-1.414 7.072l-4.95-4.95l-9.09 9.091a1.5 1.5 0 0 0-.401.724l-1.029 4.455a1 1 0 0 0 1.2 1.2l4.456-1.028a1.5 1.5 0 0 0 .723-.401z' /></g></svg>") 1 16, crosshair`;
 const PEN_CURSOR = `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M4 4l7 2.5L8 14 4 4z' fill='white' stroke='black' stroke-width='1.1'/%3E%3Cpath d='M8 14l-1.5 5' stroke='white' stroke-width='2'/%3E%3Cpath d='M8 14l-1.5 5' stroke='black' stroke-width='.8'/%3E%3C/svg%3E") 4 4, crosshair`;
@@ -2870,102 +2876,8 @@ const MainEditor = ({
     return () => clearInterval(interval);
   }, [activePageIndex]);
 
-  // Handle external asset insertion events
+  // Handle external asset insertion events (hotspots, images, videos)
   useEffect(() => {
-    const handleAddIcon = (e) => {
-      const { icon, pageIndex } = e.detail;
-      const targetPageIndex = pageIndex !== undefined ? pageIndex : activePageIndex;
-      const page = pages[targetPageIndex];
-      if (!page) return;
-
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(page.html || '', 'image/svg+xml');
-      const svg = doc.querySelector('svg');
-      if (!svg) return;
-
-      let svgW = 793;
-      let svgH = 1121;
-      const viewBox = svg.getAttribute('viewBox');
-      if (viewBox) {
-        const parts = viewBox.split(/[ ,]+/).map(parseFloat);
-        if (parts.length === 4) {
-          svgW = parts[2];
-          svgH = parts[3];
-        }
-      } else {
-        const wAttr = parseFloat(svg.getAttribute('width'));
-        const hAttr = parseFloat(svg.getAttribute('height'));
-        if (!isNaN(wAttr) && wAttr > 0) svgW = wAttr;
-        if (!isNaN(hAttr) && hAttr > 0) svgH = hAttr;
-      }
-      const centerX = e.detail.dropPoint ? e.detail.dropPoint.x : (svgW / 2);
-      const centerY = e.detail.dropPoint ? e.detail.dropPoint.y : (svgH / 2);
-
-      // Unique ID
-      const newId = e.detail.isShape ? `shape-${Date.now()}` : `icon-${Date.now()}`;
-
-      // Create element
-      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      g.id = newId;
-      g.setAttribute('data-type', e.detail.isShape ? 'shape' : 'icon');
-      if (e.detail.isShape) {
-        g.setAttribute('data-shape-type', 'shape');
-      }
-      // Place centered. Icon path is 24x24. Scaled by 0.5 = 12x12. Offset by -6 to truly center.
-      g.setAttribute('transform', `translate(${centerX - 6}, ${centerY - 6}) scale(0.5)`);
-      g.setAttribute('fill', icon.fill !== undefined ? icon.fill : 'none');
-      g.setAttribute('stroke', icon.stroke !== undefined ? icon.stroke : '#000000');
-      g.setAttribute('stroke-width', icon.strokeWidth !== undefined ? icon.strokeWidth : '1');
-      if (icon.Component) {
-        // If it's a lucide icon component, we can't easily render it to a string here 
-        // without react-dom/server or similar. 
-        // But I'll try to find a way to get its SVG path.
-        // For now, let's assume we use the data if available.
-        if (icon.html) g.innerHTML = icon.html;
-        else if (icon.d) {
-          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          path.setAttribute('d', icon.d);
-          g.appendChild(path);
-        }
-      } else {
-        if (icon.html) g.innerHTML = icon.html;
-        else if (icon.d) {
-          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          path.setAttribute('d', icon.d);
-          g.appendChild(path);
-        }
-      }
-
-      if (icon.html) {
-        const rects = g.querySelectorAll('rect');
-        rects.forEach(rect => {
-          if (!rect.hasAttribute('fill')) {
-            rect.setAttribute('fill', 'none');
-          }
-        });
-      }
-
-      const targetContainer = svg.querySelector('[data-type="frame"]') || svg.querySelector('[data-name="Overlay"]') || svg;
-      targetContainer.appendChild(g);
-
-      updatePageHtml(targetPageIndex, svg.outerHTML);
-      if (typeof setSingleSelection === 'function') {
-        setSingleSelection(newId);
-      } else {
-        if (setSelectedLayerId) setSelectedLayerId(newId);
-        selectedLayerIdRef.current = newId;
-        if (setMultiSelectedIds) setMultiSelectedIds(new Set([newId]));
-        multiSelectedIdsRef.current = new Set([newId]);
-      }
-      if (setActiveMainTool) setActiveMainTool('select');
-      setTimeout(() => {
-        const el = document.getElementById(newId);
-        if (el && typeof drawOverlayHighlight === 'function') {
-          drawOverlayHighlight(el, 'selected');
-        }
-      }, 50);
-    };
-
     const handleAddHotspot = (e) => {
       const { icon, pageIndex } = e.detail;
       const targetPageIndex = pageIndex !== undefined ? pageIndex : activePageIndex;
@@ -3310,10 +3222,28 @@ const MainEditor = ({
       const mediaUrl = gifUrl || url;
       if (!mediaUrl) return;
       const dataType = type || (gifUrl || mediaUrl.toLowerCase().endsWith('.gif') ? 'gif' : 'image');
-      insertImageIntoPage(targetPageIndex, mediaUrl, dataType, dropPoint, targetShapeId);
+      
+      let finalTargetId = targetShapeId;
+      if (!finalTargetId && selectedLayerIdRef.current) {
+        const selectedEl = document.getElementById(selectedLayerIdRef.current);
+        if (selectedEl && selectedEl.getAttribute('data-type') === 'image-frame') {
+          const highlight = selectedEl.querySelector('[data-highlight-id]');
+          if (highlight) {
+            const patternId = highlight.getAttribute('data-highlight-id').replace('highlight-', '');
+            const specificSlot = selectedEl.querySelector(`[data-pattern-id="${patternId}"]`);
+            if (specificSlot) {
+              if (!specificSlot.id) specificSlot.id = `inner-slot-${Date.now()}`;
+              finalTargetId = specificSlot.id;
+            }
+          } else {
+            finalTargetId = selectedLayerIdRef.current;
+          }
+        }
+      }
+      
+      insertImageIntoPage(targetPageIndex, mediaUrl, dataType, dropPoint, finalTargetId);
     };
 
-    window.addEventListener('add-icon-to-editor', handleAddIcon);
     window.addEventListener('add-hotspot-to-editor', handleAddHotspot);
     window.addEventListener('update-hotspot-style', (e) => {
       const { id, pageIndex, html, presetId, iconSrc, bgColor, iconColor } = e.detail;
@@ -3344,55 +3274,9 @@ const MainEditor = ({
       updatePageHtml(targetPageIndex, svg.outerHTML);
     });
 
-    const handleAddElement = (e) => {
-      console.log('handleAddElement triggered', e.detail);
-      const { svgContent, pageIndex, dropPoint } = e.detail;
-      const targetPageIndex = pageIndex !== undefined ? pageIndex : activePageIndex;
-      const page = pages[targetPageIndex];
-      if (!page) return;
-
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(page.html || '', 'image/svg+xml');
-      const svg = doc.querySelector('svg');
-      if (!svg) return;
-
-      const elementDoc = parser.parseFromString(`<svg xmlns="http://www.w3.org/2000/svg">${svgContent}</svg>`, 'image/svg+xml');
-      const newElement = elementDoc.querySelector('g') || elementDoc.querySelector('svg').firstElementChild;
-      if (!newElement) return;
-
-      // Positioning logic if dropped
-      if (dropPoint) {
-        // Simple translation for the group if necessary, though it might already have one
-        const currentTransform = newElement.getAttribute('transform') || '';
-        newElement.setAttribute('transform', `translate(${dropPoint.x - 100}, ${dropPoint.y - 25}) ${currentTransform}`);
-      }
-
-      const targetContainer = svg.querySelector('[data-type="frame"]') || svg.querySelector('[data-name="Overlay"]') || svg;
-      targetContainer.appendChild(newElement);
-
-      updatePageHtml(targetPageIndex, svg.outerHTML);
-
-      // Select the new element
-      const newId = newElement.getAttribute('id');
-      if (newId) {
-        if (typeof setSingleSelection === 'function') {
-          setSingleSelection(newId);
-        } else {
-          if (setSelectedLayerId) setSelectedLayerId(newId);
-          selectedLayerIdRef.current = newId;
-          if (setMultiSelectedIds) setMultiSelectedIds(new Set([newId]));
-          multiSelectedIdsRef.current = new Set([newId]);
-        }
-        if (typeof setActiveMainTool === 'function') setActiveMainTool('select');
-      }
-    };
-
-    window.addEventListener('add-element-to-editor', handleAddElement);
     window.addEventListener('add-image-to-editor', handleAddImage);
     window.addEventListener('upload-video-to-editor', handleUploadVideo);
     return () => {
-      window.removeEventListener('add-element-to-editor', handleAddElement);
-      window.removeEventListener('add-icon-to-editor', handleAddIcon);
       window.removeEventListener('add-hotspot-to-editor', handleAddHotspot);
       window.removeEventListener('add-image-to-editor', handleAddImage);
       window.removeEventListener('upload-video-to-editor', handleUploadVideo);
@@ -6694,7 +6578,14 @@ const MainEditor = ({
       inserted = true;
 
       if (targetShapeId && dataType === 'image') {
-        const shapeEl = svg.querySelector(`[id="${targetShapeId}"]`);
+        let shapeEl = svg.querySelector(`[id="${targetShapeId}"]`);
+        
+        // If the target is a group (Shape or Image Frame), find the actual geometry element inside it
+        if (shapeEl && (shapeEl.tagName.toLowerCase() === 'g' || shapeEl.hasAttribute('data-type'))) {
+            const innerGeo = shapeEl.querySelector('path, rect, circle, ellipse, polygon');
+            if (innerGeo) shapeEl = innerGeo;
+        }
+
         if (shapeEl) {
           try {
             const frame = shapeEl.closest('[data-type="image-frame"]');
@@ -6767,6 +6658,25 @@ const MainEditor = ({
                   return; // Stop here, don't do the clipping logic
                 }
               }
+            }
+
+            if (checkIsElementShape(shapeEl)) {
+              fillElementShapeWithPattern({
+                shapeEl,
+                svg,
+                targetShapeId,
+                dataUrl,
+                imgWidth,
+                imgHeight,
+                pageIdx,
+                updatePageHtml,
+                saveModifiedPageHtml,
+                setSingleSelection,
+                setSelectedLayerId,
+                setActiveMainTool,
+                drawOverlayHighlight
+              });
+              return;
             }
 
             // Check if it already has a fill, to store it
@@ -11708,6 +11618,20 @@ const MainEditor = ({
     }
   };
 
+  // ── Elements System Integration Hook ──────────────────────────────────────
+  useElementsEditor({
+    pages,
+    activePageIndex,
+    updatePageHtml,
+    setSelectedLayerId,
+    selectedLayerIdRef,
+    setMultiSelectedIds,
+    multiSelectedIdsRef,
+    setSingleSelection,
+    setActiveMainTool,
+    drawOverlayHighlight
+  });
+
 
   const enterTextEditMode = (target, clientX = null, clientY = null, selectAll = false) => {
     if (!target || !target.id) return;
@@ -13150,6 +13074,11 @@ const MainEditor = ({
       if (isMediaGroupChild && isMediaGroupChild !== target) {
         return;
       }
+      
+      if (target.getAttribute('data-is-mask-image') === 'true') {
+         const parentShape = svg.querySelector(`[id="${target.getAttribute('data-target-shape')}"]`);
+         if (parentShape) target = parentShape;
+      }
 
       if (setSelectedLayerId) {
         setSelectedLayerId(target.id);
@@ -14368,15 +14297,34 @@ const MainEditor = ({
 
                                     let targetShapeId = undefined;
                                     if (e.target) {
-                                      const leaf = e.target.closest('[data-type="shape"], [data-type="vector-path"], [data-shape-type]');
-                                      const frame = e.target.closest('[data-type="image-frame"]');
-                                      if (leaf && leaf.id && !leaf.id.includes('mask') && !leaf.id.includes('clip')) {
-                                        targetShapeId = leaf.id;
-                                      } else if (frame && e.target.tagName !== 'g' && (!e.target.id || (!e.target.id.includes('mask') && !e.target.id.includes('clip')))) {
-                                        if (!e.target.id) {
-                                          e.target.id = `frame-slot-${Math.random().toString(36).substr(2, 9)}`;
+                                      const shapeLeaf = e.target.closest('[data-is-element-shape="true"]');
+                                      const frameLeaf = e.target.closest('[data-type="image-frame"]');
+                                      
+                                      if (shapeLeaf) {
+                                        const shapeGroup = shapeLeaf.closest('[data-type="shape"]');
+                                        if (shapeGroup && shapeGroup.id) {
+                                          targetShapeId = shapeGroup.id;
+                                        } else if (shapeLeaf.id && !shapeLeaf.id.includes('mask') && !shapeLeaf.id.includes('clip')) {
+                                          targetShapeId = shapeLeaf.id;
                                         }
-                                        targetShapeId = e.target.id;
+                                      } else if (frameLeaf && frameLeaf.id) {
+                                        let specificSlot = null;
+                                        const highlight = frameLeaf.querySelector('[data-highlight-id]');
+                                        if (highlight) {
+                                          const patternId = highlight.getAttribute('data-highlight-id').replace('highlight-', '');
+                                          specificSlot = frameLeaf.querySelector(`[data-pattern-id="${patternId}"]`);
+                                        }
+                                        
+                                        if (!specificSlot && e.target && ['path', 'rect', 'circle', 'ellipse', 'polygon'].includes(e.target.tagName.toLowerCase())) {
+                                          specificSlot = e.target;
+                                        }
+                                        
+                                        if (specificSlot) {
+                                          if (!specificSlot.id) specificSlot.id = `inner-slot-${Date.now()}`;
+                                          targetShapeId = specificSlot.id;
+                                        } else {
+                                          targetShapeId = frameLeaf.id;
+                                        }
                                       }
                                     }
 
@@ -14480,24 +14428,8 @@ const MainEditor = ({
                                         }
                                       }));
                                       setShowHotspotPopup(false);
-                                    } else if (data.type === 'icon' || data.type === 'shape') {
-                                      window.dispatchEvent(new CustomEvent('add-icon-to-editor', {
-                                        detail: {
-                                          pageIndex: displayIndex,
-                                          icon: data.icon,
-                                          dropPoint,
-                                          isShape: data.type === 'shape'
-                                        }
-                                      }));
-                                    } else if (['button', 'image-frame', 'map'].includes(data.type)) {
-                                      console.log(`${data.type} Dropped:`, data);
-                                      window.dispatchEvent(new CustomEvent('add-element-to-editor', {
-                                        detail: {
-                                          pageIndex: displayIndex,
-                                          svgContent: data.svgContent,
-                                          dropPoint
-                                        }
-                                      }));
+                                    } else if (handleElementsDropData(data, displayIndex, dropPoint)) {
+                                      // Handled button, image-frame, map, qrcode, icon, shape via Elements module
                                     } else if (data.type === 'image' || data.type === 'upload' || data.url) {
                                       window.dispatchEvent(new CustomEvent('add-image-to-editor', {
                                         detail: {
