@@ -19,8 +19,10 @@ import GroupProperties from './GroupProperties';
 import ThirdPartyEmbedProperties from './Elements/3rdPartyEmbedProperties';
 import AudioProperties from './Elements/AudioProperties';
 import ImportViaUrlModal from './ImportViaUrlModal';
-import ButtonEditor from './Elements/ButtonEditor';
 import MapEditor from './Elements/MapEditor';
+import SlideshowEditor from './Elements/slideshowEditor';
+import TextElementEditor from './Elements/TextElementEditor';
+import ButtonEditor from './Elements/ButtonEdtitor';
 import ColorPicker, { parseGradient } from './ColorPicker';
 import MediaGalleryPopup from './MediaGalleryPopup';
 import { generateGradientString } from "../CustomizedEditor/AppearanceShared";
@@ -656,10 +658,10 @@ const RightSidebar = ({
       const parser = new DOMParser();
       const doc = parser.parseFromString(page.html, 'image/svg+xml');
       let el = doc.getElementById(selectedLayerId);
-      
+
       const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
       const actualEl = editorDoc.getElementById(selectedLayerId);
-      
+
       // Fallback to real DOM if React state (page.html) is slightly behind
       if (!el && actualEl) {
         el = actualEl;
@@ -782,15 +784,15 @@ const RightSidebar = ({
 
         // For shapes added as SVGs wrapped in a <g>, extract inner shape properties
         if (el.tagName.toLowerCase() === 'g') {
-           const innerShape = el.querySelector('path, polygon, rect, circle, ellipse, line');
-           if (innerShape) {
-               props.innerTagName = innerShape.tagName.toLowerCase();
-               Array.from(innerShape.attributes).forEach(attr => {
-                 if (['data-shape-type', 'data-count', 'data-ratio', 'data-radius', 'data-cx', 'data-cy', 'data-rx', 'rx'].includes(attr.name)) {
-                     props[attr.name] = attr.value;
-                 }
-               });
-           }
+          const innerShape = el.querySelector('path, polygon, rect, circle, ellipse, line');
+          if (innerShape) {
+            props.innerTagName = innerShape.tagName.toLowerCase();
+            Array.from(innerShape.attributes).forEach(attr => {
+              if (['data-shape-type', 'data-count', 'data-ratio', 'data-radius', 'data-cx', 'data-cy', 'data-rx', 'rx'].includes(attr.name)) {
+                props[attr.name] = attr.value;
+              }
+            });
+          }
         }
 
         // Add a flag for image detection
@@ -837,13 +839,26 @@ const RightSidebar = ({
           return props;
         }
 
-        const isUserGroup = lowerTagName === 'g' && !isShape && !isAudio && (
+        const isTypographyGroup = dataType === 'text' && lowerId.includes('typography');
+        const typographyParent = el.closest('g[data-type="text"][id*="typography-"]');
+        const isTypography = isTypographyGroup || !!typographyParent;
+        if (isTypography) {
+          props.typographyId = typographyParent ? typographyParent.id : selectedLayerId;
+        }
+
+        const buttonParent = el.closest('[data-type="button"], [id^="button-"]');
+        const isButton = dataType === 'button' || lowerId.includes('button') || !!buttonParent;
+        if (isButton) {
+          props.buttonId = buttonParent ? buttonParent.id : selectedLayerId;
+        }
+
+        const isUserGroup = lowerTagName === 'g' && !isShape && !isAudio && !isTypography && (
           dataType === 'group' ||
           lowerDataName === 'group' ||
           lowerId.startsWith('group-') ||
           el.getAttribute('data-type') === 'group' ||
-          (!el.getAttribute('data-is-image-group') && !el.getAttribute('data-is-video-group') && !el.getAttribute('data-is-gif-group') && dataType !== 'icon' && dataType !== 'button' && lowerDataName !== 'icon' && !lowerId.includes('icon') && !lowerId.includes('button'))
-        ) && el.getAttribute('data-is-image-group') !== 'true' && el.getAttribute('data-is-video-group') !== 'true' && el.getAttribute('data-is-gif-group') !== 'true' && dataType !== 'icon' && dataType !== 'button' && lowerDataName !== 'icon' && !lowerId.includes('icon') && !lowerId.includes('button') && !isMap;
+          (!el.getAttribute('data-is-image-group') && !el.getAttribute('data-is-video-group') && !el.getAttribute('data-is-gif-group') && dataType !== 'icon' && dataType !== 'button' && dataType !== 'slideshow' && lowerDataName !== 'icon' && !lowerId.includes('icon') && !lowerId.includes('button') && !lowerId.includes('slideshow'))
+        ) && el.getAttribute('data-is-image-group') !== 'true' && el.getAttribute('data-is-video-group') !== 'true' && el.getAttribute('data-is-gif-group') !== 'true' && dataType !== 'icon' && dataType !== 'button' && dataType !== 'slideshow' && lowerDataName !== 'icon' && !lowerId.includes('icon') && !lowerId.includes('button') && !lowerId.includes('slideshow') && !isMap;
 
         const isImage = !isUserGroup && (lowerTagName.includes('image') ||
           lowerTagName === 'img' ||
@@ -856,14 +871,16 @@ const RightSidebar = ({
         const isVideo = (lowerTagName === 'video' || lowerTagName === 'iframe' || dataType === 'video' || lowerDataName.includes('video') || lowerId.includes('video') || (lowerTagName === 'foreignobject' && el.querySelector('video, iframe'))) && !isMap;
         const isText = (lowerTagName === 'text' || lowerTagName === 'tspan' || (lowerTagName === 'foreignobject' && !isVideo && !isMap)) || dataType === 'text' || lowerDataName.includes('text') || lowerId.includes('text');
         const isIcon = (dataType === 'icon' || dataType === 'hotspot' || lowerDataName.includes('icon') || lowerDataName.includes('hotspot') || lowerId.includes('icon') || lowerId.includes('hotspot') || lowerTagName.includes('lucide') || el.classList.contains('lucide') || el.classList.contains('iconify')) && !isShape;
-        const isButton = dataType === 'button' || lowerId.includes('button');
         const isEmbed = dataType === 'embed-frame' || lowerDataName.includes('embed-frame') || lowerId.includes('embed-frame') || el.querySelector('[data-type="embed-frame"]') !== null;
+        const isSlideshow = dataType === 'slideshow' || lowerId.includes('slideshow');
 
-        props.isUserGroup = isUserGroup;
+        props.isUserGroup = isUserGroup && !isButton;
         props.isMap = isMap;
         props.isButton = isButton;
+        props.isSlideshow = isSlideshow;
         props.isImage = isImage;
-        props.isText = isText;
+        props.isText = isText && !isTypography && !isButton;
+        props.isTypography = isTypography;
         props.isVideo = isVideo;
         props.isGif = isGif;
         props.isIcon = isIcon;
@@ -1408,19 +1425,6 @@ const RightSidebar = ({
                           flipbookVId={effectiveVId}
                           onDeleteLayer={() => deleteLayer?.(activePageIndex, selectedLayerId)}
                         />
-                      ) : selectedElementProps?.isButton ? (
-                        <ButtonEditor
-                          selectedElement={(() => {
-                            const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
-                            return editorDoc.getElementById(selectedLayerId);
-                          })()}
-                          onUpdate={(newHtml) => {
-                            window.__skipCanvasUpdateForPage = activePageIndex;
-                            if (typeof newHtml === 'string') {
-                              updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', newHtml);
-                            }
-                          }}
-                        />
                       ) : selectedElementProps?.isMap ? (
                         <MapEditor
                           selectedElement={(() => {
@@ -1433,6 +1437,70 @@ const RightSidebar = ({
                               updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', newHtml);
                             }
                           }}
+                        />
+                      ) : selectedElementProps?.isSlideshow ? (
+                        <SlideshowEditor
+                          selectedElement={(() => {
+                            const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                            return editorDoc.getElementById(selectedLayerId);
+                          })()}
+                          onDeleteLayer={() => deleteLayer?.(activePageIndex, selectedLayerId)}
+                          onUpdate={(newHtml) => {
+                            window.__skipCanvasUpdateForPage = activePageIndex;
+                            if (typeof newHtml === 'string') {
+                              updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', newHtml);
+                            }
+                          }}
+                        />
+                      ) : selectedElementProps?.isButton ? (
+                        <ButtonEditor
+                          selectedElement={(() => {
+                            const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                            return editorDoc.getElementById(selectedElementProps.buttonId || selectedLayerId);
+                          })()}
+                          selectedLayerId={selectedElementProps.buttonId || selectedLayerId}
+                          activePageIndex={activePageIndex}
+                          updateElementAttribute={updateElementAttribute}
+                          onUpdate={(newHtml) => {
+                            window.__skipCanvasUpdateForPage = activePageIndex;
+                            if (typeof newHtml === 'string') {
+                              updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', newHtml);
+                            } else {
+                              const svgRoot = (() => {
+                                const targetId = selectedElementProps?.buttonId || selectedLayerId;
+                                const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                                const el = (targetId ? editorDoc.getElementById(targetId) : null) || (targetId ? document.getElementById(targetId) : null);
+                                if (!el) return null;
+                                const container = el.closest('.page-svg-container');
+                                if (container) {
+                                  const canvasContent = container.querySelector('[id^="canvas-content-"]');
+                                  return canvasContent ? canvasContent.querySelector('svg') : container.querySelector('svg');
+                                }
+                                let node = el;
+                                let lastSvg = null;
+                                while (node) {
+                                  if (node.tagName?.toLowerCase() === 'svg') lastSvg = node;
+                                  node = node.parentElement;
+                                }
+                                return lastSvg;
+                              })();
+                              if (svgRoot) {
+                                const serializer = new XMLSerializer();
+                                const html = serializer.serializeToString(svgRoot);
+                                updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', html);
+                              }
+                            }
+                          }}
+                        />
+                      ) : selectedElementProps?.isTypography ? (
+                        <TextElementEditor
+                          selectedElement={(() => {
+                            const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                            return editorDoc.getElementById(selectedElementProps.typographyId);
+                          })()}
+                          selectedLayerId={selectedElementProps.typographyId}
+                          selectedTextId={selectedLayerId !== selectedElementProps.typographyId ? selectedLayerId : null}
+                          updateElementAttribute={(layerId, attr, val) => updateElementAttribute(activePageIndex, layerId, attr, val)}
                         />
                       ) : selectedElementProps?.isText ? (
                         <TextEditor

@@ -4,6 +4,7 @@ export const CANVAS_HEIGHT = 842;
 
 // Font families
 export const fontFamilies = [
+  "Bangers",
   "Arial",
   "Times New Roman",
   "Courier New",
