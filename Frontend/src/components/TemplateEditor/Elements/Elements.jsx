@@ -7,6 +7,8 @@ import QRCode from './QRCode';
 import Table from './Table';
 import Audio from './Audio';
 import ThirdPartyEmbed from './3rdPartyEmbed';
+import TextElementStyle from './TextElementStyle';
+import SlideShowStyle from './slideShowstyle';
 import ButtonStyle from './ButtonStyle';
 
 // Map element as inline component (your work)
@@ -59,6 +61,11 @@ const MapElement = ({ isFullView }) => {
   );
 };
 
+const TypographyElement = ({ isFullView }) => {
+  if (!isFullView) return null;
+  return <TextElementStyle isFullView={isFullView} />;
+};
+
 const sectionData = [
   { id: 'shapes',        title: 'Shapes',          component: Shapes },
   { id: 'image-framing', title: 'Image Framing',   component: ImageFraming },
@@ -66,8 +73,10 @@ const sectionData = [
   { id: 'table',         title: 'Table',            component: Table },
   { id: 'audio',         title: 'Audio',            component: Audio },
   { id: 'embed',         title: '3rd Party Embed',  component: ThirdPartyEmbed },
-  { id: 'buttons',       title: 'Buttons',          component: ButtonStyle },
   { id: 'map',           title: 'Map',              component: MapElement },
+  { id: 'typography',    title: 'Typography',       component: TypographyElement },
+  { id: 'buttons',       title: 'Buttons',          component: ButtonStyle },
+  { id: 'slideshow',     title: 'Slideshow',        component: SlideShowStyle },
 ];
 
 const Elements = () => {
