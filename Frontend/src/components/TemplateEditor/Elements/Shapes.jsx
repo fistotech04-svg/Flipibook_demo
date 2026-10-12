@@ -9,9 +9,9 @@ const shapes = Object.keys(shapeModules).map(path => {
   // Remove fill="none" on the <svg> root so that it doesn't block inheritance from the <g> wrapper
   svgContent = svgContent.replace(/<svg[^>]*>/i, match => match.replace(/fill="none"/gi, 'fill="inherit"'));
 
-  // Replace fill and stroke colors with #EA4724, except when they are "none"
-  svgContent = svgContent.replace(/fill="(?!none|inherit)[^"]*"/gi, 'fill="#EA4724"');
-  svgContent = svgContent.replace(/stroke="(?!none|inherit)[^"]*"/gi, 'stroke="#9f2d14ff"');
+  // Replace fill and stroke colors with #FBDCD7, except when they are "none"
+  svgContent = svgContent.replace(/fill="(?!none|inherit)[^"]*"/gi, 'fill="#FBDCD7"');
+  svgContent = svgContent.replace(/stroke="(?!none|inherit)[^"]*"/gi, 'stroke="#EC5137"');
   
   // Extract dimensions for dynamic shapes
   let cx = 50, cy = 50, rx = 50;
@@ -70,11 +70,11 @@ const Shapes = ({ isFullView }) => {
     e.dataTransfer.setData('application/json', JSON.stringify({ 
       type: 'shape', 
       icon: { 
-        html: shape.svgContent.replace(/fill="#EA4724"/gi, 'fill="inherit"').replace(/stroke="#EA4724"/gi, 'stroke="inherit"'), 
+        html: shape.svgContent.replace(/fill="#FBDCD7"/gi, 'fill="inherit"').replace(/stroke="#EC5137"/gi, 'stroke="inherit"'), 
         name: shape.name, 
-        fill: '#EA4724',
-        stroke: 'none', 
-        strokeWidth: '0' 
+        fill: '#FBDCD7',
+        stroke: '#EC5137', 
+        strokeWidth: '1' 
       } 
     }));
   };
@@ -83,11 +83,11 @@ const Shapes = ({ isFullView }) => {
     window.dispatchEvent(new CustomEvent('add-icon-to-editor', {
       detail: {
         icon: { 
-          html: shape.svgContent.replace(/fill="#EA4724"/gi, 'fill="inherit"').replace(/stroke="#EA4724"/gi, 'stroke="inherit"'), 
+          html: shape.svgContent.replace(/fill="#FBDCD7"/gi, 'fill="inherit"').replace(/stroke="#EC5137"/gi, 'stroke="inherit"'), 
           name: shape.name, 
-          fill: '#EA4724',
-          stroke: 'none', 
-          strokeWidth: '0' 
+          fill: '#FBDCD7',
+          stroke: '#EC5137', 
+          strokeWidth: '1' 
         },
         isShape: true
       }
@@ -106,7 +106,7 @@ const Shapes = ({ isFullView }) => {
           onClick={() => handleClick(shape)}
         >
           <div 
-            className="w-full h-full flex items-center justify-center transition-opacity [&>svg]:w-full [&>svg]:h-full [&>svg]:object-contain"
+            className="w-full h-full flex items-center justify-center transition-opacity [&>svg]:w-full [&>svg]:h-full [&>svg]:object-contain [&>svg]:stroke-[#EC5137] [&>svg]:stroke-[1px]"
             dangerouslySetInnerHTML={{ __html: shape.svgContent }}
           />
         </div>
