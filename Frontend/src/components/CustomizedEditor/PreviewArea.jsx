@@ -2848,7 +2848,6 @@ const PreviewArea = React.memo(({
             textureScale: 0,
             opacity: 100,
             flipStyle: 'Classic Flip',
-            flipSpeed: validSpeed,
             corner: 'Sharp',
             dropShadow: { active: true, color: '#4f4f4fff', opacity: 50, xAxis: 0, yAxis: 0, blur: 0, spread: 0 },
             ...rawApp,
