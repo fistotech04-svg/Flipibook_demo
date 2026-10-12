@@ -26,7 +26,7 @@ const TypographyPanel = ({
     const [showLineHeightSlider, setShowLineHeightSlider] = useState(false);
     const [showColorPicker, setShowColorPicker] = useState(false);
 
-    const fontFamilies = ['Poppins', 'Inter', 'Roboto', 'Outfit', 'Montserrat', 'Playfair Display'];
+    const fontFamilies = ['Bangers', 'Poppins', 'Inter', 'Roboto', 'Outfit', 'Montserrat', 'Playfair Display'];
     const fontSizes = [10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 64];
     const fontWeights = ['Regular', 'Medium', 'Semi Bold', 'Bold', 'Black'];
 

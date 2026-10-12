@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 const fontFamilies = [
-  'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana',
+  'Bangers', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana',
   'Helvetica', 'Poppins', 'Roboto', 'Open Sans', 'Lato', 'Montserrat',
   'Inter', 'Playfair Display', 'Oswald', 'Merriweather',
   'Designer_Signature', 'Public Sans', 'Lora', 'Cabin',
@@ -421,7 +421,7 @@ const syncTextEffect = (doc, element) => {
   }
 
   const baseFilterId = `filter-${element.id || element.getAttribute('data-name') || 'text-effect'}`;
-  
+
   // Cache-busting: Remove any existing filters for this element to force a fresh render
   Array.from(defs.querySelectorAll(`[id^="${baseFilterId}"]`)).forEach(old => old.remove());
 
@@ -474,7 +474,7 @@ const syncTextEffect = (doc, element) => {
     const bgStrokeWidth = parseFloat(getVal('data-bg-stroke-width', '0'));
     const textStrokeWidth = parseFloat(getVal('stroke-width', '0'));
     const strokeErodeRadius = bgStrokeWidth > 0 ? bgStrokeWidth : textStrokeWidth;
-    
+
     let insideMask = 'SourceAlpha';
 
     if (strokeErodeRadius > 0 && isForeignObject) {
@@ -503,7 +503,7 @@ const syncTextEffect = (doc, element) => {
       crispStroke.setAttribute('in2', insideMask);
       crispStroke.setAttribute('result', 'crisp_stroke');
       filterEl.appendChild(crispStroke);
-      
+
       // Composite crisp stroke over the blurred interior
       const restoreStroke = d.createElementNS("http://www.w3.org/2000/svg", "feComposite");
       restoreStroke.setAttribute('operator', 'over');
@@ -681,7 +681,7 @@ const syncTextEffect = (doc, element) => {
     if (inner) {
       inner.style.removeProperty('clip-path');
       inner.style.setProperty('filter', finalFilterUrl, 'important');
-      
+
       // Preserve backdrop-filter logic for SVG path
       if (hasBackgroundBlur) {
         const bBlur = getVal('data-effect-background-blur-value', '10');
@@ -693,7 +693,7 @@ const syncTextEffect = (doc, element) => {
       }
     }
     element.style.removeProperty('filter'); // Make sure wrapper doesn't have it
-    element.removeAttribute('filter'); 
+    element.removeAttribute('filter');
   } else {
     element.setAttribute('filter', finalFilterUrl);
   }

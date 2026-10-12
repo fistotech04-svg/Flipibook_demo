@@ -425,6 +425,13 @@ const svgGlobalStyles = `
     pointer-events: auto !important;
   }
 
+  .page-svg-container svg [data-type="button"] text,
+  .page-svg-container svg [data-type="button"] tspan,
+  .page-svg-container svg [class*="btn-"] text,
+  .page-svg-container svg [class*="btn-"] tspan {
+    pointer-events: none !important;
+  }
+
   .page-svg-container svg * {
     cursor: default;
   }
@@ -2641,7 +2648,7 @@ const MainEditor = ({
     if (editorDoc && editorDoc.body) {
       try {
         observer.observe(editorDoc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-scrollbar-color', 'data-bg-fill', 'data-bg-fill-opacity', 'data-bg-stroke', 'data-bg-stroke-opacity', 'data-bg-stroke-width', 'id'] });
-      } catch (e) {}
+      } catch (e) { }
     }
 
     return () => {
@@ -2799,7 +2806,7 @@ const MainEditor = ({
           iframe.style.setProperty('width', origW + 'px', 'important');
           iframe.style.setProperty('height', origH + 'px', 'important');
           iframe.style.setProperty('transform-origin', '0 0', 'important');
-          
+
           const isInteractive = fo.getAttribute('data-video-interactive') === 'true';
           iframe.style.setProperty('pointer-events', isInteractive ? 'auto' : 'none', 'important');
           iframe.style.setProperty('border', 'none', 'important');
@@ -2838,22 +2845,22 @@ const MainEditor = ({
               else clipShape.removeAttribute(attr);
             });
           }
-          
+
           // Sync Image properties
           const transform = shapeEl.getAttribute('transform');
           if (transform) imgEl.setAttribute('transform', transform);
           else imgEl.removeAttribute('transform');
 
           if (typeof shapeEl.getBBox === 'function') {
-             try {
-                const bbox = shapeEl.getBBox();
-                if (bbox && bbox.width > 0 && bbox.height > 0) {
-                   imgEl.setAttribute('x', bbox.x);
-                   imgEl.setAttribute('y', bbox.y);
-                   imgEl.setAttribute('width', bbox.width);
-                   imgEl.setAttribute('height', bbox.height);
-                }
-             } catch(e) {}
+            try {
+              const bbox = shapeEl.getBBox();
+              if (bbox && bbox.width > 0 && bbox.height > 0) {
+                imgEl.setAttribute('x', bbox.x);
+                imgEl.setAttribute('y', bbox.y);
+                imgEl.setAttribute('width', bbox.width);
+                imgEl.setAttribute('height', bbox.height);
+              }
+            } catch (e) { }
           }
         }
       });
@@ -5196,9 +5203,8 @@ const MainEditor = ({
             htmlOverlay.appendChild(toggleBtn);
           }
 
-          toggleBtn.className = `video-mode-toggle absolute flex items-center gap-1.5 px-3 py-1 rounded-full text-white shadow-lg text-xs font-semibold cursor-pointer select-none transition-all pointer-events-auto ${
-            isInteractive ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'
-          }`;
+          toggleBtn.className = `video-mode-toggle absolute flex items-center gap-1.5 px-3 py-1 rounded-full text-white shadow-lg text-xs font-semibold cursor-pointer select-none transition-all pointer-events-auto ${isInteractive ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'
+            }`;
           toggleBtn.style.zIndex = '2147483647';
           toggleBtn.style.left = `${mapped[1].x}px`;
           toggleBtn.style.top = `${mapped[1].y - (28 / zoomScale)}px`;
@@ -6736,10 +6742,10 @@ const MainEditor = ({
               imageEl.setAttribute('y', bbox.y);
               imageEl.setAttribute('width', bbox.width);
               imageEl.setAttribute('height', bbox.height);
-              
+
               // We must also apply the shape's transform to the image, BUT if we do, the clipPath (which has the transform)
               // would be double-transformed. So we must NOT put the transform on the clipShape!
-              
+
               // Actually, wait, let's reset the clip path content:
               clip.innerHTML = '';
               const cleanClipShape = shapeEl.cloneNode(true);
@@ -6749,7 +6755,7 @@ const MainEditor = ({
               cleanClipShape.removeAttribute('stroke-width');
               cleanClipShape.removeAttribute('transform'); // REMOVE transform from clip path
               clip.appendChild(cleanClipShape);
-              
+
               // Apply the shape's transform to the image
               const transform = shapeEl.getAttribute('transform');
               if (transform) {
@@ -7250,7 +7256,7 @@ const MainEditor = ({
     // If this element is an image/video/gif group, or a compound element (audio/embed/icon), it should act as a single layer (no children exposed)
     const dataType = el.getAttribute('data-type');
     if (el.getAttribute('data-is-image-group') || el.getAttribute('data-is-video-group') || el.getAttribute('data-is-gif-group') ||
-        dataType === 'embed-frame' || dataType === 'audio-frame' || dataType === 'icon' || (el.querySelector && el.querySelector('[data-type="audio-frame"]'))) {
+      dataType === 'embed-frame' || dataType === 'audio-frame' || dataType === 'icon' || (el.querySelector && el.querySelector('[data-type="audio-frame"]'))) {
       return [];
     }
 
@@ -8252,13 +8258,13 @@ const MainEditor = ({
                 try {
                   const c = canvasSvg.querySelector(`[id="${CSS.escape(id)}"]`);
                   if (c) return c;
-                } catch (_) {}
+                } catch (_) { }
               }
               if (pageContainer) {
                 try {
                   const c = pageContainer.querySelector(`[id="${CSS.escape(id)}"]`);
                   if (c) return c;
-                } catch (_) {}
+                } catch (_) { }
               }
               return document.getElementById(id);
             };
@@ -8323,7 +8329,7 @@ const MainEditor = ({
                 matrix = getElementMatrix(el);
               }
               bbox = getVisualBBox(el);
-              if (el.getAttribute('data-is-hotspot') === 'true' && el.querySelector('rect') && (el.querySelector('text') || el.querySelector('[data-type="text"]'))) {
+              if ((el.getAttribute('data-is-hotspot') === 'true' || el.getAttribute('data-type') === 'button') && el.querySelector('rect') && (el.querySelector('text') || el.querySelector('[data-type="text"]'))) {
                 const rc = el.querySelector('rect');
                 const rw = parseFloat(rc.getAttribute('width')) || 0;
                 const rh = parseFloat(rc.getAttribute('height')) || 0;
@@ -9077,8 +9083,8 @@ const MainEditor = ({
                       const ptCorner = new DOMPoint(finalX + finalWidth, finalY + finalHeight).matrixTransform(matrix);
                       const newTx = Math.min(ptOrigin.x, ptCorner.x);
                       const newTy = Math.min(ptOrigin.y, ptCorner.y);
-                      const newW  = Math.abs(ptCorner.x - ptOrigin.x);
-                      const newH  = Math.abs(ptCorner.y - ptOrigin.y);
+                      const newW = Math.abs(ptCorner.x - ptOrigin.x);
+                      const newH = Math.abs(ptCorner.y - ptOrigin.y);
                       // Derive scale from inner content size
                       const innerWidth = (state.bbox && state.bbox.width > 0) ? state.bbox.width : 48;
                       const innerHeight = (state.bbox && state.bbox.height > 0) ? state.bbox.height : 48;
@@ -9112,8 +9118,8 @@ const MainEditor = ({
                     const tag = child.tagName?.toLowerCase();
                     const isChildText = tag === 'text' || child.getAttribute('data-type') === 'text';
 
-                    if (isInteractiveButton && (isChildText || tag === 'image' || tag === 'g' || tag === 'path')) {
-                      return; // Text and icons are positioned/scaled in the dedicated interactive button block below
+                    if (isInteractiveButton && (isChildText || tag === 'image' || tag === 'g' || tag === 'path' || tag === 'polygon')) {
+                      return; // Text, icons, and ribbon shapes are positioned/scaled in the dedicated interactive button block below
                     }
 
                     let myScaleX = scaleX;
@@ -9479,17 +9485,18 @@ const MainEditor = ({
                       const baseFontSize = textData.initialFontSize || parseFloat(textEl.getAttribute('data-base-font-size') || textEl.getAttribute('font-size') || '14');
                       let newFontSize = Math.max(6, Math.round(baseFontSize * scaleRatio * 10) / 10);
 
-                      // Check if button has an icon
-                      const iconImg = el.querySelector('image');
-                      const iconG = el.querySelector('g:not(defs g)');
-                      const iconPath = el.querySelector('path');
-                      const hasIcon = !!(iconImg || iconG || iconPath);
+                      // Check if button has an icon (only hotspots have icons in interactive buttons)
+                      const isHotspotBtn = el.getAttribute('data-is-hotspot') === 'true';
+                      const iconImg = isHotspotBtn ? el.querySelector('image') : null;
+                      const iconG = isHotspotBtn ? el.querySelector('g:not(defs g):not(.button-hover-slide-group)') : null;
+                      const iconPath = isHotspotBtn ? el.querySelector('path') : null;
+                      const hasIcon = isHotspotBtn && !!(iconImg || iconG || iconPath);
 
                       const label = textEl.textContent || '';
                       // Prevent font size from overflowing button width if narrowed
                       if (label.length > 0 && rectW > 0) {
-                        const availableWidth = Math.max(8, rectW - (hasIcon ? 18 * scaleRatio : 6));
-                        const maxFontForWidth = availableWidth / (label.length * 0.6);
+                        const availableWidth = Math.max(8, rectW - (hasIcon ? 18 * scaleRatio : 12));
+                        const maxFontForWidth = availableWidth / (label.length * 0.55);
                         if (maxFontForWidth > 0 && newFontSize > maxFontForWidth) {
                           newFontSize = Math.max(5, Math.round(maxFontForWidth * 10) / 10);
                         }
@@ -9554,12 +9561,71 @@ const MainEditor = ({
                         textEl.setAttribute('y', rectY + rectH / 2);
                         textEl.setAttribute('dominant-baseline', 'central');
                         textEl.setAttribute('text-anchor', 'middle');
+                        textEl.style.textAnchor = 'middle';
+                        textEl.style.dominantBaseline = 'central';
                       } else {
                         // No icon: center text directly in rect
                         textEl.setAttribute('x', rectX + rectW / 2);
                         textEl.setAttribute('y', rectY + rectH / 2);
-                        textEl.setAttribute('dominant-baseline', 'central');
+                        textEl.setAttribute('dominant-baseline', 'middle');
                         textEl.setAttribute('text-anchor', 'middle');
+                        textEl.style.textAnchor = 'middle';
+                        textEl.style.dominantBaseline = 'middle';
+                      }
+
+                      // Synchronize slide group, slide rect, border rect, clip path, and ribbon polygons
+                      const slideGroup = el.querySelector('.button-hover-slide-group');
+                      if (slideGroup) {
+                        slideGroup.removeAttribute('transform');
+                      }
+                      const slideRect = el.querySelector('.button-hover-slide-rect');
+                      if (slideRect) {
+                        slideRect.setAttribute('x', rectX);
+                        slideRect.setAttribute('y', rectY);
+                        slideRect.setAttribute('width', rectW);
+                        slideRect.setAttribute('height', rectH);
+                      }
+                      const borderRect = el.querySelector('rect.btn-border');
+                      if (borderRect) {
+                        borderRect.setAttribute('x', rectX);
+                        borderRect.setAttribute('y', rectY);
+                        borderRect.setAttribute('width', rectW);
+                        borderRect.setAttribute('height', rectH);
+                        borderRect.setAttribute('rx', newRx);
+                      }
+                      const mainPoly = el.querySelector('.btn-main-poly');
+                      const accentLeft = el.querySelector('.btn-accent-left');
+                      const accentRight = el.querySelector('.btn-accent-right');
+                      if (mainPoly || accentLeft || accentRight) {
+                        const slantDx = Math.round(rectH * 0.22);
+                        if (mainPoly) {
+                          mainPoly.removeAttribute('transform');
+                          mainPoly.setAttribute('points', `${rectX},${rectY} ${rectX + rectW - slantDx},${rectY} ${rectX + rectW},${rectY + rectH} ${rectX + slantDx},${rectY + rectH}`);
+                        }
+                        if (accentLeft) {
+                          accentLeft.removeAttribute('transform');
+                          accentLeft.setAttribute('points', `${rectX},${rectY + rectH} ${rectX + slantDx},${rectY + rectH} ${rectX + slantDx / 2},${rectY + rectH / 2}`);
+                        }
+                        if (accentRight) {
+                          accentRight.removeAttribute('transform');
+                          accentRight.setAttribute('points', `${rectX + rectW - slantDx},${rectY} ${rectX + rectW},${rectY} ${rectX + rectW - slantDx / 2},${rectY + rectH / 2}`);
+                        }
+                      }
+                      const svgRoot = el.closest('svg');
+                      const clipId = `clip-${el.id}`;
+                      if (svgRoot) {
+                        const clipRect = svgRoot.querySelector(`#${clipId} rect`);
+                        if (clipRect) {
+                          clipRect.setAttribute('x', rectX);
+                          clipRect.setAttribute('y', rectY);
+                          clipRect.setAttribute('width', rectW);
+                          clipRect.setAttribute('height', rectH);
+                        }
+                        const clipPoly = svgRoot.querySelector(`#${clipId} polygon`);
+                        if (clipPoly) {
+                          const slantDx = Math.round(rectH * 0.22);
+                          clipPoly.setAttribute('points', `${rectX},${rectY} ${rectX + rectW},${rectY} ${rectX + rectW - slantDx / 2},${rectY + rectH / 2} ${rectX + rectW},${rectY + rectH} ${rectX},${rectY + rectH} ${rectX + slantDx / 2},${rectY + rectH / 2}`);
+                        }
                       }
                     }
                   }
@@ -11340,6 +11406,24 @@ const MainEditor = ({
       div.style.overflowX = 'hidden';
     }
     div.style.color = el.getAttribute('fill') || '#000000';
+
+    // Apply stroke fixes ONLY if this text belongs to a typography group
+    if (el.closest && el.closest('[id^="typography-"]')) {
+      const strokeColor = el.getAttribute('stroke');
+      if (strokeColor && strokeColor !== 'none') {
+        div.style.webkitTextStrokeColor = strokeColor;
+      }
+      const strokeWidthRaw = el.getAttribute('stroke-width');
+      if (strokeWidthRaw) {
+        div.style.webkitTextStrokeWidth = strokeWidthRaw.includes('px') ? strokeWidthRaw : `${strokeWidthRaw}px`;
+      } else {
+        const computedStrokeWidth = window.getComputedStyle(el).getPropertyValue('stroke-width');
+        if (computedStrokeWidth && computedStrokeWidth !== 'none' && computedStrokeWidth !== '0px') {
+          div.style.webkitTextStrokeWidth = computedStrokeWidth;
+        }
+      }
+    }
+
     div.style.fontFamily = el.getAttribute('font-family') || 'Inter, sans-serif';
     div.style.fontSize = (el.getAttribute('font-size') || '10') + 'px';
     div.style.fontWeight = el.style.fontWeight || el.getAttribute('font-weight') || 'normal';
@@ -11933,7 +12017,7 @@ const MainEditor = ({
             mark.setAttribute('data-suggestions', suggData);
             mark.setAttribute('data-message', msg);
             range.surroundContents(mark);
-          } catch (e) {}
+          } catch (e) { }
         }
 
         runningOffset = nodeEnd;
@@ -11978,7 +12062,7 @@ const MainEditor = ({
             s.addRange(newRange);
           }
         }
-      } catch (err) {}
+      } catch (err) { }
     }
 
     const showSuggestionPopup = (markEl, clientX, clientY) => {
@@ -11988,7 +12072,7 @@ const MainEditor = ({
       let suggestions = [];
       try {
         suggestions = JSON.parse(decodeURIComponent(markEl.getAttribute('data-suggestions') || '[]'));
-      } catch (e) {}
+      } catch (e) { }
 
       if (suggestions.length === 0) {
         suggestions = getSpellingSuggestions(word);
@@ -11997,7 +12081,7 @@ const MainEditor = ({
       let message = '';
       try {
         message = decodeURIComponent(markEl.getAttribute('data-message') || '');
-      } catch (e) {}
+      } catch (e) { }
 
       const rect = markEl.getBoundingClientRect();
       const popup = document.createElement('div');
@@ -12495,7 +12579,7 @@ const MainEditor = ({
           if (underlyingEl) {
             const tag = underlyingEl.tagName.toLowerCase();
             const isButton = underlyingEl.getAttribute('data-type') === 'button';
-            
+
             if (tag === 'text' || tag === 'tspan' || tag === 'foreignobject') {
               console.log('[handleSvgClick] Entering text edit mode for', underlyingEl);
               enterTextEditMode(underlyingEl, e.clientX, e.clientY);
@@ -14222,7 +14306,7 @@ const MainEditor = ({
                         const isTypeActive = activeMainTool === 'type';
 
                         const pageHtml = pages[displayIndex]?.html;
-                        const isPageEmpty = !pages[displayIndex]?.isHidden && (!pageHtml || (pages[displayIndex]?.layers?.length === 0) || (pages[displayIndex]?.layers?.length === 1 && (!pages[displayIndex].layers[0].children || pages[displayIndex].layers[0].children.length === 0) && !pages[displayIndex].layers[0].id?.includes('shape') && !pages[displayIndex].layers[0].id?.includes('video') && !pages[displayIndex].layers[0].id?.includes('image') && !pages[displayIndex].layers[0].id?.includes('embed')));
+                        const isPageEmpty = !pages[displayIndex]?.isHidden && (!pageHtml || (pages[displayIndex]?.layers?.length === 0) || (pages[displayIndex]?.layers?.length === 1 && (!pages[displayIndex].layers[0].children || pages[displayIndex].layers[0].children.length === 0) && !pages[displayIndex].layers[0].id?.includes('shape') && !pages[displayIndex].layers[0].id?.includes('video') && !pages[displayIndex].layers[0].id?.includes('image') && !pages[displayIndex].layers[0].id?.includes('embed') && !pages[displayIndex].layers[0].id?.includes('slideshow')));
 
                         return (
                           <div
@@ -14330,7 +14414,7 @@ const MainEditor = ({
 
                                     let data = null;
                                     console.log('Drop Event Fired! Types:', e.dataTransfer.types);
-                                    
+
                                     // 1. Try reading JSON data
                                     const rawJson = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('application/x-flipbook-element');
                                     if (rawJson) {
@@ -14428,8 +14512,24 @@ const MainEditor = ({
                                         }
                                       }));
                                       setShowHotspotPopup(false);
-                                    } else if (handleElementsDropData(data, displayIndex, dropPoint)) {
-                                      // Handled button, image-frame, map, qrcode, icon, shape via Elements module
+                                    } else if (data.type === 'icon' || data.type === 'shape') {
+                                      window.dispatchEvent(new CustomEvent('add-icon-to-editor', {
+                                        detail: {
+                                          pageIndex: displayIndex,
+                                          icon: data.icon,
+                                          dropPoint,
+                                          isShape: data.type === 'shape'
+                                        }
+                                      }));
+                                    } else if (['button', 'text', 'slideshow', 'image-frame', 'map'].includes(data.type)) {
+                                      console.log(`${data.type} Dropped:`, data);
+                                      window.dispatchEvent(new CustomEvent('add-element-to-editor', {
+                                        detail: {
+                                          pageIndex: displayIndex,
+                                          svgContent: data.svgContent,
+                                          dropPoint
+                                        }
+                                      }));
                                     } else if (data.type === 'image' || data.type === 'upload' || data.url) {
                                       window.dispatchEvent(new CustomEvent('add-image-to-editor', {
                                         detail: {
@@ -14479,7 +14579,7 @@ const MainEditor = ({
                                 <span className="text-gray-500 text-[0.85vw] mt-[0.5vw]">It will not be shown in the flipbook.</span>
                               </div>
                             )}
-                            
+
                             {!pages[displayIndex]?.isHidden && (
                               <>
                                 {/* Selection Overlay (Overlay rotated element perfectly) */}
