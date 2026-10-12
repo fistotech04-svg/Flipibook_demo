@@ -3,8 +3,6 @@ import { createRoot } from 'react-dom/client';
 import { Icon } from '@iconify/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import interact from 'interactjs';
-import { NavIconRenderer } from '../CustomizedEditor/popups/NavIconStylesPopup';
-import { DotRenderer } from '../CustomizedEditor/popups/DotStylesPopup';
 import { checkIsAnimatedWebp } from './editorUtils';
 import FlipBookEngine from '../CustomizedEditor/FlipBookEngine';
 import usePreventBrowserZoom from '../../hooks/usePreventBrowserZoom';
@@ -22,6 +20,17 @@ import { generateHotspotSVG } from './HotspotCustomizationPopup';
 import { CropController, isElementCropped } from './Crop';
 import { useToast } from '../CustomToast';
 import { checkSpellingAndGrammar, getSpellingSuggestions } from './spellGrammarChecker';
+import {
+  useElementsEditor,
+  handleElementsDropData,
+  fillElementShapeWithPattern,
+  isElementShape as checkIsElementShape,
+  getElementCompoundTarget,
+  getTargetElementShapeOrFrameId,
+  resizeInteractiveButton,
+  resizeAudioGroup,
+  isAudioGroup as checkIsAudioGroup
+} from './Elements/useElementsEditor';
 
 const PENCIL_CURSOR = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24'><g fill='none' fill-rule='evenodd'><path d='m12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035q-.016-.005-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.017-.018m.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093q.019.005.029-.008l.004-.014l-.034-.614q-.005-.018-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01z' /><path fill='%23000' d='M20.131 3.16a3 3 0 0 0-4.242 0l-.707.708l4.95 4.95l.706-.707a3 3 0 0 0 0-4.243l-.707-.707Zm-1.414 7.072l-4.95-4.95l-9.09 9.091a1.5 1.5 0 0 0-.401.724l-1.029 4.455a1 1 0 0 0 1.2 1.2l4.456-1.028a1.5 1.5 0 0 0 .723-.401z' /></g></svg>") 1 16, crosshair`;
 const PEN_CURSOR = `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M4 4l7 2.5L8 14 4 4z' fill='white' stroke='black' stroke-width='1.1'/%3E%3Cpath d='M8 14l-1.5 5' stroke='white' stroke-width='2'/%3E%3Cpath d='M8 14l-1.5 5' stroke='black' stroke-width='.8'/%3E%3C/svg%3E") 4 4, crosshair`;
@@ -1203,576 +1212,8 @@ const MainEditor = ({
     };
   }, [activeTopTool]);
 
-  // ── Global Slideshow UI Manager ───────────────────────────────────────────
-  // Maintains pagination dots and hover arrows for all slideshows even when not selected
-  useEffect(() => {
-    const renderOverlays = () => {
-      const slideshows = document.querySelectorAll('[data-is-slideshow="true"]');
-      slideshows.forEach(el => {
-        // Skip if selected (SlideshowProperties handles it)
-        if (el._slideshowManual) {
-          const existing = el._globalSsOverlay;
-          if (existing) {
-            existing.remove();
-            delete el._globalSsOverlay;
-          }
-          return;
-        }
+  // (Slideshow UI management, auto-slide runner, and click-advance are handled via useElementsEditor)
 
-        const dataStr = el.getAttribute('data-slideshow');
-        if (!dataStr) return;
-        let data;
-        try { data = JSON.parse(dataStr); } catch (e) { return; }
-
-        const settings = data.settings || {};
-        const images = data.images || [];
-        if (images.length < 2) return;
-
-        const activeIndex = parseInt(el.getAttribute('data-active-index') || '0');
-        const pageContainer = el.closest('.page-svg-container');
-        if (!pageContainer) return;
-
-        let overlay = el._globalSsOverlay;
-        if (!overlay || !pageContainer.contains(overlay)) {
-          overlay = document.createElement('div');
-          overlay.className = 'global-ss-overlay';
-          Object.assign(overlay.style, {
-            position: 'absolute',
-            pointerEvents: 'none',
-            zIndex: '9998',
-          });
-          pageContainer.style.position = 'relative';
-          if (pageContainer.style.overflow !== 'visible') {
-            pageContainer.style.overflow = 'visible';
-          }
-          pageContainer.appendChild(overlay);
-          el._globalSsOverlay = overlay;
-
-          let leaveTimeout = null;
-          const handleEnter = () => {
-            if (leaveTimeout) clearTimeout(leaveTimeout);
-            overlay.querySelectorAll('.editor-ss-nav').forEach(btn => {
-              btn.style.opacity = '1';
-              btn.style.pointerEvents = 'auto';
-            });
-            el._isHovering = true;
-          };
-          const handleLeave = () => {
-            leaveTimeout = setTimeout(() => {
-              overlay.querySelectorAll('.editor-ss-nav').forEach(btn => {
-                btn.style.opacity = '0';
-                btn.style.pointerEvents = 'none';
-              });
-              el._isHovering = false;
-            }, 50);
-          };
-
-          overlay.addEventListener('mouseenter', handleEnter);
-          overlay.addEventListener('mouseleave', handleLeave);
-          el.addEventListener('mouseenter', handleEnter);
-          el.addEventListener('mouseleave', handleLeave);
-
-          overlay._cleanupHover = () => {
-            if (leaveTimeout) clearTimeout(leaveTimeout);
-            overlay.removeEventListener('mouseenter', handleEnter);
-            overlay.removeEventListener('mouseleave', handleLeave);
-            el.removeEventListener('mouseenter', handleEnter);
-            el.removeEventListener('mouseleave', handleLeave);
-          };
-        }
-
-        const containerRect = pageContainer.getBoundingClientRect();
-
-        let elRect;
-        try {
-          const bbox = getVisualBBox(el);
-          const ctm = el.getScreenCTM();
-          const pt = el.ownerSVGElement.createSVGPoint();
-          const corners = [
-            { x: bbox.x, y: bbox.y },
-            { x: bbox.x + bbox.width, y: bbox.y },
-            { x: bbox.x, y: bbox.y + bbox.height },
-            { x: bbox.x + bbox.width, y: bbox.y + bbox.height }
-          ];
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          for (let c of corners) {
-            pt.x = c.x; pt.y = c.y;
-            const mapped = pt.matrixTransform(ctm);
-            if (mapped.x < minX) minX = mapped.x;
-            if (mapped.y < minY) minY = mapped.y;
-            if (mapped.x > maxX) maxX = mapped.x;
-            if (mapped.y > maxY) maxY = mapped.y;
-          }
-          elRect = { left: minX, top: minY, right: maxX, bottom: maxY, width: maxX - minX, height: maxY - minY };
-        } catch (e) {
-          elRect = el.getBoundingClientRect();
-        }
-
-        const scaleX = containerRect.width / (pageContainer.offsetWidth || 1);
-        const scaleY = containerRect.height / (pageContainer.offsetHeight || 1);
-        const localLeft = (elRect.left - containerRect.left) / scaleX;
-        const localTop = (elRect.top - containerRect.top) / scaleY;
-        const localWidth = elRect.width / scaleX;
-        const localHeight = elRect.height / scaleY;
-
-        overlay.style.left = localLeft + 'px';
-        overlay.style.top = localTop + 'px';
-        overlay.style.width = localWidth + 'px';
-        overlay.style.height = localHeight + 'px';
-
-        const scaleFactor = Math.max(0.4, Math.min(1.8, localWidth / 300));
-
-        const { dotColor = '#000000', navIconColor = '#000000', showDots = true, showArrows = true, showNav = true } = settings;
-
-        const signature = JSON.stringify({
-          imagesCount: images.length,
-          scaleFactor: scaleFactor.toFixed(2),
-          dotColor, navIconColor, showDots, showArrows, showNav
-        });
-
-        if (overlay.dataset.signature !== signature) {
-          overlay.dataset.signature = signature;
-          overlay.innerHTML = '';
-
-          const showNavArrows = showArrows !== false && showNav !== false;
-          if (showNavArrows) {
-            ['prev', 'next'].forEach(type => {
-              const btn = document.createElement('button');
-              btn.className = 'editor-ss-nav editor-ss-nav-' + type;
-              const size = 48 * scaleFactor;
-              const offset = 12 * scaleFactor;
-              Object.assign(btn.style, {
-                position: 'absolute',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                [type === 'prev' ? 'left' : 'right']: offset + 'px',
-                zIndex: '10',
-                background: 'transparent',
-                border: 'none',
-                borderRadius: '50%',
-                width: size + 'px',
-                height: size + 'px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                boxShadow: 'none',
-                padding: '0',
-                pointerEvents: 'none',
-                opacity: '0',
-                transition: 'transform 0.15s, opacity 0.2s',
-              });
-              const svgSize = 32 * scaleFactor;
-
-              // We'll use a container inside the button for React to render into
-              const iconContainer = document.createElement('div');
-              Object.assign(iconContainer.style, {
-                width: svgSize + 'px',
-                height: svgSize + 'px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              });
-              btn.appendChild(iconContainer);
-
-              const root = createRoot(iconContainer);
-              const iconKey = type === 'prev' ? 'left' : 'right';
-              // Default to style 1 if navStyle is missing
-              const styleId = settings.navStyle || 1;
-              root.render(NavIconRenderer({ styleId, size: svgSize + 'px', color: navIconColor })[iconKey]);
-
-              // Attach the root to the btn so we can clean it up later if needed
-              btn._reactRoot = root;
-
-              // btn.addEventListener('mouseenter', () => btn.style.transform = `translateY(-50%) scale(1.25)`);
-              btn.addEventListener('mouseleave', () => btn.style.transform = `translateY(-50%)`);
-              btn.addEventListener('mousedown', e => { e.stopPropagation(); e.preventDefault(); });
-              btn.addEventListener('click', e => {
-                e.stopPropagation(); e.preventDefault();
-                let next = type === 'prev' ? parseInt(el.getAttribute('data-active-index') || '0') - 1 : parseInt(el.getAttribute('data-active-index') || '0') + 1;
-                if (next < 0) next = images.length - 1;
-                if (next >= images.length) next = 0;
-                el.setAttribute('data-active-index', next.toString());
-                el._lastSlideTime = Date.now();
-
-                const evt = new CustomEvent('force-slideshow-advance', { detail: { el, nextIndex: next } });
-                window.dispatchEvent(evt);
-              });
-              overlay.appendChild(btn);
-            });
-          }
-
-          if (showDots) {
-            let dotsWrap = overlay.querySelector('.editor-ss-dots-wrap');
-            if (!dotsWrap) {
-              dotsWrap = document.createElement('div');
-              dotsWrap.className = 'editor-ss-dots-wrap';
-              Object.assign(dotsWrap.style, {
-                position: 'absolute',
-                bottom: (8 * scaleFactor) + 'px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                display: 'flex',
-                gap: (5 * scaleFactor) + 'px',
-                alignItems: 'center',
-                pointerEvents: 'auto',
-              });
-              overlay.appendChild(dotsWrap);
-            }
-
-            if (!dotsWrap._reactRoot) {
-              dotsWrap._reactRoot = createRoot(dotsWrap);
-            }
-
-            const dotStyleId = settings.dotStyle || 1;
-            const dotsSig = `${dotStyleId}-${activeIndex}-${images.length}-${dotColor}-${scaleFactor.toFixed(2)}`;
-
-            if (dotsWrap._lastSig !== dotsSig) {
-              dotsWrap._lastSig = dotsSig;
-              dotsWrap._reactRoot.render(
-                <DotRenderer
-                  styleId={dotStyleId}
-                  size={`${Math.max(6, 8 * scaleFactor)}px`}
-                  color={dotColor || '#000000'}
-                  activeIndex={activeIndex}
-                  count={images.length}
-                  onDotClick={(e, i) => {
-                    e.stopPropagation(); e.preventDefault();
-                    const current = parseInt(el.getAttribute('data-active-index') || '0');
-                    if (i === current) return;
-                    el.setAttribute('data-active-index', i.toString());
-                    el._lastSlideTime = Date.now();
-
-                    const evt = new CustomEvent('force-slideshow-advance', { detail: { el, nextIndex: i } });
-                    window.dispatchEvent(evt);
-                  }}
-                />
-              );
-            }
-          }
-        }
-
-        // Sync state continuously
-        const isHovering = el._isHovering === true;
-        overlay.querySelectorAll('.editor-ss-nav').forEach(btn => {
-          btn.style.opacity = isHovering ? '1' : '0';
-          btn.style.pointerEvents = isHovering ? 'auto' : 'none';
-        });
-      });
-
-      document.querySelectorAll('.global-ss-overlay').forEach(overlay => {
-        const found = Array.from(slideshows).some(el => el._globalSsOverlay === overlay);
-        if (!found) {
-          if (overlay._cleanupHover) overlay._cleanupHover();
-          overlay.remove();
-        }
-      });
-    };
-
-    const interval = setInterval(renderOverlays, 200);
-
-    const handleForceAdvance = (e) => {
-      const { el, nextIndex } = e.detail;
-      if (!el) return;
-      try {
-        const dataStr = el.getAttribute('data-slideshow');
-        if (!dataStr) return;
-        const data = JSON.parse(dataStr);
-        const images = data.images || [];
-        const url = images[nextIndex]?.url;
-        if (!url) return;
-
-        const _findImgInPattern = (node) => {
-          const fill = node.getAttribute?.('fill') || '';
-          if (fill?.startsWith('url(#')) {
-            const patternId = fill.match(/url\(#([^)]+)\)/)?.[1];
-            if (patternId) {
-              const ownerSvg = node.closest('svg');
-              const pattern = ownerSvg?.querySelector(`[id="${patternId}"]`);
-              if (pattern) {
-                const img = pattern.querySelector('image');
-                if (img) return img;
-                const useEl = pattern.querySelector('use');
-                if (useEl) {
-                  const refId = (useEl.getAttribute('href') || useEl.getAttribute('xlink:href'))?.replace('#', '');
-                  if (refId) return ownerSvg?.querySelector(`[id="${refId}"]`) || null;
-                }
-              }
-            }
-          }
-          return null;
-        };
-        let imgEl = null;
-        const elTag = el.tagName?.toLowerCase();
-        if (elTag === 'image' || elTag === 'img') imgEl = el;
-        else {
-          imgEl = _findImgInPattern(el) || el.querySelector('image') || el.querySelector('img');
-          if (!imgEl) {
-            const childrenWithPatterns = el.querySelectorAll('[fill^="url(#"]');
-            for (const child of Array.from(childrenWithPatterns)) {
-              const t = _findImgInPattern(child);
-              if (t) { imgEl = t; break; }
-            }
-          }
-          if (!imgEl) imgEl = el;
-        }
-
-        if (!imgEl) return;
-        const imgTag2 = imgEl.tagName?.toLowerCase();
-        if (imgTag2 === 'image') {
-          imgEl.setAttribute('href', url);
-          try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (err) { }
-        } else if (imgTag2 === 'img') {
-          imgEl.src = url;
-        } else {
-          imgEl.style.backgroundImage = `url("${url}")`;
-        }
-        renderOverlays();
-      } catch (err) { }
-    };
-
-    window.addEventListener('force-slideshow-advance', handleForceAdvance);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('force-slideshow-advance', handleForceAdvance);
-      document.querySelectorAll('.global-ss-overlay').forEach(overlay => {
-        if (overlay._cleanupHover) overlay._cleanupHover();
-        overlay.remove();
-      });
-    };
-  }, []);
-
-  // ── Global Slideshow Runner ───────────────────────────────────────────────
-  // Ensures all slideshows on the template slide automatically even when not selected.
-  // This logic runs independently for every element with [data-is-slideshow="true"].
-  useEffect(() => {
-    const globalSlideshowInterval = setInterval(() => {
-      const slideshows = document.querySelectorAll('[data-is-slideshow="true"]');
-      slideshows.forEach(el => {
-        // Skip if manual control/overlay is active or if user is hovering (prevents conflicts)
-        if (el._slideshowManual ||
-          el._isHovering === true ||
-          el.matches(':hover') ||
-          (el._globalSsOverlay && el._globalSsOverlay.querySelector(':hover'))) return;
-
-        try {
-          const dataStr = el.getAttribute('data-slideshow');
-          if (!dataStr) return;
-          const data = JSON.parse(dataStr);
-          const settings = data.settings || {};
-
-          // Only auto-slide if enabled in settings
-          if (!settings.autoPlay && !settings.autoSlide) return;
-
-          const images = data.images || [];
-          if (images.length <= 1) return;
-
-          const speed = (settings.speed || 3) * 1000;
-          const now = Date.now();
-          const lastTime = el._lastSlideTime || 0;
-
-          if (now - lastTime >= speed) {
-            let currentIndex = parseInt(el.getAttribute('data-active-index') || '0');
-            let nextIndex = (currentIndex + 1) % images.length;
-
-            // If not infinite and reached end, stop
-            if (nextIndex === 0 && settings.infiniteLoop === false && currentIndex !== 0) return;
-
-            // Update DOM attributes
-            el.setAttribute('data-active-index', nextIndex.toString());
-            el._lastSlideTime = now;
-
-            // ── Resolve the actual <image>/<img>, including SVG pattern fills ──
-            const _findImgInPattern = (node) => {
-              const fill = node.getAttribute?.('fill') || '';
-              if (fill?.startsWith('url(#')) {
-                const patternId = fill.match(/url\(#([^)]+)\)/)?.[1];
-                if (patternId) {
-                  const ownerSvg = node.closest('svg');
-                  const pattern = ownerSvg?.querySelector(`[id="${patternId}"]`);
-                  if (pattern) {
-                    const img = pattern.querySelector('image');
-                    if (img) return img;
-                    const useEl = pattern.querySelector('use');
-                    if (useEl) {
-                      const refId = (useEl.getAttribute('href') || useEl.getAttribute('xlink:href'))?.replace('#', '');
-                      if (refId) return ownerSvg?.querySelector(`[id="${refId}"]`) || null;
-                    }
-                  }
-                }
-              }
-              return null;
-            };
-
-            let imgEl = null;
-            const elTag = el.tagName?.toLowerCase();
-            if (elTag === 'image' || elTag === 'img') {
-              imgEl = el;
-            } else {
-              // 1. Pattern fill on the element itself
-              imgEl = _findImgInPattern(el);
-              // 2. Direct child <image>/<img>
-              if (!imgEl) imgEl = el.querySelector('image') || el.querySelector('img');
-              // 3. Pattern fills on children
-              if (!imgEl) {
-                const childrenWithPatterns = el.querySelectorAll('[fill^="url(#"]');
-                for (const child of Array.from(childrenWithPatterns)) {
-                  const t = _findImgInPattern(child);
-                  if (t) { imgEl = t; break; }
-                }
-              }
-              // 4. Fallback to element itself
-              if (!imgEl) imgEl = el;
-            }
-
-            const url = images[nextIndex]?.url;
-            if (url && imgEl) {
-              const imgTag = imgEl.tagName?.toLowerCase();
-              if (imgTag === 'image') {
-                imgEl.setAttribute('href', url);
-                try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (e) { }
-              } else if (imgTag === 'img') {
-                imgEl.src = url;
-              } else {
-                imgEl.style.backgroundImage = `url("${url}")`;
-              }
-            }
-          }
-        } catch (e) {
-          // Silent catch for parse errors during rapid edits
-        }
-      });
-
-      // ── Safety: clear stale data-slideshow-manual flags ──
-      // If an overlay element is marked manual but no active editor overlay div exists,
-      // the flag was left behind when the properties panel closed unexpectedly. Clear it.
-      if (!document.querySelector('.editor-ss-overlay')) {
-        document.querySelectorAll('[data-is-slideshow="true"]').forEach(el => {
-          el._slideshowManual = false;
-        });
-      }
-    }, 50); // Check every 50ms for accurate timing
-
-    return () => clearInterval(globalSlideshowInterval);
-  }, []);
-
-  // ── Global Slideshow Manual Click Handler ─────────────────────────────────
-  // Advances a slideshow to the next image on click (even when NOT selected).
-  // Uses mousedown+mouseup in capture phase to avoid being blocked by
-  // handleSvgClick's stopPropagation, and guards against drag-clicks.
-  useEffect(() => {
-    // Shared pattern-traversal helper (same logic as auto-runner above)
-    const findImgInPattern = (node) => {
-      const fill = node.getAttribute?.('fill') || '';
-      if (fill?.startsWith('url(#')) {
-        const patternId = fill.match(/url\(#([^)]+)\)/)?.[1];
-        if (patternId) {
-          const ownerSvg = node.closest('svg');
-          const pattern = ownerSvg?.querySelector(`[id="${patternId}"]`);
-          if (pattern) {
-            const img = pattern.querySelector('image');
-            if (img) return img;
-            const useEl = pattern.querySelector('use');
-            if (useEl) {
-              const refId = (useEl.getAttribute('href') || useEl.getAttribute('xlink:href'))?.replace('#', '');
-              if (refId) return ownerSvg?.querySelector(`[id="${refId}"]`) || null;
-            }
-          }
-        }
-      }
-      return null;
-    };
-
-    const resolveImgEl = (el) => {
-      const tag = el.tagName?.toLowerCase();
-      if (tag === 'image' || tag === 'img') return el;
-      let img = findImgInPattern(el);
-      if (!img) img = el.querySelector('image') || el.querySelector('img');
-      if (!img) {
-        const childrenWithPatterns = el.querySelectorAll('[fill^="url(#"]');
-        for (const child of Array.from(childrenWithPatterns)) {
-          const t = findImgInPattern(child);
-          if (t) { img = t; break; }
-        }
-      }
-      return img || el;
-    };
-
-    // Track mouse-down position to distinguish clicks from drags
-    let mdX = 0, mdY = 0;
-
-    const advanceSlideshow = (slideshowEl) => {
-      try {
-        const dataStr = slideshowEl.getAttribute('data-slideshow');
-        if (!dataStr) return;
-        const data = JSON.parse(dataStr);
-        const images = data.images || [];
-        if (images.length <= 1) return;
-
-        const settings = data.settings || {};
-        const infiniteLoop = settings.infiniteLoop !== false;
-
-        let currentIndex = parseInt(slideshowEl.getAttribute('data-active-index') || '0');
-        let nextIndex = currentIndex + 1;
-        if (nextIndex >= images.length) nextIndex = infiniteLoop ? 0 : images.length - 1;
-        if (nextIndex === currentIndex) return;
-
-        const url = images[nextIndex]?.url;
-        if (!url) return;
-
-        const imgEl = resolveImgEl(slideshowEl);
-        const imgTag = imgEl.tagName?.toLowerCase();
-        if (imgTag === 'image') {
-          imgEl.setAttribute('href', url);
-          try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (err) { }
-        } else if (imgTag === 'img') {
-          imgEl.src = url;
-        } else {
-          imgEl.style.backgroundImage = `url("${url}")`;
-        }
-
-        slideshowEl.setAttribute('data-active-index', nextIndex.toString());
-        slideshowEl._lastSlideTime = Date.now();
-      } catch (err) {
-        // Silent catch
-      }
-    };
-
-    const handleMouseDown = (e) => {
-      mdX = e.clientX;
-      mdY = e.clientY;
-    };
-
-    const handleMouseUp = (e) => {
-      // Ignore if mouse moved too much (drag, not click)
-      if (Math.abs(e.clientX - mdX) > 5 || Math.abs(e.clientY - mdY) > 5) return;
-
-      // Walk up using parentNode (works for SVG elements, unlike parentElement)
-      let node = e.target;
-      let slideshowEl = null;
-      while (node && node.nodeType === 1) {
-        if (node.getAttribute?.('data-is-slideshow') === 'true') {
-          slideshowEl = node;
-          break;
-        }
-        node = node.parentNode;
-      }
-      if (!slideshowEl) return;
-
-      // Defer to the live-runner overlay when the element is selected
-      if (slideshowEl._slideshowManual) return;
-
-      advanceSlideshow(slideshowEl);
-    };
-
-    document.addEventListener('mousedown', handleMouseDown, true);
-    document.addEventListener('mouseup', handleMouseUp, true);
-    return () => {
-      document.removeEventListener('mousedown', handleMouseDown, true);
-      document.removeEventListener('mouseup', handleMouseUp, true);
-    };
-  }, []);
 
   useEffect(() => {
     // Inject global styles for the progress bar thumb
@@ -2877,102 +2318,8 @@ const MainEditor = ({
     return () => clearInterval(interval);
   }, [activePageIndex]);
 
-  // Handle external asset insertion events
+  // Handle external asset insertion events (hotspots, images, videos)
   useEffect(() => {
-    const handleAddIcon = (e) => {
-      const { icon, pageIndex } = e.detail;
-      const targetPageIndex = pageIndex !== undefined ? pageIndex : activePageIndex;
-      const page = pages[targetPageIndex];
-      if (!page) return;
-
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(page.html || '', 'image/svg+xml');
-      const svg = doc.querySelector('svg');
-      if (!svg) return;
-
-      let svgW = 793;
-      let svgH = 1121;
-      const viewBox = svg.getAttribute('viewBox');
-      if (viewBox) {
-        const parts = viewBox.split(/[ ,]+/).map(parseFloat);
-        if (parts.length === 4) {
-          svgW = parts[2];
-          svgH = parts[3];
-        }
-      } else {
-        const wAttr = parseFloat(svg.getAttribute('width'));
-        const hAttr = parseFloat(svg.getAttribute('height'));
-        if (!isNaN(wAttr) && wAttr > 0) svgW = wAttr;
-        if (!isNaN(hAttr) && hAttr > 0) svgH = hAttr;
-      }
-      const centerX = e.detail.dropPoint ? e.detail.dropPoint.x : (svgW / 2);
-      const centerY = e.detail.dropPoint ? e.detail.dropPoint.y : (svgH / 2);
-
-      // Unique ID
-      const newId = e.detail.isShape ? `shape-${Date.now()}` : `icon-${Date.now()}`;
-
-      // Create element
-      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      g.id = newId;
-      g.setAttribute('data-type', e.detail.isShape ? 'shape' : 'icon');
-      if (e.detail.isShape) {
-        g.setAttribute('data-shape-type', 'shape');
-      }
-      // Place centered. Icon path is 24x24. Scaled by 0.5 = 12x12. Offset by -6 to truly center.
-      g.setAttribute('transform', `translate(${centerX - 6}, ${centerY - 6}) scale(0.5)`);
-      g.setAttribute('fill', icon.fill !== undefined ? icon.fill : 'none');
-      g.setAttribute('stroke', icon.stroke !== undefined ? icon.stroke : '#000000');
-      g.setAttribute('stroke-width', icon.strokeWidth !== undefined ? icon.strokeWidth : '1');
-      if (icon.Component) {
-        // If it's a lucide icon component, we can't easily render it to a string here 
-        // without react-dom/server or similar. 
-        // But I'll try to find a way to get its SVG path.
-        // For now, let's assume we use the data if available.
-        if (icon.html) g.innerHTML = icon.html;
-        else if (icon.d) {
-          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          path.setAttribute('d', icon.d);
-          g.appendChild(path);
-        }
-      } else {
-        if (icon.html) g.innerHTML = icon.html;
-        else if (icon.d) {
-          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          path.setAttribute('d', icon.d);
-          g.appendChild(path);
-        }
-      }
-
-      if (icon.html) {
-        const rects = g.querySelectorAll('rect');
-        rects.forEach(rect => {
-          if (!rect.hasAttribute('fill')) {
-            rect.setAttribute('fill', 'none');
-          }
-        });
-      }
-
-      const targetContainer = svg.querySelector('[data-type="frame"]') || svg.querySelector('[data-name="Overlay"]') || svg;
-      targetContainer.appendChild(g);
-
-      updatePageHtml(targetPageIndex, svg.outerHTML);
-      if (typeof setSingleSelection === 'function') {
-        setSingleSelection(newId);
-      } else {
-        if (setSelectedLayerId) setSelectedLayerId(newId);
-        selectedLayerIdRef.current = newId;
-        if (setMultiSelectedIds) setMultiSelectedIds(new Set([newId]));
-        multiSelectedIdsRef.current = new Set([newId]);
-      }
-      if (setActiveMainTool) setActiveMainTool('select');
-      setTimeout(() => {
-        const el = document.getElementById(newId);
-        if (el && typeof drawOverlayHighlight === 'function') {
-          drawOverlayHighlight(el, 'selected');
-        }
-      }, 50);
-    };
-
     const handleAddHotspot = (e) => {
       const { icon, pageIndex } = e.detail;
       const targetPageIndex = pageIndex !== undefined ? pageIndex : activePageIndex;
@@ -3317,10 +2664,28 @@ const MainEditor = ({
       const mediaUrl = gifUrl || url;
       if (!mediaUrl) return;
       const dataType = type || (gifUrl || mediaUrl.toLowerCase().endsWith('.gif') ? 'gif' : 'image');
-      insertImageIntoPage(targetPageIndex, mediaUrl, dataType, dropPoint, targetShapeId);
+      
+      let finalTargetId = targetShapeId;
+      if (!finalTargetId && selectedLayerIdRef.current) {
+        const selectedEl = document.getElementById(selectedLayerIdRef.current);
+        if (selectedEl && selectedEl.getAttribute('data-type') === 'image-frame') {
+          const highlight = selectedEl.querySelector('[data-highlight-id]');
+          if (highlight) {
+            const patternId = highlight.getAttribute('data-highlight-id').replace('highlight-', '');
+            const specificSlot = selectedEl.querySelector(`[data-pattern-id="${patternId}"]`);
+            if (specificSlot) {
+              if (!specificSlot.id) specificSlot.id = `inner-slot-${Date.now()}`;
+              finalTargetId = specificSlot.id;
+            }
+          } else {
+            finalTargetId = selectedLayerIdRef.current;
+          }
+        }
+      }
+      
+      insertImageIntoPage(targetPageIndex, mediaUrl, dataType, dropPoint, finalTargetId);
     };
 
-    window.addEventListener('add-icon-to-editor', handleAddIcon);
     window.addEventListener('add-hotspot-to-editor', handleAddHotspot);
     window.addEventListener('update-hotspot-style', (e) => {
       const { id, pageIndex, html, presetId, iconSrc, bgColor, iconColor } = e.detail;
@@ -3351,55 +2716,9 @@ const MainEditor = ({
       updatePageHtml(targetPageIndex, svg.outerHTML);
     });
 
-    const handleAddElement = (e) => {
-      console.log('handleAddElement triggered', e.detail);
-      const { svgContent, pageIndex, dropPoint } = e.detail;
-      const targetPageIndex = pageIndex !== undefined ? pageIndex : activePageIndex;
-      const page = pages[targetPageIndex];
-      if (!page) return;
-
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(page.html || '', 'image/svg+xml');
-      const svg = doc.querySelector('svg');
-      if (!svg) return;
-
-      const elementDoc = parser.parseFromString(`<svg xmlns="http://www.w3.org/2000/svg">${svgContent}</svg>`, 'image/svg+xml');
-      const newElement = elementDoc.querySelector('g') || elementDoc.querySelector('svg').firstElementChild;
-      if (!newElement) return;
-
-      // Positioning logic if dropped
-      if (dropPoint) {
-        // Simple translation for the group if necessary, though it might already have one
-        const currentTransform = newElement.getAttribute('transform') || '';
-        newElement.setAttribute('transform', `translate(${dropPoint.x - 100}, ${dropPoint.y - 25}) ${currentTransform}`);
-      }
-
-      const targetContainer = svg.querySelector('[data-type="frame"]') || svg.querySelector('[data-name="Overlay"]') || svg;
-      targetContainer.appendChild(newElement);
-
-      updatePageHtml(targetPageIndex, svg.outerHTML);
-
-      // Select the new element
-      const newId = newElement.getAttribute('id');
-      if (newId) {
-        if (typeof setSingleSelection === 'function') {
-          setSingleSelection(newId);
-        } else {
-          if (setSelectedLayerId) setSelectedLayerId(newId);
-          selectedLayerIdRef.current = newId;
-          if (setMultiSelectedIds) setMultiSelectedIds(new Set([newId]));
-          multiSelectedIdsRef.current = new Set([newId]);
-        }
-        if (typeof setActiveMainTool === 'function') setActiveMainTool('select');
-      }
-    };
-
-    window.addEventListener('add-element-to-editor', handleAddElement);
     window.addEventListener('add-image-to-editor', handleAddImage);
     window.addEventListener('upload-video-to-editor', handleUploadVideo);
     return () => {
-      window.removeEventListener('add-element-to-editor', handleAddElement);
-      window.removeEventListener('add-icon-to-editor', handleAddIcon);
       window.removeEventListener('add-hotspot-to-editor', handleAddHotspot);
       window.removeEventListener('add-image-to-editor', handleAddImage);
       window.removeEventListener('upload-video-to-editor', handleUploadVideo);
@@ -6700,7 +6019,14 @@ const MainEditor = ({
       inserted = true;
 
       if (targetShapeId && dataType === 'image') {
-        const shapeEl = svg.querySelector(`[id="${targetShapeId}"]`);
+        let shapeEl = svg.querySelector(`[id="${targetShapeId}"]`);
+        
+        // If the target is a group (Shape or Image Frame), find the actual geometry element inside it
+        if (shapeEl && (shapeEl.tagName.toLowerCase() === 'g' || shapeEl.hasAttribute('data-type'))) {
+            const innerGeo = shapeEl.querySelector('path, rect, circle, ellipse, polygon');
+            if (innerGeo) shapeEl = innerGeo;
+        }
+
         if (shapeEl) {
           try {
             const frame = shapeEl.closest('[data-type="image-frame"]');
@@ -6773,6 +6099,25 @@ const MainEditor = ({
                   return; // Stop here, don't do the clipping logic
                 }
               }
+            }
+
+            if (checkIsElementShape(shapeEl)) {
+              fillElementShapeWithPattern({
+                shapeEl,
+                svg,
+                targetShapeId,
+                dataUrl,
+                imgWidth,
+                imgHeight,
+                pageIdx,
+                updatePageHtml,
+                saveModifiedPageHtml,
+                setSingleSelection,
+                setSelectedLayerId,
+                setActiveMainTool,
+                drawOverlayHighlight
+              });
+              return;
             }
 
             // Check if it already has a fill, to store it
@@ -7515,47 +6860,10 @@ const MainEditor = ({
       return hotspotGroup;
     }
 
-    // Buttons are single compound elements; drag the whole button!
-    const buttonGroup = current && typeof current.closest === 'function' ? current.closest('[data-type="button"]') : null;
-    if (buttonGroup) {
-      if (!buttonGroup.id) {
-        buttonGroup.id = `button-${Date.now()}`;
-      }
-      return buttonGroup;
-    }
-    // Embed frames are single compound elements; drag the whole wrapper!
-    const embedFrame = current && typeof current.closest === 'function' ? current.closest('[data-type="embed-frame"]') : null;
-    if (embedFrame) {
-      const parentG = embedFrame.parentElement;
-      if (parentG && parentG.tagName?.toLowerCase() === 'g' && parentG.id) {
-        return parentG;
-      }
-      if (!embedFrame.id) {
-        embedFrame.id = `embed-frame-${Date.now()}`;
-      }
-      return embedFrame;
-    }
-
-    // Image frames are single compound elements; drag the whole wrapper!
-    const imageFrame = current && typeof current.closest === 'function' ? current.closest('[data-type="image-frame"]') : null;
-    if (imageFrame && current.tagName?.toLowerCase() !== 'image' && current.tagName?.toLowerCase() !== 'img') {
-      if (!imageFrame.id) {
-        imageFrame.id = `image-frame-${Date.now()}`;
-      }
-      return imageFrame;
-    }
-
-    // Audio frames are single compound elements; drag the whole wrapper!
-    const audioFrame = current && typeof current.closest === 'function' ? current.closest('[data-type="audio-frame"]') : null;
-    if (audioFrame) {
-      const parentG = audioFrame.parentElement;
-      if (parentG && parentG.tagName?.toLowerCase() === 'g' && parentG.id) {
-        return parentG;
-      }
-      if (!audioFrame.id) {
-        audioFrame.id = `audio-frame-${Date.now()}`;
-      }
-      return audioFrame;
+    // Compound Elements from Elements system (buttons, embed frames, image frames, audio frames)
+    const elementCompoundTarget = getElementCompoundTarget(current);
+    if (elementCompoundTarget) {
+      return elementCompoundTarget;
     }
 
     let deepestElementWithId = null;
@@ -9158,35 +8466,20 @@ const MainEditor = ({
                   const la = state.localAnchor; // anchor in <g> local space
                   const isHotspot = el.getAttribute('data-is-hotspot') === 'true';
                   const isInteractiveButton = (isHotspot || el.getAttribute('data-type') === 'button') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'rect') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
-                  const isAudioGroup = el.getAttribute('data-type') === 'audio-frame' || el.getAttribute('data-type') === 'audio';
-                  // ── HOTSPOT ICON GROUP: update outer transform, NOT children ───────
-                  // Hotspot preset icon groups have transform="translate(tx,ty) scale(s)"
-                  // with 48×48 inner content. Resizing must update this outer transform so
-                  // the group's position and size in the page change correctly.
-                  // Modifying children would only scale inside the 48×48 local space while
-                  // the group's outer translate+scale stays the same → no visible resize effect.
-                  if ((isHotspot && !isInteractiveButton) || isAudioGroup) {
-                    try {
-                      // finalX/Y/W/H are in the group's LOCAL coordinate space (0–48 range).
-                      // Convert them to parent-local space using matrix (local→parent mapping).
-                      const ptOrigin = new DOMPoint(finalX, finalY).matrixTransform(matrix);
-                      const ptCorner = new DOMPoint(finalX + finalWidth, finalY + finalHeight).matrixTransform(matrix);
-                      const newTx = Math.min(ptOrigin.x, ptCorner.x);
-                      const newTy = Math.min(ptOrigin.y, ptCorner.y);
-                      const newW = Math.abs(ptCorner.x - ptOrigin.x);
-                      const newH = Math.abs(ptCorner.y - ptOrigin.y);
-                      // Derive scale from inner content size
-                      const innerWidth = (state.bbox && state.bbox.width > 0) ? state.bbox.width : 48;
-                      const innerHeight = (state.bbox && state.bbox.height > 0) ? state.bbox.height : 48;
-                      const newSx = newW / innerWidth;
-                      const newSy = newH / innerHeight;
-                      el.setAttribute('transform', `translate(${newTx}, ${newTy}) scale(${newSx}, ${newSy})`);
-                    } catch (e) { /* fallback: do nothing if matrix ops fail */ }
-                    // Update overlay handles to follow the new position during drag
-                    if (typeof drawOverlayHighlight === 'function') {
-                      const highlightType = (currentFrameIdRef.current && el.id !== currentFrameIdRef.current) ? 'child-selected' : 'selected';
-                      drawOverlayHighlight(el, highlightType);
-                    }
+                  const isAudio = checkIsAudioGroup(el);
+                  // ── HOTSPOT ICON GROUP & AUDIO GROUP: update outer transform, NOT children ───────
+                  if ((isHotspot && !isInteractiveButton) || isAudio) {
+                    resizeAudioGroup({
+                      el,
+                      state,
+                      matrix,
+                      finalX,
+                      finalY,
+                      finalWidth,
+                      finalHeight,
+                      drawOverlayHighlight,
+                      currentFrameIdRef
+                    });
                     return; // skip children modification
                   }
 
@@ -9548,176 +8841,7 @@ const MainEditor = ({
                   });
 
                   if (isInteractiveButton) {
-                    const rectData = state.childrenData.find(c => c.child.tagName.toLowerCase() === 'rect');
-                    const textData = state.childrenData.find(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
-
-                    if (rectData && textData) {
-                      const rectEl = rectData.child;
-                      const textEl = textData.child;
-
-                      const rectX = parseFloat(rectEl.getAttribute('x')) || 0;
-                      const rectY = parseFloat(rectEl.getAttribute('y')) || 0;
-                      const rectW = parseFloat(rectEl.getAttribute('width')) || 0;
-                      const rectH = parseFloat(rectEl.getAttribute('height')) || 0;
-
-                      const initRectW = rectData.initialRect?.width || rectData.bound?.width || 80;
-                      const initRectH = rectData.initialRect?.height || rectData.bound?.height || 32;
-
-                      // Scale factor based on button height change (proportional scaling)
-                      const scaleRatio = initRectH > 0 ? (rectH / initRectH) : 1;
-
-                      // Update rect border radius rx proportionally
-                      const baseRx = rectData.initialRect?.rx ?? parseFloat(rectEl.getAttribute('data-base-rx') || rectEl.getAttribute('rx') || '4');
-                      const newRx = Math.max(0, Math.min(rectW / 2, rectH / 2, Math.round(baseRx * scaleRatio * 10) / 10));
-                      rectEl.setAttribute('rx', newRx);
-
-                      // Update text font-size proportionally with button scale
-                      const baseFontSize = textData.initialFontSize || parseFloat(textEl.getAttribute('data-base-font-size') || textEl.getAttribute('font-size') || '14');
-                      let newFontSize = Math.max(6, Math.round(baseFontSize * scaleRatio * 10) / 10);
-
-                      // Check if button has an icon (only hotspots have icons in interactive buttons)
-                      const isHotspotBtn = el.getAttribute('data-is-hotspot') === 'true';
-                      const iconImg = isHotspotBtn ? el.querySelector('image') : null;
-                      const iconG = isHotspotBtn ? el.querySelector('g:not(defs g):not(.button-hover-slide-group)') : null;
-                      const iconPath = isHotspotBtn ? el.querySelector('path') : null;
-                      const hasIcon = isHotspotBtn && !!(iconImg || iconG || iconPath);
-
-                      const label = textEl.textContent || '';
-                      // Prevent font size from overflowing button width if narrowed
-                      if (label.length > 0 && rectW > 0) {
-                        const availableWidth = Math.max(8, rectW - (hasIcon ? 18 * scaleRatio : 12));
-                        const maxFontForWidth = availableWidth / (label.length * 0.55);
-                        if (maxFontForWidth > 0 && newFontSize > maxFontForWidth) {
-                          newFontSize = Math.max(5, Math.round(maxFontForWidth * 10) / 10);
-                        }
-                      }
-
-                      textEl.setAttribute('font-size', newFontSize);
-                      textEl.style.fontSize = `${newFontSize}px`;
-                      textEl.removeAttribute('transform');
-                      textEl.querySelectorAll('tspan').forEach(ts => {
-                        ts.removeAttribute('x');
-                        ts.removeAttribute('y');
-                        ts.removeAttribute('font-size');
-                        ts.style.removeProperty('font-size');
-                      });
-
-                      if (hasIcon) {
-                        const iconSize = Math.max(6, Math.round(14 * scaleRatio));
-                        const gap = Math.max(2, Math.round(5 * scaleRatio));
-
-                        let textWidth = 0;
-                        try {
-                          textWidth = textEl.getBBox().width;
-                        } catch (e) { }
-                        if (!textWidth || textWidth <= 0) {
-                          textWidth = label.length * (newFontSize * 0.55);
-                        }
-
-                        let isEndPlacement = false;
-                        if (iconImg) {
-                          const imgX = parseFloat(iconImg.getAttribute('x') || '0');
-                          const tX = parseFloat(textEl.getAttribute('x') || '0');
-                          if (imgX > tX) isEndPlacement = true;
-                        } else if (iconG) {
-                          const gT = iconG.getAttribute('transform') || '';
-                          const m = gT.match(/translate\(([-\d.]+)/);
-                          if (m && parseFloat(m[1]) > (initRectW / 2)) isEndPlacement = true;
-                        }
-
-                        const contentWidth = iconSize + gap + textWidth;
-                        const startX = rectX + (rectW - contentWidth) / 2;
-
-                        let iconX, textX;
-                        if (isEndPlacement) {
-                          textX = startX + textWidth / 2;
-                          iconX = startX + textWidth + gap;
-                        } else {
-                          iconX = startX;
-                          textX = startX + iconSize + gap + textWidth / 2;
-                        }
-
-                        if (iconImg) {
-                          iconImg.setAttribute('x', iconX);
-                          iconImg.setAttribute('y', rectY + (rectH - iconSize) / 2);
-                          iconImg.setAttribute('width', iconSize);
-                          iconImg.setAttribute('height', iconSize);
-                          iconImg.removeAttribute('transform');
-                        } else if (iconG) {
-                          iconG.setAttribute('transform', `translate(${iconX - 20 * scaleRatio}, ${rectY + (rectH - 32 * scaleRatio) / 2}) scale(${scaleRatio})`);
-                        }
-
-                        textEl.setAttribute('x', textX);
-                        textEl.setAttribute('y', rectY + rectH / 2);
-                        textEl.setAttribute('dominant-baseline', 'central');
-                        textEl.setAttribute('text-anchor', 'middle');
-                        textEl.style.textAnchor = 'middle';
-                        textEl.style.dominantBaseline = 'central';
-                      } else {
-                        // No icon: center text directly in rect
-                        textEl.setAttribute('x', rectX + rectW / 2);
-                        textEl.setAttribute('y', rectY + rectH / 2);
-                        textEl.setAttribute('dominant-baseline', 'middle');
-                        textEl.setAttribute('text-anchor', 'middle');
-                        textEl.style.textAnchor = 'middle';
-                        textEl.style.dominantBaseline = 'middle';
-                      }
-
-                      // Synchronize slide group, slide rect, border rect, clip path, and ribbon polygons
-                      const slideGroup = el.querySelector('.button-hover-slide-group');
-                      if (slideGroup) {
-                        slideGroup.removeAttribute('transform');
-                      }
-                      const slideRect = el.querySelector('.button-hover-slide-rect');
-                      if (slideRect) {
-                        slideRect.setAttribute('x', rectX);
-                        slideRect.setAttribute('y', rectY);
-                        slideRect.setAttribute('width', rectW);
-                        slideRect.setAttribute('height', rectH);
-                      }
-                      const borderRect = el.querySelector('rect.btn-border');
-                      if (borderRect) {
-                        borderRect.setAttribute('x', rectX);
-                        borderRect.setAttribute('y', rectY);
-                        borderRect.setAttribute('width', rectW);
-                        borderRect.setAttribute('height', rectH);
-                        borderRect.setAttribute('rx', newRx);
-                      }
-                      const mainPoly = el.querySelector('.btn-main-poly');
-                      const accentLeft = el.querySelector('.btn-accent-left');
-                      const accentRight = el.querySelector('.btn-accent-right');
-                      if (mainPoly || accentLeft || accentRight) {
-                        const slantDx = Math.round(rectH * 0.22);
-                        if (mainPoly) {
-                          mainPoly.removeAttribute('transform');
-                          mainPoly.setAttribute('points', `${rectX},${rectY} ${rectX + rectW - slantDx},${rectY} ${rectX + rectW},${rectY + rectH} ${rectX + slantDx},${rectY + rectH}`);
-                        }
-                        if (accentLeft) {
-                          accentLeft.removeAttribute('transform');
-                          accentLeft.setAttribute('points', `${rectX},${rectY + rectH} ${rectX + slantDx},${rectY + rectH} ${rectX + slantDx / 2},${rectY + rectH / 2}`);
-                        }
-                        if (accentRight) {
-                          accentRight.removeAttribute('transform');
-                          accentRight.setAttribute('points', `${rectX + rectW - slantDx},${rectY} ${rectX + rectW},${rectY} ${rectX + rectW - slantDx / 2},${rectY + rectH / 2}`);
-                        }
-                      }
-                      const svgRoot = el.closest('svg');
-                      const clipId = `clip-${el.id}`;
-                      if (svgRoot) {
-                        const clipRect = svgRoot.querySelector(`#${clipId} rect`);
-                        if (clipRect) {
-                          clipRect.setAttribute('x', rectX);
-                          clipRect.setAttribute('y', rectY);
-                          clipRect.setAttribute('width', rectW);
-                          clipRect.setAttribute('height', rectH);
-                        }
-                        const clipPoly = svgRoot.querySelector(`#${clipId} polygon`);
-                        if (clipPoly) {
-                          const slantDx = Math.round(rectH * 0.22);
-                          clipPoly.setAttribute('points', `${rectX},${rectY} ${rectX + rectW},${rectY} ${rectX + rectW - slantDx / 2},${rectY + rectH / 2} ${rectX + rectW},${rectY + rectH} ${rectX},${rectY + rectH} ${rectX + slantDx / 2},${rectY + rectH / 2}`);
-                        }
-                      }
-                    }
+                    resizeInteractiveButton({ el, state });
                   }
                 }
               }
@@ -11792,6 +10916,21 @@ const MainEditor = ({
     }
   };
 
+  // ── Elements System Integration Hook ──────────────────────────────────────
+  useElementsEditor({
+    pages,
+    activePageIndex,
+    updatePageHtml,
+    setSelectedLayerId,
+    selectedLayerIdRef,
+    setMultiSelectedIds,
+    multiSelectedIdsRef,
+    setSingleSelection,
+    setActiveMainTool,
+    drawOverlayHighlight,
+    getVisualBBox
+  });
+
 
   const enterTextEditMode = (target, clientX = null, clientY = null, selectAll = false) => {
     if (!target || !target.id) return;
@@ -13234,6 +12373,11 @@ const MainEditor = ({
       if (isMediaGroupChild && isMediaGroupChild !== target) {
         return;
       }
+      
+      if (target.getAttribute('data-is-mask-image') === 'true') {
+         const parentShape = svg.querySelector(`[id="${target.getAttribute('data-target-shape')}"]`);
+         if (parentShape) target = parentShape;
+      }
 
       if (setSelectedLayerId) {
         setSelectedLayerId(target.id);
@@ -14450,19 +13594,13 @@ const MainEditor = ({
                                     const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
                                     const dropPoint = { x: svgP.x, y: svgP.y };
 
-                                    let targetShapeId = undefined;
-                                    if (e.target) {
-                                      const leaf = e.target.closest('[data-type="shape"], [data-type="vector-path"], [data-shape-type]');
-                                      const frame = e.target.closest('[data-type="image-frame"]');
-                                      if (leaf && leaf.id && !leaf.id.includes('mask') && !leaf.id.includes('clip')) {
-                                        targetShapeId = leaf.id;
-                                      } else if (frame && e.target.tagName !== 'g' && (!e.target.id || (!e.target.id.includes('mask') && !e.target.id.includes('clip')))) {
-                                        if (!e.target.id) {
-                                          e.target.id = `frame-slot-${Math.random().toString(36).substr(2, 9)}`;
-                                        }
-                                        targetShapeId = e.target.id;
-                                      }
-                                    }
+                                    const targetShapeId = getTargetElementShapeOrFrameId(e.target);
+
+                                      
+
+
+                                        
+
 
                                     let data = null;
                                     console.log('Drop Event Fired! Types:', e.dataTransfer.types);
@@ -14554,7 +13692,9 @@ const MainEditor = ({
 
                                     if (!data) return;
 
-                                    if (data.type === 'hotspot') {
+                                    if (handleElementsDropData(data, displayIndex, dropPoint)) {
+                                      // Handled by Elements system
+                                    } else if (data.type === 'hotspot') {
                                       window.dispatchEvent(new CustomEvent('add-hotspot-to-editor', {
                                         detail: {
                                           pageIndex: displayIndex,
@@ -14564,24 +13704,6 @@ const MainEditor = ({
                                         }
                                       }));
                                       setShowHotspotPopup(false);
-                                    } else if (data.type === 'icon' || data.type === 'shape') {
-                                      window.dispatchEvent(new CustomEvent('add-icon-to-editor', {
-                                        detail: {
-                                          pageIndex: displayIndex,
-                                          icon: data.icon,
-                                          dropPoint,
-                                          isShape: data.type === 'shape'
-                                        }
-                                      }));
-                                    } else if (['button', 'text', 'slideshow', 'image-frame', 'map'].includes(data.type)) {
-                                      console.log(`${data.type} Dropped:`, data);
-                                      window.dispatchEvent(new CustomEvent('add-element-to-editor', {
-                                        detail: {
-                                          pageIndex: displayIndex,
-                                          svgContent: data.svgContent,
-                                          dropPoint
-                                        }
-                                      }));
                                     } else if (data.type === 'image' || data.type === 'upload' || data.url) {
                                       window.dispatchEvent(new CustomEvent('add-image-to-editor', {
                                         detail: {

@@ -4,8 +4,8 @@ import { Icon } from '@iconify/react';
 import ColorPicker, { parseGradient } from './ColorPicker';
 import { presets as hotspotPresets } from './HotspotPresetPopup';
 
-const ALL_ICON_ASSETS = import.meta.glob('../../assets/hotspot preset icon/**/*.svg', { as: 'url', eager: true });
-const BUTTON_ICON_ASSETS = import.meta.glob('../../assets/hotspot preset icon/interactive_button/*.png', { as: 'url', eager: true });
+const ALL_ICON_ASSETS = import.meta.glob('../../assets/hotspot preset icon/**/*.svg', { query: '?url', import: 'default', eager: true });
+const BUTTON_ICON_ASSETS = import.meta.glob('../../assets/hotspot preset icon/interactive_button/*.png', { query: '?url', import: 'default', eager: true });
 
 const getCategoryKeywords = (actionId) => {
   const map = {

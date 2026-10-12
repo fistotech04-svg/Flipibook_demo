@@ -13,6 +13,7 @@ import GifEditor from './Gif';
 import AnimationPanel from './AnimationPanel';
 import InteractionPanel from './InteractionPanel';
 import Elements from './Elements/Elements';
+import ElementShapesProperties from './Elements/Element-ShapesProperties';
 import PopupTemplateSelection from './PopupTemplateSelection';
 import Model3DEditor from './Model3DEditor';
 import GroupProperties from './GroupProperties';
@@ -833,7 +834,8 @@ const RightSidebar = ({
 
         const isGif = isGifFile || lowerDataName.includes('gif') || lowerId.includes('gif') || el.getAttribute('data-is-gif-group') === 'true' || el.dataset?.mediaType === 'gif';
         const isAudio = dataType === 'audio' || dataType === 'audio-frame' || lowerDataName.includes('audio') || lowerId.includes('audio') || (el && el.querySelector && el.querySelector('[data-type="audio-frame"]') !== null);
-        const isShape = dataType === 'shape' || el.getAttribute('data-shape-type') === 'shape';
+        const isElementShape = el.getAttribute('data-is-element-shape') === 'true' || (el.querySelector && el.querySelector('[data-is-element-shape="true"]') !== null);
+        const isShape = dataType === 'shape' || el.getAttribute('data-shape-type') === 'shape' || isElementShape;
 
         const isMap = dataType === 'map' || lowerId.includes('map');
         if (isMap) {
@@ -875,7 +877,7 @@ const RightSidebar = ({
           lowerId.includes('image') ||
           !!(el.getAttribute('href') || el.getAttribute('xlink:href')) ||
           (lowerTagName === 'g' && hasImageChild && el.getAttribute('data-is-image-group') === 'true') ||
-          isPatternImage) && !isGif && !isPdfBackground && !isMap;
+          isPatternImage) && !isGif && !isPdfBackground && !isMap && !isElementShape;
         const isVideo = (lowerTagName === 'video' || lowerTagName === 'iframe' || dataType === 'video' || lowerDataName.includes('video') || lowerId.includes('video') || (lowerTagName === 'foreignobject' && el.querySelector('video, iframe'))) && !isMap;
         const isText = (lowerTagName === 'text' || lowerTagName === 'tspan' || (lowerTagName === 'foreignobject' && !isVideo && !isMap)) || dataType === 'text' || lowerDataName.includes('text') || lowerId.includes('text');
         const isIcon = (dataType === 'icon' || dataType === 'hotspot' || lowerDataName.includes('icon') || lowerDataName.includes('hotspot') || lowerId.includes('icon') || lowerId.includes('hotspot') || lowerTagName.includes('lucide') || el.classList.contains('lucide') || el.classList.contains('iconify')) && !isShape;
@@ -894,6 +896,7 @@ const RightSidebar = ({
         props.isVideo = isVideo;
         props.isGif = isGif;
         props.isIcon = isIcon;
+        props.isElementShape = isElementShape;
         props.isShape = isShape;
         props.isEmbed = isEmbed;
         props.isImageFrame = isImageFrame;
@@ -1709,6 +1712,14 @@ const RightSidebar = ({
                           selectedLayerId={selectedLayerId}
                           activePageIndex={activePageIndex}
                           updateElementAttribute={updateElementAttribute}
+                        />
+                      ) : selectedElementProps?.isElementShape ? (
+                        <ElementShapesProperties
+                          selectedElementProps={selectedElementProps}
+                          activePageIndex={activePageIndex}
+                          selectedLayerId={selectedLayerId}
+                          updateElementAttribute={updateElementAttribute}
+                          activeMainTool={activeMainTool}
                         />
                       ) : (
                         <>
