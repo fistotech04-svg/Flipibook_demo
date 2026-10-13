@@ -61,6 +61,7 @@ export default function DashboardNavbar() {
     { name: 'Templates', path: '/templates' },
     { name: 'Explore', path: '/explore' },
     { name: 'Features', path: '#' },
+    { name: 'Converter', path: '/converter' },
     { name: 'About Us', path: '/about' },
     { name: 'Contact Us', path: '/contact' },
     { name: 'Help', path: '#' },
