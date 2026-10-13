@@ -41,6 +41,22 @@ const buttonTemplates = [
     textColor: '#5b52f9',
     fontWeight: '600',
     fontSize: 15
+  },
+  {
+    id: 'linear-button',
+    name: 'Linear Button',
+    width: 140,
+    height: 42,
+    rx: 21,
+    isGradient: true,
+    gradientColors: ['#9B7CFF', '#F655C8'],
+    stroke: 'none',
+    strokeWidth: 0,
+    text: 'LINEAR',
+    textColor: '#ffffff',
+    fontWeight: '700',
+    fontSize: 14,
+    letterSpacing: '1px'
   }
 ];
 
@@ -61,6 +77,26 @@ const ButtonStyle = ({ isFullView }) => {
           <polygon class="btn-accent-right" points="${w - slantDx},0 ${w},0 ${w - slantDx / 2},${h / 2}" fill="${template.accentColor}" stroke="none" />
           <polygon class="btn-main-poly" points="0,0 ${w - slantDx},0 ${w},${h} ${slantDx},${h}" fill="${template.fill}" stroke="none" />
           <text x="${centerX}" y="${centerY}" fill="${template.textColor}" font-size="${template.fontSize}" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="${template.fontWeight}" text-anchor="middle" dominant-baseline="middle" style="text-anchor: middle; dominant-baseline: middle;" data-type="text">${template.text}</text>
+        </g>
+      `;
+    }
+
+    if (template.isGradient) {
+      const gradId = `btn-grad-${uniqueId}`;
+      const color1 = template.gradientColors?.[0] || '#9B7CFF';
+      const color2 = template.gradientColors?.[1] || '#F655C8';
+      const letterSpacingAttr = template.letterSpacing ? ` letter-spacing="${template.letterSpacing}"` : '';
+      const letterSpacingStyle = template.letterSpacing ? ` letter-spacing: ${template.letterSpacing};` : '';
+      return `
+        <g id="button-${uniqueId}" data-type="button" cursor="pointer"${transformAttr}>
+          <defs>
+            <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="${color1}" />
+              <stop offset="100%" stop-color="${color2}" />
+            </linearGradient>
+          </defs>
+          <rect class="btn-bg" x="0" y="0" width="${template.width}" height="${template.height}" rx="${template.rx}" fill="url(#${gradId})" data-fill-color="linear-gradient(90deg, ${color1} 0%, ${color2} 100%)" stroke="${template.stroke || 'none'}" stroke-width="${template.strokeWidth || 0}" />
+          <text x="${centerX}" y="${centerY}" fill="${template.textColor}" font-size="${template.fontSize}" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="${template.fontWeight}" text-anchor="middle" dominant-baseline="middle"${letterSpacingAttr} style="text-anchor: middle; dominant-baseline: middle;${letterSpacingStyle}" data-type="text">${template.text}</text>
         </g>
       `;
     }
@@ -107,6 +143,14 @@ const ButtonStyle = ({ isFullView }) => {
         >
           <div className="w-full py-[0.2vw] flex items-center justify-center">
             <svg viewBox={`0 0 ${btn.width} ${btn.height}`} className="w-full h-auto pointer-events-none select-none max-h-[2.5vw]">
+              {btn.isGradient && (
+                <defs>
+                  <linearGradient id={`preview-grad-${btn.id}`} x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor={btn.gradientColors?.[0] || '#9B7CFF'} />
+                    <stop offset="100%" stopColor={btn.gradientColors?.[1] || '#F655C8'} />
+                  </linearGradient>
+                </defs>
+              )}
               {btn.isRibbon ? (
                 (() => {
                   const slantDx = Math.round(btn.height * 0.22);
@@ -120,14 +164,14 @@ const ButtonStyle = ({ isFullView }) => {
                 })()
               ) : (
                 <rect
-                  x="1"
-                  y="1"
-                  width={btn.width - 2}
-                  height={btn.height - 2}
+                  x={btn.strokeWidth ? 1 : 0}
+                  y={btn.strokeWidth ? 1 : 0}
+                  width={btn.strokeWidth ? btn.width - 2 : btn.width}
+                  height={btn.strokeWidth ? btn.height - 2 : btn.height}
                   rx={btn.rx}
-                  fill={btn.fill}
-                  stroke={btn.stroke}
-                  strokeWidth={btn.strokeWidth}
+                  fill={btn.isGradient ? `url(#preview-grad-${btn.id})` : btn.fill}
+                  stroke={btn.stroke || 'none'}
+                  strokeWidth={btn.strokeWidth || 0}
                 />
               )}
               <text
@@ -136,9 +180,11 @@ const ButtonStyle = ({ isFullView }) => {
                 fill={btn.textColor}
                 fontSize={btn.fontSize}
                 fontWeight={btn.fontWeight}
+                letterSpacing={btn.letterSpacing || undefined}
                 fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
                 textAnchor="middle"
                 dominantBaseline="middle"
+                style={btn.letterSpacing ? { letterSpacing: btn.letterSpacing } : undefined}
               >
                 {btn.text}
               </text>
