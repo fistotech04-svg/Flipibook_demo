@@ -1055,25 +1055,11 @@ const SlideshowProperties = ({ selectedElement, activePageIndex, onUpdate, isOpe
     };
 
     const resetAutoTimer = () => {
-      if (liveRunnerAutoTimer.current) clearInterval(liveRunnerAutoTimer.current);
-      if (isHoveringRef.current) return;
-      const { autoSlide = true, autoPlay = true, speed = 3 } = slideshowSettings;
-      if (!autoSlide && !autoPlay) return;
-
-      const intervalMs = (parseFloat(speed) || 3) * 1000;
-      liveRunnerAutoTimer.current = setInterval(() => {
-        if (isAnimatingRef.current) return;
-        // Only skip if mouse is actively over a control button
-        const isHoveringControls = liveRunnerOverlayRef.current?.querySelector('button:hover');
-        if (isHoveringControls) return;
-
-        const images = liveRunnerImagesRef.current;
-        if (!images || images.length < 2) return;
-
-        let next = liveRunnerIndexRef.current + 1;
-        if (next >= images.length) { if (!slideshowSettings.infiniteLoop) return; next = 0; }
-        switchTo(next, 'next');
-      }, intervalMs);
+      if (liveRunnerAutoTimer.current) {
+        clearInterval(liveRunnerAutoTimer.current);
+        liveRunnerAutoTimer.current = null;
+      }
+      // Auto Slide Mode does not run in Template Editor (only works in PreviewArea)
     };
     resetAutoTimerRef.current = resetAutoTimer;
 

@@ -29,7 +29,10 @@ import {
   getTargetElementShapeOrFrameId,
   resizeInteractiveButton,
   resizeAudioGroup,
-  isAudioGroup as checkIsAudioGroup
+  isAudioGroup as checkIsAudioGroup,
+  isSlideshowGroup,
+  getSlideshowBBox,
+  resizeSlideshowGroup
 } from './Elements/useElementsEditor';
 
 const PENCIL_CURSOR = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24'><g fill='none' fill-rule='evenodd'><path d='m12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035q-.016-.005-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.017-.018m.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093q.019.005.029-.008l.004-.014l-.034-.614q-.005-.018-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01z' /><path fill='%23000' d='M20.131 3.16a3 3 0 0 0-4.242 0l-.707.708l4.95 4.95l.706-.707a3 3 0 0 0 0-4.243l-.707-.707Zm-1.414 7.072l-4.95-4.95l-9.09 9.091a1.5 1.5 0 0 0-.401.724l-1.029 4.455a1 1 0 0 0 1.2 1.2l4.456-1.028a1.5 1.5 0 0 0 .723-.401z' /></g></svg>") 1 16, crosshair`;
@@ -65,6 +68,9 @@ export const formatSmoothPathD = (pts) => {
 
 export const getVisualBBox = (el) => {
   if (!el || typeof el.getBBox !== 'function') return { x: 0, y: 0, width: 0, height: 0 };
+
+  const ssBBox = getSlideshowBBox(el);
+  if (ssBBox) return ssBBox;
 
   const isUserGroup = el.tagName?.toLowerCase() === 'g' && (
     el.getAttribute('data-type') === 'group' ||
@@ -4076,6 +4082,17 @@ const MainEditor = ({
           if (!localBBox || localBBox.width <= 0 || localBBox.height <= 0) {
             localBBox = { x: 0, y: 0, width: 48, height: 48 };
           }
+        } else if (el.getAttribute('data-type') === 'decorator' || (el.id && el.id.startsWith('decorator-'))) {
+          const fo = el.querySelector('foreignObject') || el.querySelector('rect');
+          if (fo) {
+            const w = parseFloat(fo.getAttribute('width')) || 0;
+            const h = parseFloat(fo.getAttribute('height')) || 0;
+            const x = parseFloat(fo.getAttribute('x') || '0');
+            const y = parseFloat(fo.getAttribute('y') || '0');
+            if (w > 0 && h > 0) {
+              localBBox = { x, y, width: w, height: h };
+            }
+          }
         }
         const elScreenCtm = el.getScreenCTM();
 
@@ -7736,6 +7753,17 @@ const MainEditor = ({
                 if (rw > 0 && rh > 0) {
                   bbox = { x: rx, y: ry, width: rw, height: rh };
                 }
+              } else if (el.getAttribute('data-type') === 'decorator' || (el.id && el.id.startsWith('decorator-'))) {
+                const fo = el.querySelector('foreignObject') || el.querySelector('rect');
+                if (fo) {
+                  const rw = parseFloat(fo.getAttribute('width')) || 0;
+                  const rh = parseFloat(fo.getAttribute('height')) || 0;
+                  const rx = parseFloat(fo.getAttribute('x') || '0');
+                  const ry = parseFloat(fo.getAttribute('y') || '0');
+                  if (rw > 0 && rh > 0) {
+                    bbox = { x: rx, y: ry, width: rw, height: rh };
+                  }
+                }
               }
             }
 
@@ -8031,12 +8059,12 @@ const MainEditor = ({
             if (dir === 'n' || dir === 's') scaleX = 1;
             if (dir === 'e' || dir === 'w') scaleY = 1;
 
-            // Maintain Aspect Ratio for images, text, or if Shift key is held (only for corners, but force for text on all handles to prevent distortion)
+            const isSlideshowEl = isSlideshowGroup(el);
             const isUserGroupResize = (el.getAttribute('data-type') === 'group' || (el.getAttribute('data-name') || '').toLowerCase() === 'group' || (el.id || '').startsWith('group-')) && el.getAttribute('data-is-image-group') !== 'true' && el.getAttribute('data-is-gif-group') !== 'true' && el.getAttribute('data-is-video-group') !== 'true';
-            const childImage = (!isUserGroupResize && el.tagName?.toLowerCase() === 'g') ? el.querySelector('image, img') : null;
+            const childImage = (!isUserGroupResize && !isSlideshowEl && el.tagName?.toLowerCase() === 'g') ? el.querySelector('image, img') : null;
             const src = el.getAttribute('href') || el.getAttribute('xlink:href') || el.getAttribute('src') || (childImage ? (childImage.getAttribute('href') || childImage.getAttribute('xlink:href') || childImage.getAttribute('src')) : '') || '';
             const isGif = el.getAttribute('data-type') === 'gif' || el.getAttribute('data-is-gif-group') === 'true' || el.dataset?.mediaType === 'gif' || src.split('?')[0].toLowerCase().endsWith('.gif') || src.toLowerCase().startsWith('data:image/gif') || (el.getAttribute('data-name') || '').toLowerCase().includes('gif') || (el.id || '').toLowerCase().includes('gif');
-            const isImage = !isUserGroupResize && (el.getAttribute('data-type') === 'image' || el.tagName?.toLowerCase() === 'image' || el.getAttribute('data-type') === 'video' || el.getAttribute('data-type') === 'gif' || el.getAttribute('data-is-image-group') === 'true' || el.getAttribute('data-is-gif-group') === 'true' || isGif || (el.getAttribute('data-name') || '').toLowerCase().includes('image') || !!childImage);
+            const isImage = !isUserGroupResize && !isSlideshowEl && (el.getAttribute('data-type') === 'image' || el.tagName?.toLowerCase() === 'image' || el.getAttribute('data-type') === 'video' || el.getAttribute('data-type') === 'gif' || el.getAttribute('data-is-image-group') === 'true' || el.getAttribute('data-is-gif-group') === 'true' || isGif || (el.getAttribute('data-name') || '').toLowerCase().includes('image') || !!childImage);
             const isElementInCropMode = el.getAttribute?.('data-object-fit') === 'Crop' || el.hasAttribute?.('data-effect-crop-inset') || (el.getAttribute?.('data-crop-data') && el.getAttribute?.('data-crop-data') !== 'null');
             const isScaledImage = isImage && !isElementInCropMode;
             const isText = el.getAttribute('data-type') === 'text' || el.tagName?.toLowerCase() === 'text';
@@ -8049,6 +8077,7 @@ const MainEditor = ({
             const isCtrlPressedMove = event.ctrlKey || (event.sourceEvent && event.sourceEvent.ctrlKey) || isCtrlPressedRef.current;
 
             const isHotspot = el.getAttribute('data-is-hotspot') === 'true';
+            const isDecorator = el.getAttribute('data-type') === 'decorator' || (el.id && el.id.startsWith('decorator-'));
             const isInteractiveButton = (isHotspot || el.getAttribute('data-type') === 'button') && state.childrenData && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'rect') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
             const isHotspotPreset = isHotspot && !isInteractiveButton;
 
@@ -8118,9 +8147,9 @@ const MainEditor = ({
                   }
                 }
               }
-            } else if (!isInteractiveButton && ((isCorner && (isScaledImage || isShape || isHotspotPreset || (isText && !isForeignObject))) || (!isCorner && ((isText && !isForeignObject) || isHotspotPreset)))) {
+            } else if (!isInteractiveButton && ((isCorner && (isScaledImage || isShape || isHotspotPreset || isSlideshowEl || isDecorator || (isText && !isForeignObject))) || (!isCorner && ((isText && !isForeignObject) || isHotspotPreset || isDecorator)))) {
               const s = Math.max(Math.abs(scaleX), Math.abs(scaleY)) * (Math.sign(scaleX) || 1);
-              if (!isCorner && ((isText && !isForeignObject) || isHotspotPreset)) {
+              if (!isCorner && ((isText && !isForeignObject) || isHotspotPreset || isDecorator)) {
                 const sSide = (dir === 'n' || dir === 's') ? scaleY : scaleX;
                 scaleX = sSide;
                 scaleY = sSide;
@@ -8467,7 +8496,38 @@ const MainEditor = ({
                   const isHotspot = el.getAttribute('data-is-hotspot') === 'true';
                   const isInteractiveButton = (isHotspot || el.getAttribute('data-type') === 'button') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'rect') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
                   const isAudio = checkIsAudioGroup(el);
-                  // ── HOTSPOT ICON GROUP & AUDIO GROUP: update outer transform, NOT children ───────
+                  const isSlideshow = isSlideshowGroup(el);
+
+                  const isDecorator = el.getAttribute('data-type') === 'decorator' || (el.id && el.id.startsWith('decorator-'));
+
+                  // ── HOTSPOT ICON GROUP, AUDIO GROUP, SLIDESHOW & DECORATOR: update outer transform, NOT children ───────
+                  if (isDecorator) {
+                    const scaleMatrix = new DOMMatrix()
+                      .translate(worldAnchor.x, worldAnchor.y)
+                      .scale(scaleX, scaleY)
+                      .translate(-worldAnchor.x, -worldAnchor.y);
+                    const nextMatrix = scaleMatrix.multiply(matrix);
+                    el.setAttribute('transform', matrixToTransform(nextMatrix));
+                    if (typeof drawOverlayHighlight === 'function') {
+                      drawOverlayHighlight(el, 'selected');
+                    }
+                    return;
+                  }
+
+                  if (isSlideshow) {
+                    resizeSlideshowGroup({
+                      el,
+                      worldAnchor,
+                      scaleX,
+                      scaleY,
+                      matrix,
+                      matrixToTransform,
+                      drawOverlayHighlight,
+                      currentFrameIdRef
+                    });
+                    return; // preserve internal relative frame coordinates and pattern fills
+                  }
+
                   if ((isHotspot && !isInteractiveButton) || isAudio) {
                     resizeAudioGroup({
                       el,
