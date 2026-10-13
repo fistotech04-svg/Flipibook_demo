@@ -191,13 +191,24 @@ const UploadPage = ({ onBack, onContinue, initialConfig }) => {
         {selectedFile && (
           <div className="w-full mt-4 bg-[#F6F9FD] border border-[#F6F9FD] rounded-[6px] px-3.5 py-2.5 flex items-center justify-between transition-all">
             <div className="flex items-center gap-3.5 min-w-0">
-              {/* Thumbnail Image */}
-              <div className="w-16 h-11 rounded-[4px] overflow-hidden bg-gray-200 flex-shrink-0 flex items-center justify-center border border-[#e2e8f0]">
-                {selectedFile.previewUrl ? (
+              {/* Thumbnail Image / Video */}
+              <div className="w-16 h-11 rounded-[4px] overflow-hidden bg-gray-900 flex-shrink-0 flex items-center justify-center border border-[#e2e8f0]">
+                {selectedFile.rawFile?.type?.startsWith('video/') || selectedFile.name?.match(/\.(mp4|mov|avi|wmv|mkv|webm)$/i) ? (
+                  <video
+                    src={selectedFile.previewUrl}
+                    className="w-full h-full object-cover"
+                    muted
+                    playsInline
+                    preload="metadata"
+                  />
+                ) : selectedFile.previewUrl ? (
                   <img
                     src={selectedFile.previewUrl}
                     alt={selectedFile.name}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
                   />
                 ) : (
                   <div className="text-gray-400">
