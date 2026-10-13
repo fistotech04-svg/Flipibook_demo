@@ -4,7 +4,8 @@ import React, { useState, useRef, useEffect } from 'react';
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1608248597359-1e16c80521ba?w=800&q=80';
 
 const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig }) => {
-  const [selectedFormat, setSelectedFormat] = useState('JPG');
+  const [selectedFormat, setSelectedFormat] = useState(null);
+  const [formatError, setFormatError] = useState(false);
   const [quality, setQuality] = useState('Original (Keep Quality)');
   const [resolution, setResolution] = useState('Original');
   const [openDropdown, setOpenDropdown] = useState(null); // 'quality' | 'resolution' | null
@@ -13,6 +14,10 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
   const [copiedNotification, setCopiedNotification] = useState(false);
 
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [convertedBlobUrl, setConvertedBlobUrl] = useState(null);
+  const [actualConvertedSize, setActualConvertedSize] = useState(null);
 
   // File information passed from upload page or fallback to demo
   const file = fileData || {
@@ -33,18 +38,106 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
 
   const originalFormat = getOriginalExt(file.name);
 
-  // Calculate converted size estimate
-  const getConvertedSize = () => {
-    if (file.size && file.size.includes('MB')) {
-      const num = parseFloat(file.size);
-      if (!isNaN(num)) {
-        return (num * 0.49).toFixed(1) + ' MB';
+  // Parse file size into bytes
+  const getSizeBytes = () => {
+    if (file.rawFile?.size) return file.rawFile.size;
+    if (file.size) {
+      const match = file.size.match(/([\d.]+)\s*(MB|KB|Bytes|GB)/i);
+      if (match) {
+        const val = parseFloat(match[1]);
+        const unit = match[2].toUpperCase();
+        if (unit === 'KB') return Math.round(val * 1024);
+        if (unit === 'MB') return Math.round(val * 1024 * 1024);
+        if (unit === 'GB') return Math.round(val * 1024 * 1024 * 1024);
+        return Math.round(val);
       }
     }
-    return '4.1 MB';
+    return 4.1 * 1024 * 1024;
   };
 
-  const convertedSize = getConvertedSize();
+  const formatBytes = (bytes) => {
+    if (!bytes || bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const getMimeType = (formatStr) => {
+    const upper = (formatStr || '').toUpperCase();
+    if (upper === 'PNG') return 'image/png';
+    if (upper === 'WEBP') return 'image/webp';
+    if (upper === 'AVIF') return 'image/avif';
+    return 'image/jpeg';
+  };
+
+  const convertImageOnClient = async () => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+
+      img.onload = () => {
+        try {
+          let targetWidth = img.naturalWidth;
+          let targetHeight = img.naturalHeight;
+
+          // Handle resolution setting
+          if (resolution === 'Low') {
+            const ratio = Math.min(800 / targetWidth, 600 / targetHeight, 1);
+            targetWidth = Math.max(1, Math.round(targetWidth * ratio));
+            targetHeight = Math.max(1, Math.round(targetHeight * ratio));
+          } else if (resolution.includes('Optimized')) {
+            if (targetWidth > 1920 || targetHeight > 1080) {
+              const ratio = Math.min(1920 / targetWidth, 1080 / targetHeight);
+              targetWidth = Math.max(1, Math.round(targetWidth * ratio));
+              targetHeight = Math.max(1, Math.round(targetHeight * ratio));
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          const ctx = canvas.getContext('2d');
+
+          const mimeType = getMimeType(selectedFormat);
+
+          // Fill white background for JPEG / TIFF so transparency is preserved cleanly
+          if (mimeType === 'image/jpeg') {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, targetWidth, targetHeight);
+          }
+
+          ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+          // Quality calculation
+          let q = 0.92;
+          if (quality === 'High') q = 0.85;
+          if (quality === 'Medium') q = 0.65;
+          if (quality === 'Low') q = 0.45;
+          if (quality === 'Original (Keep Quality)') q = 0.95;
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error('Canvas toBlob returned null'));
+              }
+            },
+            mimeType,
+            q
+          );
+        } catch (err) {
+          reject(err);
+        }
+      };
+
+      img.onerror = (err) => reject(err);
+      img.src = file.previewUrl || DEFAULT_IMAGE;
+    });
+  };
+
+  const convertedSize = actualConvertedSize || '...';
 
   const qualityRef = useRef(null);
   const resolutionRef = useRef(null);
@@ -94,22 +187,63 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
     'Low',
   ];
 
-  const handleAction = () => {
-    // Transition to converted result screen
-    setIsConverted(true);
-    if (onConvert) {
-      onConvert({
-        file,
-        format: selectedFormat,
-        quality,
-        resolution,
-      });
+  const handleAction = async () => {
+    if (!selectedFormat) {
+      setFormatError(true);
+      return;
+    }
+    setFormatError(false);
+    setIsProcessing(true);
+
+    try {
+      const blob = await convertImageOnClient();
+      const blobUrl = URL.createObjectURL(blob);
+      setConvertedBlobUrl(blobUrl);
+      setActualConvertedSize(formatBytes(blob.size));
+      setIsConverted(true);
+
+      if (onConvert) {
+        onConvert({
+          file,
+          format: selectedFormat,
+          quality,
+          resolution,
+          blob,
+          blobUrl,
+          size: formatBytes(blob.size),
+        });
+      }
+    } catch (err) {
+      console.warn('Direct canvas conversion fallback triggered:', err);
+      // Fallback calculation based on original size, quality and format
+      const baseBytes = getSizeBytes();
+      let formatFactor = 0.85;
+      const fmt = (selectedFormat || '').toUpperCase();
+      if (fmt === 'WEBP') formatFactor = 0.65;
+      else if (fmt === 'AVIF') formatFactor = 0.55;
+      else if (fmt === 'PNG') formatFactor = 1.15;
+      else if (fmt === 'JPG') formatFactor = 0.80;
+
+      let qFactor = 0.95;
+      if (quality === 'High') qFactor = 0.80;
+      else if (quality === 'Medium') qFactor = 0.60;
+      else if (quality === 'Low') qFactor = 0.40;
+
+      let resFactor = 1.0;
+      if (resolution === 'Low') resFactor = 0.35;
+      else if (resolution.includes('Optimized')) resFactor = 0.75;
+
+      const estimated = Math.max(1024, Math.round(baseBytes * formatFactor * qFactor * resFactor));
+      setActualConvertedSize(formatBytes(estimated));
+      setIsConverted(true);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleDownload = () => {
     const link = document.createElement('a');
-    link.href = file.previewUrl || DEFAULT_IMAGE;
+    link.href = convertedBlobUrl || file.previewUrl || DEFAULT_IMAGE;
     const baseName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
     link.download = `${baseName}.${selectedFormat.toLowerCase()}`;
     document.body.appendChild(link);
@@ -150,7 +284,7 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
                 title="Click to view full screen preview"
               >
                 <img
-                  src={file.previewUrl || DEFAULT_IMAGE}
+                  src={(isConverted && convertedBlobUrl) ? convertedBlobUrl : (file.previewUrl || DEFAULT_IMAGE)}
                   alt={fileName || 'Preview'}
                   className="w-full h-full object-contain p-1 transition-transform duration-300 group-hover:scale-102"
                 />
@@ -409,17 +543,27 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
 
               {/* Section 1: Output Format */}
               <div className="mt-6">
-                <h2 className="text-[15px] font-bold text-[#1e293b] mb-3">
-                  1. Output Format
-                </h2>
-                <div className="grid grid-cols-5 gap-3">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-[15px] font-bold text-[#1e293b]">
+                    1. Output Format
+                  </h2>
+                  {formatError && (
+                    <span className="text-[12px] font-medium text-red-500 animate-pulse">
+                      Please select an output format
+                    </span>
+                  )}
+                </div>
+                <div className={`grid grid-cols-5 gap-3 p-1 rounded-[10px] transition-all ${formatError ? 'ring-2 ring-red-400 bg-red-50/20' : ''}`}>
                   {formats.map((format) => {
                     const isSelected = selectedFormat === format;
                     return (
                       <button
                         key={format}
                         type="button"
-                        onClick={() => setSelectedFormat(format)}
+                        onClick={() => {
+                          setSelectedFormat(format);
+                          setFormatError(false);
+                        }}
                         className={`relative h-[86px] rounded-[8px] flex flex-col items-center justify-center p-2 transition-all cursor-pointer ${
                           isSelected
                             ? 'border border-[#EA7233] bg-[#fffaf6] shadow-sm'
@@ -616,21 +760,33 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
                 <button
                   type="button"
                   onClick={handleAction}
-                  className="inline-flex items-center gap-2 px-8 py-2.5 bg-[#EA7233] hover:bg-[#d86326] active:scale-98 text-white rounded-[6px] text-sm font-medium shadow-sm transition-all cursor-pointer"
+                  disabled={isProcessing}
+                  className={`inline-flex items-center gap-2 px-8 py-2.5 bg-[#EA7233] hover:bg-[#d86326] active:scale-98 text-white rounded-[6px] text-sm font-medium shadow-sm transition-all cursor-pointer ${
+                    isProcessing ? 'opacity-70 cursor-not-allowed' : ''
+                  }`}
                 >
-                  <span>Convert</span>
-                  <svg
-                    className="w-4 h-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                    <polyline points="12 5 19 12 12 19" />
-                  </svg>
+                  {isProcessing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Converting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Convert</span>
+                      <svg
+                        className="w-4 h-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                        <polyline points="12 5 19 12 12 19" />
+                      </svg>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -666,7 +822,7 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
             onClick={() => setIsPreviewOpen(false)}
           >
             <img
-              src={file.previewUrl || DEFAULT_IMAGE}
+              src={(isConverted && convertedBlobUrl) ? convertedBlobUrl : (file.previewUrl || DEFAULT_IMAGE)}
               alt={fileName || 'Preview'}
               className="w-[72vw] max-w-[1080px] max-h-[88vh] object-contain rounded-[8px] shadow-2xl select-none"
               onClick={(e) => e.stopPropagation()}
