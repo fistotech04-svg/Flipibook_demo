@@ -6,6 +6,7 @@ import UploadPage from './Converter/uploadPage';
 import ImageConverter from './Converter/imageConverter';
 import ImageCompressor from './Converter/imageCompressor';
 import VideoConverter from './Converter/videoConverter';
+import VideoCompressor from './Converter/videoCompressor';
 
 const Converter = () => {
   const [step, setStep] = useState('select'); // 'select' | 'upload' | 'convert'
@@ -74,6 +75,21 @@ const Converter = () => {
     if (selectedConfig.action === 'compress' && selectedConfig.type === 'image') {
       return (
         <ImageCompressor
+          fileData={uploadedFile}
+          initialConfig={selectedConfig}
+          onBack={() => setStep('upload')}
+          onReset={() => {
+            setStep('select');
+            setSelectedConfig(null);
+            setUploadedFile(null);
+          }}
+        />
+      );
+    }
+
+    if (selectedConfig.action === 'compress' && selectedConfig.type === 'video') {
+      return (
+        <VideoCompressor
           fileData={uploadedFile}
           initialConfig={selectedConfig}
           onBack={() => setStep('upload')}
