@@ -44,18 +44,38 @@ import { getFromDB, saveToDB } from '../../utils/dbUtils';
 const getSlideshowScript = () => `
   <script>
     (function() {
+      const DEFAULT_FALLBACK_IMAGES = [
+        { id: 1, url: 'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?w=600&auto=format&fit=crop&q=80', name: 'Slide 1' },
+        { id: 2, url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&auto=format&fit=crop&q=80', name: 'Slide 2' },
+        { id: 3, url: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&auto=format&fit=crop&q=80', name: 'Slide 3' }
+      ];
+
       const initSlideshows = () => {
-        const elements = document.querySelectorAll('[data-slideshow]');
+        const elements = document.querySelectorAll('[data-slideshow], [data-is-slideshow="true"], [data-type="slideshow"]');
         elements.forEach(el => {
           if (el.dataset.slideshowInitialized) return;
           el.dataset.slideshowInitialized = 'true';
           try {
-            const data = JSON.parse(el.dataset.slideshow);
+            let data = {};
+            try {
+              data = JSON.parse(el.dataset.slideshow || el.getAttribute('data-slideshow') || '{}');
+            } catch(e) { data = {}; }
+
             const settings = data.settings || {};
-            const images = data.images || [];
-            if (!images || images.length < 1) return;
+            let images = data.images || [];
+            if (!Array.isArray(images) || images.length === 0) {
+              images = DEFAULT_FALLBACK_IMAGES;
+            }
 
             let currentIndex = parseInt(el.getAttribute('data-active-index') || '0');
+            if (isNaN(currentIndex) || currentIndex < 0 || currentIndex >= images.length) {
+              currentIndex = 0;
+            }
+
+            const is3Frame = el.getAttribute('data-type') === 'slideshow' ||
+                             el.getAttribute('data-is-slideshow') === 'true' ||
+                             el.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)').length >= 3;
+
             let isAnimating = false;
             let autoTimer = null;
             let manualMode = false;
@@ -66,7 +86,195 @@ const getSlideshowScript = () => `
             if (getComputedStyle(container).position === 'static') {
               container.style.position = 'relative';
             }
-            container.style.overflow = 'hidden';
+
+            // --- 3-Frame Carousel Engine (3D Coverflow & Flat Gallery) ---
+            const update3Frame = (activeIdx, dir) => {
+              const uniqueId = el.id.replace('slideshow-', '') || Date.now();
+              let defs = el.querySelector('defs');
+              if (!defs) {
+                defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+                el.insertBefore(defs, el.firstChild);
+              }
+              const len = images.length;
+              if (len === 0) return;
+              const centerIndex = activeIdx % len;
+              const rightIndex = len >= 2 ? (activeIdx + 1) % len : -1;
+              const leftIndex = len >= 3 ? (activeIdx - 1 + len) % len : (len === 2 ? (activeIdx + 1) % len : -1);
+
+              const rects = el.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)');
+              const leftRect = rects[0];
+              const rightRect = rects[1];
+              const centerRect = rects[2];
+
+              const applyFrameImage = (rect, imgIdx, prefix) => {
+                if (!rect) return;
+                const imgObj = imgIdx >= 0 ? images[imgIdx] : null;
+                const url = imgObj?.url || (typeof imgObj === 'string' ? imgObj : null);
+                if (!url) {
+                  rect.setAttribute('fill', '#f3f4f6');
+                  return;
+                }
+                const patternId = 'slideshow-pattern-' + prefix + '-' + uniqueId;
+                let pattern = defs.querySelector('#' + patternId);
+                if (!pattern) {
+                  pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+                  pattern.setAttribute('id', patternId);
+                  pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+                  const imgNode = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+                  imgNode.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+                  imgNode.setAttribute('x', '0');
+                  imgNode.setAttribute('y', '0');
+                  pattern.appendChild(imgNode);
+                  const textGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                  textGroup.setAttribute('class', 'overlay-text-group');
+                  pattern.appendChild(textGroup);
+                  defs.appendChild(pattern);
+                }
+                const pWidth = rect.getAttribute('width') || '130';
+                const pHeight = rect.getAttribute('height') || '140';
+                pattern.setAttribute('width', pWidth);
+                pattern.setAttribute('height', pHeight);
+
+                const imgNode = pattern.querySelector('image');
+                if (imgNode) {
+                  imgNode.setAttribute('href', url);
+                  try { imgNode.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (e) {}
+                  imgNode.setAttribute('width', pWidth);
+                  imgNode.setAttribute('height', pHeight);
+                }
+
+                // Text overlay if present
+                const textGroup = pattern.querySelector('.overlay-text-group');
+                if (textGroup) {
+                  textGroup.innerHTML = '';
+                  if (prefix === 'center' && imgObj) {
+                    const fFam = imgObj.fontFamily || 'Arial';
+                    const fSize = imgObj.fontSize || 16;
+                    const pW = parseFloat(pWidth) || 130;
+                    const pH = parseFloat(pHeight) || 140;
+                    const centerX = pW / 2;
+                    const centerY = pH / 2;
+                    const hasHeading = Boolean(imgObj.heading);
+                    const hasSubtext = Boolean(imgObj.subtext);
+
+                    if (hasHeading) {
+                      const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                      t.setAttribute('x', centerX.toString());
+                      t.setAttribute('y', (hasSubtext ? centerY - 10 : centerY).toString());
+                      t.setAttribute('text-anchor', 'middle');
+                      t.setAttribute('dominant-baseline', 'central');
+                      t.setAttribute('fill', 'white');
+                      t.setAttribute('font-size', fSize + 'px');
+                      t.setAttribute('font-family', "'" + fFam + "', sans-serif");
+                      t.setAttribute('font-weight', 'bold');
+                      t.setAttribute('style', 'text-shadow: 1px 1px 2px rgba(0,0,0,0.8); pointer-events: none;');
+                      t.textContent = imgObj.heading;
+                      textGroup.appendChild(t);
+                    }
+                    if (hasSubtext) {
+                      const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                      t.setAttribute('x', centerX.toString());
+                      t.setAttribute('y', (hasHeading ? centerY + 14 : centerY).toString());
+                      t.setAttribute('text-anchor', 'middle');
+                      t.setAttribute('dominant-baseline', 'central');
+                      t.setAttribute('fill', 'white');
+                      t.setAttribute('font-size', Math.max(8, fSize * 0.6) + 'px');
+                      t.setAttribute('font-family', "'" + fFam + "', sans-serif");
+                      t.setAttribute('style', 'text-shadow: 1px 1px 2px rgba(0,0,0,0.8); pointer-events: none;');
+                      t.textContent = imgObj.subtext;
+                      textGroup.appendChild(t);
+                    }
+                  }
+                }
+
+                // Image filters
+                if (imgObj) {
+                  const blurVal = imgObj.blur || 0;
+                  const brightnessVal = imgObj.brightness !== undefined ? imgObj.brightness : 100;
+                  const contrastVal = imgObj.contrast !== undefined ? imgObj.contrast : 100;
+                  let filterString = '';
+                  if (blurVal > 0) filterString += 'blur(' + blurVal + 'px) ';
+                  if (brightnessVal !== 100) filterString += 'brightness(' + brightnessVal + '%) ';
+                  if (contrastVal !== 100) filterString += 'contrast(' + contrastVal + '%)';
+                  filterString = filterString.trim();
+                  if (filterString) rect.style.filter = filterString;
+                  else rect.style.removeProperty('filter');
+                }
+
+                pattern.setAttribute('patternTransform', 'translate(' + (rect.getAttribute('x') || 0) + ', ' + (rect.getAttribute('y') || 0) + ')');
+                rect.setAttribute('fill', 'url(#' + patternId + ')');
+                rect.style.fill = 'url(#' + patternId + ')';
+              };
+
+              applyFrameImage(leftRect, leftIndex, 'left');
+              applyFrameImage(rightRect, rightIndex, 'right');
+              applyFrameImage(centerRect, centerIndex, 'center');
+
+              // Also update any legacy placeholder pattern to point to current center image
+              const phPattern = defs.querySelector('#slideshow-pattern-' + uniqueId);
+              if (phPattern && centerIndex >= 0 && images[centerIndex]) {
+                const phImg = phPattern.querySelector('image');
+                const u = images[centerIndex].url || images[centerIndex];
+                if (phImg && u) {
+                  phImg.setAttribute('href', u);
+                  try { phImg.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', u); } catch(e){}
+                }
+              }
+
+              // Flat gallery thumbnails
+              const slideStyle = el.getAttribute('data-style');
+              if (slideStyle === 'flat') {
+                for (let i = 0; i < 5; i++) {
+                  let tIdx = -1;
+                  if (len > 0) tIdx = (activeIdx - 2 + i + len * 5) % len;
+                  applyFrameImage(rects[3 + i], tIdx, 'thumb' + i);
+                  const tRect = rects[3 + i];
+                  if (tRect) {
+                    if (i === 2) {
+                      tRect.setAttribute('stroke', '#0ea5e9');
+                      tRect.setAttribute('stroke-width', '2');
+                    } else {
+                      tRect.setAttribute('stroke', '#9ca3af');
+                      tRect.setAttribute('stroke-width', '1');
+                    }
+                  }
+                }
+                const scrollThumb = el.querySelector('.scrollbar-thumb');
+                if (scrollThumb && len > 1) {
+                  const maxTrack = 160;
+                  const thumbPos = 20 + Math.round((activeIdx / (len - 1)) * maxTrack);
+                  scrollThumb.setAttribute('x', thumbPos.toString());
+                }
+              }
+
+              // Animation effect on center frame
+              if (centerRect && dir) {
+                const effect = (settings.transitionEffect || 'Linear').toLowerCase();
+                const duration = 380;
+                if (effect === 'fade') {
+                  centerRect.animate([{ opacity: 0.2 }, { opacity: 1 }], { duration, easing: 'ease-out' });
+                } else if (effect === 'flip') {
+                  centerRect.style.transformBox = 'fill-box';
+                  centerRect.style.transformOrigin = '50% 50%';
+                  centerRect.animate([
+                    { transform: 'perspective(400px) rotateY(90deg)', opacity: 0.3 },
+                    { transform: 'perspective(400px) rotateY(0deg)', opacity: 1 }
+                  ], { duration, easing: 'ease-out' });
+                } else if (effect === 'reveal') {
+                  const startClip = dir === 'next' ? 'inset(0 0 0 100%)' : 'inset(0 100% 0 0)';
+                  centerRect.animate([
+                    { clipPath: startClip },
+                    { clipPath: 'inset(0 0 0 0)' }
+                  ], { duration, easing: 'ease-in-out' });
+                } else if (effect === 'slide' || effect === 'push') {
+                  const dx = dir === 'next' ? 40 : -40;
+                  centerRect.animate([
+                    { translate: dx + 'px 0px', opacity: 0.4 },
+                    { translate: '0px 0px', opacity: 1 }
+                  ], { duration, easing: 'ease-out' });
+                }
+              }
+            };
 
             // --- Helper: set image src (handles SVG <image> and <img>) ---
             const setElSrc = (target, imgObj) => {
@@ -124,8 +332,12 @@ const getSlideshowScript = () => `
               }
             };
 
-            // Set initial image
-            if (images[currentIndex]) setElSrc(el, images[currentIndex]);
+            // Set initial state
+            if (is3Frame) {
+              update3Frame(currentIndex, null);
+            } else if (images[currentIndex]) {
+              setElSrc(el, images[currentIndex]);
+            }
 
             // --- Transition Engine ---
             const transitionEffect = (settings.transitionEffect || 'Linear').toLowerCase();
@@ -133,24 +345,28 @@ const getSlideshowScript = () => `
 
             const applyTransition = (newIndex, dir) => {
               if (isAnimating) return;
-              if (newIndex === currentIndex && images.length > 1) {
-                // allow same index only on init
-              }
-              const oldIndex = currentIndex;
+              if (newIndex === currentIndex && images.length > 1) return;
               const nextImg = images[newIndex];
               if (!nextImg) return;
 
               isAnimating = true;
               currentIndex = newIndex;
+              el.setAttribute('data-active-index', currentIndex.toString());
 
               // Update dots
-              const dotsContainer = el.parentNode.querySelector('.ss-dots-container') || container.querySelector('.ss-dots-container');
+              const dotsContainer = (overlayContainer && overlayContainer.querySelector('.ss-dots-container')) || container.querySelector('.ss-dots-container');
               if (dotsContainer) {
                 const dots = dotsContainer.querySelectorAll('.ss-dot');
                 dots.forEach((d, i) => {
                   d.style.opacity = i === currentIndex ? '1' : '0.4';
                   d.style.transform = i === currentIndex ? 'scale(1.4)' : 'scale(1)';
                 });
+              }
+
+              if (is3Frame) {
+                update3Frame(currentIndex, dir);
+                setTimeout(() => { isAnimating = false; }, 380);
+                return;
               }
 
               const effect = transitionEffect;
@@ -248,34 +464,35 @@ const getSlideshowScript = () => `
             el.style.transformBox = 'fill-box';
             el.style.transformOrigin = 'center';
 
-            // --- Overlay Container for HTML Controls in SVG ---
+            // --- Overlay Container for Controls in SVG ---
             let overlayContainer = container;
             let bbox = null;
             let w = 300;
             let h = 88;
             if (el.ownerSVGElement || el.tagName.toLowerCase() === 'svg') {
               const fo = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
-              bbox = { x: 0, y: 0, width: 100, height: 100 };
-              try { 
-                // Find the base <rect> which defines the visual boundaries and border of the element
-                const rect = el.tagName.toLowerCase() === 'rect' ? el : el.querySelector('rect');
-                if (rect && rect.getBBox().width > 0) {
-                  bbox = rect.getBBox();
+              bbox = { x: 0, y: 0, width: 210, height: 140 };
+              try {
+                const anchor = el.querySelector('.bbox-anchor');
+                if (anchor && anchor.getBBox().width > 0) {
+                  bbox = anchor.getBBox();
+                } else if (is3Frame) {
+                  const isFlat = el.getAttribute('data-style') === 'flat';
+                  bbox = { x: 0, y: 0, width: 210, height: isFlat ? 190 : 140 };
                 } else {
-                  const anchor = el.querySelector('.bbox-anchor') || 
-                                 (el.parentNode && el.parentNode.querySelector('.bbox-anchor')) ||
-                                 (el.tagName.toLowerCase() === 'g' ? el.querySelector('rect') : null);
-                  if (anchor && anchor.getBBox().width > 0) bbox = anchor.getBBox();
-                  else bbox = el.getBBox(); 
+                  const rect = el.tagName.toLowerCase() === 'rect' ? el : el.querySelector('rect');
+                  if (rect && rect.getBBox().width > 0) {
+                    bbox = rect.getBBox();
+                  } else {
+                    bbox = el.getBBox();
+                  }
                 }
-              } catch(e) { 
-                console.error('Slideshow bbox error:', e);
-                bbox = el.getBoundingClientRect(); 
+              } catch(e) {
+                bbox = { x: 0, y: 0, width: 210, height: 140 };
               }
 
-              const imgEl = el.querySelector('image') || el;
-              w = (bbox && bbox.width) || parseFloat(el.getAttribute('data-crop-orig-w') || imgEl.getAttribute('data-crop-orig-w') || imgEl.getAttribute('width') || '135');
-              h = (bbox && bbox.height) || parseFloat(el.getAttribute('data-crop-orig-h') || imgEl.getAttribute('data-crop-orig-h') || imgEl.getAttribute('height') || '88');
+              w = (bbox && bbox.width) || 210;
+              h = (bbox && bbox.height) || 140;
 
               fo.setAttribute('x', (bbox && bbox.x) || 0);
               fo.setAttribute('y', (bbox && bbox.y) || 0);
@@ -284,11 +501,11 @@ const getSlideshowScript = () => `
               fo.style.pointerEvents = 'none';
               fo.classList.add('slideshow-overlay-fo');
               fo.setAttribute('data-scrollable', 'true');
-              
+
               overlayContainer = document.createElement('div');
               overlayContainer.style.cssText = 'position:relative; width:' + w + 'px; height:' + h + 'px; pointer-events:none;';
               fo.appendChild(overlayContainer);
-              
+
               if (el.tagName.toLowerCase() === 'g') {
                 el.appendChild(fo);
               } else {
@@ -305,10 +522,9 @@ const getSlideshowScript = () => `
 
             // --- Navigation Arrows ---
             const showArrows = settings.showArrows !== false && settings.showNav !== false;
-            const navColor = settings.navIconColor || '#000000';
+            const navColor = settings.navIconColor || '#4F46E5';
             const navStyle = settings.navStyle || 1;
 
-            // Arrow SVG paths based on style
             const getArrowPath = (dir) => {
               const d = dir === 'prev';
               const styles = {
@@ -323,16 +539,17 @@ const getSlideshowScript = () => `
               ['prev','next'].forEach(type => {
                 const btn = document.createElement('button');
                 btn.className = 'ss-nav-btn ss-' + type;
-                const btnSize = 48 * scaleFactor;
-                const offset = 12 * scaleFactor;
+                const btnSize = 38 * scaleFactor;
+                const offset = 6 * scaleFactor;
                 btn.style.cssText = [
                   'position:absolute',
                   'top:50%',
                   'transform:translateY(-50%)',
                   type === 'prev' ? 'left:' + offset + 'px' : 'right:' + offset + 'px',
                   'z-index:100',
-                  'background:transparent',
-                  'border:none',
+                  'background:rgba(255, 255, 255, 0.75)',
+                  'backdrop-filter:blur(4px)',
+                  'border:1px solid rgba(0,0,0,0.1)',
                   'border-radius:50%',
                   'width:' + btnSize + 'px',
                   'height:' + btnSize + 'px',
@@ -340,14 +557,14 @@ const getSlideshowScript = () => `
                   'align-items:center',
                   'justify-content:center',
                   'cursor:pointer',
-                  'box-shadow:none',
-                  'transition:opacity 0.2s',
+                  'box-shadow:0 2px 8px rgba(0,0,0,0.15)',
+                  'transition:opacity 0.2s, transform 0.15s',
                   'padding:0',
                   'pointer-events:auto',
                   'opacity:0'
                 ].join(';');
-                const svgSize = 32 * scaleFactor;
-                btn.innerHTML = '<svg width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 24 24" fill="none" stroke="' + navColor + '" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 2px 6px rgba(0,0,0,0.2)) drop-shadow(0 2px 2px rgba(255,255,255,0.2)); overflow:visible;"><path d="' + getArrowPath(type) + '"/></svg>';
+                const svgSize = 22 * scaleFactor;
+                btn.innerHTML = '<svg width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 24 24" fill="none" stroke="' + navColor + '" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="overflow:visible;"><path d="' + getArrowPath(type) + '"/></svg>';
                 btn.addEventListener('click', (e) => {
                   e.stopPropagation();
                   manualMode = true;
@@ -364,6 +581,35 @@ const getSlideshowScript = () => `
                 });
                 overlayContainer.appendChild(btn);
               });
+            }
+
+            // --- Direct Frame Clicks for 3D Carousel ---
+            if (is3Frame) {
+              const rects = el.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)');
+              const leftRect = rects[0];
+              const rightRect = rects[1];
+              if (leftRect) {
+                leftRect.style.cursor = 'pointer';
+                leftRect.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  manualMode = true;
+                  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+                  let prev = currentIndex - 1;
+                  if (prev < 0) prev = settings.infiniteLoop !== false ? images.length - 1 : 0;
+                  applyTransition(prev, 'prev');
+                });
+              }
+              if (rightRect) {
+                rightRect.style.cursor = 'pointer';
+                rightRect.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  manualMode = true;
+                  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+                  let next = currentIndex + 1;
+                  if (next >= images.length) next = settings.infiniteLoop !== false ? 0 : images.length - 1;
+                  applyTransition(next, 'next');
+                });
+              }
             }
 
             // --- Pagination Dots ---

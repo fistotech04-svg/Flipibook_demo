@@ -18,34 +18,72 @@ export const handleAddElementToSvg = ({
   setMultiSelectedIds,
   multiSelectedIdsRef,
   setSingleSelection,
-  setActiveMainTool
+  setActiveMainTool,
+  drawOverlayHighlight
 }) => {
-  const targetPageIndex = pageIndex !== undefined ? pageIndex : activePageIndex;
+  const targetPageIndex = pageIndex !== undefined ? pageIndex : (activePageIndex !== undefined ? activePageIndex : 0);
   const page = pages?.[targetPageIndex];
-  if (!page) return null;
+  if (!page) {
+    console.warn('handleAddElementToSvg: No page found at targetPageIndex', targetPageIndex);
+    return null;
+  }
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(page.html || '', 'image/svg+xml');
   const svg = doc.querySelector('svg');
-  if (!svg) return null;
+  if (!svg) {
+    console.warn('handleAddElementToSvg: No svg element in page.html');
+    return null;
+  }
 
-  const elementDoc = parser.parseFromString(`<svg xmlns="http://www.w3.org/2000/svg">${svgContent}</svg>`, 'image/svg+xml');
-  const newElement = elementDoc.querySelector('g') || elementDoc.querySelector('svg')?.firstElementChild;
-  if (!newElement) return null;
+  let elementDoc = parser.parseFromString(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">${svgContent}</svg>`, 'image/svg+xml');
+  let parserError = elementDoc.querySelector('parsererror');
+  let newElement = parserError ? null : (elementDoc.querySelector('g') || elementDoc.querySelector('svg')?.firstElementChild);
 
-  // Positioning logic if dropped
+  if (!newElement) {
+    // Robust fallback: parse via text/html to forgive entity/attribute issues
+    try {
+      const htmlDoc = parser.parseFromString(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">${svgContent}</svg>`, 'text/html');
+      const tempSvg = htmlDoc.querySelector('svg');
+      const candidate = tempSvg?.querySelector('g') || tempSvg?.firstElementChild;
+      if (candidate) {
+        newElement = candidate;
+      }
+    } catch (e) {
+      console.error('Fallback SVG parsing error:', e);
+    }
+  }
+
+  if (!newElement) {
+    console.error('handleAddElementToSvg: Failed to parse element from svgContent', svgContent);
+    return null;
+  }
+
+  // Ensure element is properly imported into target doc
+  let importedElement;
+  try {
+    importedElement = doc.importNode(newElement, true);
+  } catch (e) {
+    importedElement = newElement;
+  }
+
+  // Positioning logic if dropped or added
+  const foChild = importedElement.querySelector('foreignObject, rect');
+  const elW = foChild ? parseFloat(foChild.getAttribute('width') || '100') : 100;
+  const elH = foChild ? parseFloat(foChild.getAttribute('height') || '100') : 100;
+
   if (dropPoint) {
-    const currentTransform = newElement.getAttribute('transform') || '';
-    newElement.setAttribute('transform', `translate(${dropPoint.x - 100}, ${dropPoint.y - 25}) ${currentTransform}`);
+    const currentTransform = importedElement.getAttribute('transform') || '';
+    importedElement.setAttribute('transform', `translate(${dropPoint.x - (elW / 2)}, ${dropPoint.y - (elH / 2)}) ${currentTransform}`);
   }
 
   const targetContainer = svg.querySelector('[data-type="frame"]') || svg.querySelector('[data-name="Overlay"]') || svg;
-  targetContainer.appendChild(newElement);
+  targetContainer.appendChild(importedElement);
 
   updatePageHtml(targetPageIndex, svg.outerHTML);
 
   // Auto-select the newly added element
-  const newId = newElement.getAttribute('id');
+  const newId = importedElement.getAttribute('id');
   if (newId) {
     if (typeof setSingleSelection === 'function') {
       setSingleSelection(newId);
@@ -56,6 +94,13 @@ export const handleAddElementToSvg = ({
       if (multiSelectedIdsRef) multiSelectedIdsRef.current = new Set([newId]);
     }
     if (typeof setActiveMainTool === 'function') setActiveMainTool('select');
+
+    if (typeof drawOverlayHighlight === 'function') {
+      setTimeout(() => {
+        const el = document.getElementById(newId);
+        if (el) drawOverlayHighlight(el, 'selected');
+      }, 50);
+    }
   }
   return newId;
 };
@@ -265,7 +310,7 @@ export const fillElementShapeWithPattern = ({
  */
 export const handleElementsDropData = (data, displayIndex, dropPoint) => {
   if (!data) return false;
-  if (['button', 'text', 'slideshow', 'image-frame', 'map', 'qrcode'].includes(data.type)) {
+  if (['button', 'text', 'slideshow', 'image-frame', 'map', 'qrcode', 'decorator'].includes(data.type)) {
     console.log(`${data.type} Dropped:`, data);
     window.dispatchEvent(new CustomEvent('add-element-to-editor', {
       detail: {
@@ -308,6 +353,40 @@ export const isInteractiveButton = (el) => {
 };
 
 /**
+ * Identifies if an element is a Slideshow component group.
+ */
+export const isSlideshowGroup = (el) => {
+  if (!el || typeof el.getAttribute !== 'function') return false;
+  return el.getAttribute('data-type') === 'slideshow' ||
+    el.getAttribute('data-is-slideshow') === 'true' ||
+    (typeof el.id === 'string' && el.id.startsWith('slideshow-'));
+};
+
+/**
+ * Returns the exact bounding box for Slideshow groups.
+ */
+export const getSlideshowBBox = (el) => {
+  if (!isSlideshowGroup(el)) return null;
+  const isFlat = el.getAttribute?.('data-style') === 'flat';
+  const anchor = el.querySelector?.('.bbox-anchor');
+  if (anchor) {
+    const ax = parseFloat(anchor.getAttribute('x') || '0');
+    const ay = parseFloat(anchor.getAttribute('y') || '0');
+    let aw = parseFloat(anchor.getAttribute('width') || '0');
+    const ah = parseFloat(anchor.getAttribute('height') || '0');
+    if (!isFlat && aw >= 225) {
+      // Correct legacy unrotated 230 width down to 205 to match actual 3D visual projection
+      aw = 205;
+      anchor.setAttribute('width', '210');
+    }
+    if (aw > 0 && ah > 0) {
+      return { x: ax, y: ay, width: aw, height: ah };
+    }
+  }
+  return { x: 0, y: 0, width: isFlat ? 210 : 210, height: isFlat ? 190 : 140 };
+};
+
+/**
  * Identifies if an element is an Audio element.
  */
 export const isAudioGroup = (el) => {
@@ -317,11 +396,20 @@ export const isAudioGroup = (el) => {
 };
 
 /**
- * Resolves compound Elements (Buttons, Embed frames, Image frames, Audio frames)
+ * Resolves compound Elements (Buttons, Slideshows, Embed frames, Image frames, Audio frames)
  * so clicking inside them drags or selects the compound parent unit.
  */
 export const getElementCompoundTarget = (current) => {
   if (!current || typeof current.closest !== 'function') return null;
+
+  // Slideshows are single compound elements; drag the whole slideshow!
+  const slideshowGroup = current.closest('[data-type="slideshow"], [data-is-slideshow="true"], [id^="slideshow-"]');
+  if (slideshowGroup) {
+    if (!slideshowGroup.id) {
+      slideshowGroup.id = `slideshow-${Date.now()}`;
+    }
+    return slideshowGroup;
+  }
 
   // Buttons are single compound elements; drag the whole button!
   const buttonGroup = current.closest('[data-type="button"]');
@@ -330,6 +418,15 @@ export const getElementCompoundTarget = (current) => {
       buttonGroup.id = `button-${Date.now()}`;
     }
     return buttonGroup;
+  }
+
+  // Animated Decorators (Starbursts) are compound elements; drag the whole decorator!
+  const decoratorGroup = current.closest('[data-type="decorator"], [id^="decorator-"]');
+  if (decoratorGroup) {
+    if (!decoratorGroup.id) {
+      decoratorGroup.id = `decorator-${Date.now()}`;
+    }
+    return decoratorGroup;
   }
 
   // Embed frames are single compound elements; drag the whole wrapper!
@@ -627,6 +724,254 @@ export const resizeAudioGroup = ({
 };
 
 /**
+ * Handles proportional outer transform scaling for Slideshow component groups
+ * so that all internal frames, 3D perspective transforms, and patterns scale cleanly.
+ */
+export const resizeSlideshowGroup = ({
+  el,
+  worldAnchor,
+  scaleX,
+  scaleY,
+  matrix,
+  matrixToTransform,
+  drawOverlayHighlight,
+  currentFrameIdRef
+}) => {
+  if (!el) return;
+  try {
+    const scaleMatrix = new DOMMatrix()
+      .translate(worldAnchor.x, worldAnchor.y)
+      .scale(scaleX, scaleY)
+      .translate(-worldAnchor.x, -worldAnchor.y);
+    const nextMatrix = scaleMatrix.multiply(matrix);
+    const transformStr = typeof matrixToTransform === 'function'
+      ? matrixToTransform(nextMatrix)
+      : `matrix(${nextMatrix.a} ${nextMatrix.b} ${nextMatrix.c} ${nextMatrix.d} ${nextMatrix.e} ${nextMatrix.f})`;
+    el.setAttribute('transform', transformStr);
+  } catch (e) {
+    console.error('resizeSlideshowGroup error:', e);
+  }
+
+  if (typeof drawOverlayHighlight === 'function') {
+    const highlightType = (currentFrameIdRef?.current && el.id !== currentFrameIdRef.current) ? 'child-selected' : 'selected';
+    drawOverlayHighlight(el, highlightType);
+  }
+};
+
+/**
+ * Helper to update a 3-frame Coverflow / Flat gallery SVG element
+ */
+export const update3FrameSlideshow = (el, images = [], activeIdx = 0, settings = {}) => {
+  if (!el) return;
+  const uniqueId = el.id.replace('slideshow-', '') || Date.now();
+  let defs = el.querySelector('defs');
+  if (!defs) {
+    defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    el.insertBefore(defs, el.firstChild);
+  }
+
+  const len = images.length;
+  let leftIndex = -1, centerIndex = -1, rightIndex = -1;
+  if (len > 0) {
+    centerIndex = activeIdx % len;
+    if (len >= 2) rightIndex = (activeIdx + 1) % len;
+    if (len >= 3) leftIndex = (activeIdx - 1 + len) % len;
+  }
+
+  const rects = el.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)');
+  const leftRect = rects[0];
+  const rightRect = rects[1];
+  const centerRect = rects[2];
+
+  const slideStyle = el.getAttribute('data-style');
+  if (slideStyle === 'flat') {
+    if (centerRect) {
+      centerRect.setAttribute('x', '50');
+      centerRect.setAttribute('y', '0');
+      centerRect.setAttribute('width', '110');
+      centerRect.setAttribute('height', '140');
+      centerRect.setAttribute('style', 'transition: all 0.3s ease; box-shadow: 0 0 10px rgba(0,0,0,0.5);');
+    }
+    if (leftRect) {
+      leftRect.setAttribute('x', '0');
+      leftRect.setAttribute('y', '0');
+      leftRect.setAttribute('width', '46');
+      leftRect.setAttribute('height', '140');
+      leftRect.setAttribute('style', 'opacity: 0.5; transition: all 0.3s ease;');
+    }
+    if (rightRect) {
+      rightRect.setAttribute('x', '164');
+      rightRect.setAttribute('y', '0');
+      rightRect.setAttribute('width', '46');
+      rightRect.setAttribute('height', '140');
+      rightRect.setAttribute('style', 'opacity: 0.5; transition: all 0.3s ease;');
+    }
+  } else {
+    // 3D Coverflow
+    if (centerRect) {
+      centerRect.setAttribute('x', '40');
+      centerRect.setAttribute('y', '0');
+      centerRect.setAttribute('width', '130');
+      centerRect.setAttribute('height', '140');
+      centerRect.setAttribute('style', 'transform: perspective(400px) rotateY(0deg); transform-origin: 50% 50%; transform-box: fill-box; transition: all 0.3s ease;');
+    }
+    if (leftRect) {
+      leftRect.setAttribute('x', '0');
+      leftRect.setAttribute('y', '8');
+      leftRect.setAttribute('width', '80');
+      leftRect.setAttribute('height', '124');
+      leftRect.setAttribute('style', 'transform: perspective(400px) rotateY(25deg); transform-origin: 100% 50%; transform-box: fill-box; transition: all 0.3s ease;');
+    }
+    if (rightRect) {
+      rightRect.setAttribute('x', '120');
+      rightRect.setAttribute('y', '8');
+      rightRect.setAttribute('width', '110');
+      rightRect.setAttribute('height', '124');
+      rightRect.setAttribute('style', 'transform: perspective(400px) rotateY(-22deg); transform-origin: 0% 50%; transform-box: fill-box; transition: all 0.3s ease;');
+    }
+  }
+
+  let bboxAnchor = el.querySelector('.bbox-anchor');
+  if (!bboxAnchor) {
+    bboxAnchor = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bboxAnchor.setAttribute('class', 'bbox-anchor');
+    bboxAnchor.setAttribute('fill', 'transparent');
+    el.appendChild(bboxAnchor);
+  }
+  bboxAnchor.setAttribute('x', '0');
+  bboxAnchor.setAttribute('y', '0');
+  bboxAnchor.setAttribute('width', slideStyle === 'flat' ? '210' : '205');
+  bboxAnchor.setAttribute('height', slideStyle === 'flat' ? '190' : '140');
+
+  // Stroke / styling
+  const sColor = settings.strokeColor || '#000000';
+  const sWidth = settings.strokeWidth !== undefined ? settings.strokeWidth : 1;
+  const sOpacity = (settings.strokeOpacity !== undefined ? settings.strokeOpacity : 100) / 100;
+  [centerRect, leftRect, rightRect].forEach(r => {
+    if (r) {
+      r.setAttribute('stroke', sColor);
+      r.setAttribute('stroke-width', sWidth.toString());
+      r.setAttribute('stroke-opacity', sOpacity.toString());
+    }
+  });
+
+  const applyFrameImage = (rect, imgIdx, prefix) => {
+    if (!rect) return;
+    const imgObj = imgIdx >= 0 ? images[imgIdx] : null;
+    const url = imgObj?.url || (typeof imgObj === 'string' ? imgObj : null);
+
+    if (!url) {
+      if (prefix === 'center' && len === 0) {
+        rect.setAttribute('fill', `url(#slideshow-pattern-${uniqueId})`);
+      } else {
+        rect.setAttribute('fill', prefix === 'center' ? '#ffffff' : '#f3f4f6');
+      }
+      return;
+    }
+
+    const patternId = `slideshow-pattern-${prefix}-${uniqueId}`;
+    let pattern = defs.querySelector(`#${patternId}`);
+    if (!pattern) {
+      pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+      pattern.setAttribute('id', patternId);
+      pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+      const imgNode = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+      imgNode.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+      imgNode.setAttribute('x', '0');
+      imgNode.setAttribute('y', '0');
+      pattern.appendChild(imgNode);
+      const textGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      textGroup.setAttribute('class', 'overlay-text-group');
+      pattern.appendChild(textGroup);
+      defs.appendChild(pattern);
+    }
+
+    const pWidth = rect.getAttribute('width') || '130';
+    const pHeight = rect.getAttribute('height') || '140';
+    pattern.setAttribute('width', pWidth);
+    pattern.setAttribute('height', pHeight);
+    pattern.setAttribute('viewBox', `0 0 ${pWidth} ${pHeight}`);
+
+    const imgNode = pattern.querySelector('image');
+    if (imgNode) {
+      imgNode.setAttribute('href', url);
+      try { imgNode.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (e) {}
+      imgNode.setAttribute('width', pWidth);
+      imgNode.setAttribute('height', pHeight);
+    }
+
+    // Text overlay if present
+    const textGroup = pattern.querySelector('.overlay-text-group');
+    if (textGroup) {
+      textGroup.innerHTML = '';
+      if (prefix === 'center' && imgObj) {
+        const fFam = imgObj.fontFamily || 'Arial';
+        const fSize = imgObj.fontSize || 16;
+        const pW = parseFloat(pWidth) || 130;
+        const pH = parseFloat(pHeight) || 140;
+        const centerX = pW / 2;
+        const centerY = pH / 2;
+        const hasHeading = Boolean(imgObj.heading);
+        const hasSubtext = Boolean(imgObj.subtext);
+
+        if (hasHeading) {
+          const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          t.setAttribute('x', centerX.toString());
+          t.setAttribute('y', (hasSubtext ? centerY - 10 : centerY).toString());
+          t.setAttribute('text-anchor', 'middle');
+          t.setAttribute('dominant-baseline', 'central');
+          t.setAttribute('fill', 'white');
+          t.setAttribute('font-size', `${fSize}px`);
+          t.setAttribute('font-family', `'${fFam}', sans-serif`);
+          t.setAttribute('font-weight', 'bold');
+          t.setAttribute('style', 'text-shadow: 1px 1px 2px rgba(0,0,0,0.8); pointer-events: none;');
+          t.textContent = imgObj.heading;
+          textGroup.appendChild(t);
+        }
+        if (hasSubtext) {
+          const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          t.setAttribute('x', centerX.toString());
+          t.setAttribute('y', (hasHeading ? centerY + 14 : centerY).toString());
+          t.setAttribute('text-anchor', 'middle');
+          t.setAttribute('dominant-baseline', 'central');
+          t.setAttribute('fill', 'white');
+          t.setAttribute('font-size', `${Math.max(8, fSize * 0.6)}px`);
+          t.setAttribute('font-family', `'${fFam}', sans-serif`);
+          t.setAttribute('style', 'text-shadow: 1px 1px 2px rgba(0,0,0,0.8); pointer-events: none;');
+          t.textContent = imgObj.subtext;
+          textGroup.appendChild(t);
+        }
+      }
+    }
+
+    pattern.setAttribute('patternTransform', `translate(${rect.getAttribute('x') || 0}, ${rect.getAttribute('y') || 0})`);
+    rect.setAttribute('fill', `url(#${patternId})`);
+    rect.style.fill = `url(#${patternId})`;
+  };
+
+  applyFrameImage(leftRect, leftIndex, 'left');
+  applyFrameImage(rightRect, rightIndex, 'right');
+  applyFrameImage(centerRect, centerIndex, 'center');
+
+  // Also point placeholder pattern to current center image so it NEVER renders "Slideshow" placeholder
+  const placeholderPattern = defs.querySelector(`#slideshow-pattern-${uniqueId}`);
+  if (placeholderPattern && centerIndex >= 0) {
+    const phImg = placeholderPattern.querySelector('image');
+    const centerUrl = images[centerIndex]?.url || (typeof images[centerIndex] === 'string' ? images[centerIndex] : null);
+    if (phImg && centerUrl) {
+      phImg.setAttribute('href', centerUrl);
+      try { phImg.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', centerUrl); } catch (e) {}
+    }
+    const phText = placeholderPattern.querySelector('.overlay-text-group');
+    if (phText) {
+      phText.innerHTML = '';
+    }
+  }
+
+  el.setAttribute('data-active-index', activeIdx.toString());
+};
+
+/**
  * Global Slideshow UI, Runner, and Click Manager hooks.
  * Completely orchestrates slideshow lifecycle on canvas.
  */
@@ -898,6 +1243,16 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
         if (!dataStr) return;
         const data = JSON.parse(dataStr);
         const images = data.images || [];
+        if (images.length === 0) return;
+
+        const is3Frame = el.getAttribute('data-type') === 'slideshow' || el.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)').length >= 3;
+        if (is3Frame) {
+          update3FrameSlideshow(el, images, nextIndex, data.settings || {});
+          window.dispatchEvent(new CustomEvent('slideshow-index-changed', { detail: { id: el.id, index: nextIndex } }));
+          renderOverlays();
+          return;
+        }
+
         const url = images[nextIndex]?.url;
         if (!url) return;
 
@@ -946,6 +1301,7 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
         } else {
           imgEl.style.backgroundImage = `url("${url}")`;
         }
+        window.dispatchEvent(new CustomEvent('slideshow-index-changed', { detail: { id: el.id, index: nextIndex } }));
         renderOverlays();
       } catch (err) { }
     };
@@ -962,102 +1318,18 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
     };
   }, [getVisualBBox]);
 
-  // 2. Global Slideshow Runner: Auto-advances slideshows even when unselected
+  // 2. Global Slideshow Runner: Auto Slide Mode does not run in Template Editor (only works in PreviewArea)
   useEffect(() => {
-    const globalSlideshowInterval = setInterval(() => {
-      const slideshows = document.querySelectorAll('[data-is-slideshow="true"]');
-      slideshows.forEach(el => {
-        if (el._slideshowManual ||
-          el._isHovering === true ||
-          el.matches(':hover') ||
-          (el._globalSsOverlay && el._globalSsOverlay.querySelector(':hover'))) return;
-
-        try {
-          const dataStr = el.getAttribute('data-slideshow');
-          if (!dataStr) return;
-          const data = JSON.parse(dataStr);
-          const settings = data.settings || {};
-
-          if (!settings.autoPlay && !settings.autoSlide) return;
-
-          const images = data.images || [];
-          if (images.length <= 1) return;
-
-          const speed = (settings.speed || 3) * 1000;
-          const now = Date.now();
-          const lastTime = el._lastSlideTime || 0;
-
-          if (now - lastTime >= speed) {
-            let currentIndex = parseInt(el.getAttribute('data-active-index') || '0');
-            let nextIndex = (currentIndex + 1) % images.length;
-
-            if (nextIndex === 0 && settings.infiniteLoop === false && currentIndex !== 0) return;
-
-            el.setAttribute('data-active-index', nextIndex.toString());
-            el._lastSlideTime = now;
-
-            const _findImgInPattern = (node) => {
-              const fill = node.getAttribute?.('fill') || '';
-              if (fill?.startsWith('url(#')) {
-                const patternId = fill.match(/url\(#([^)]+)\)/)?.[1];
-                if (patternId) {
-                  const ownerSvg = node.closest('svg');
-                  const pattern = ownerSvg?.querySelector(`[id="${patternId}"]`);
-                  if (pattern) {
-                    const img = pattern.querySelector('image');
-                    if (img) return img;
-                    const useEl = pattern.querySelector('use');
-                    if (useEl) {
-                      const refId = (useEl.getAttribute('href') || useEl.getAttribute('xlink:href'))?.replace('#', '');
-                      if (refId) return ownerSvg?.querySelector(`[id="${refId}"]`) || null;
-                    }
-                  }
-                }
-              }
-              return null;
-            };
-
-            let imgEl = null;
-            const elTag = el.tagName?.toLowerCase();
-            if (elTag === 'image' || elTag === 'img') {
-              imgEl = el;
-            } else {
-              imgEl = _findImgInPattern(el);
-              if (!imgEl) imgEl = el.querySelector('image') || el.querySelector('img');
-              if (!imgEl) {
-                const childrenWithPatterns = el.querySelectorAll('[fill^="url(#"]');
-                for (const child of Array.from(childrenWithPatterns)) {
-                  const t = _findImgInPattern(child);
-                  if (t) { imgEl = t; break; }
-                }
-              }
-              if (!imgEl) imgEl = el;
-            }
-
-            const url = images[nextIndex]?.url;
-            if (url && imgEl) {
-              const imgTag = imgEl.tagName?.toLowerCase();
-              if (imgTag === 'image') {
-                imgEl.setAttribute('href', url);
-                try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (e) { }
-              } else if (imgTag === 'img') {
-                imgEl.src = url;
-              } else {
-                imgEl.style.backgroundImage = `url("${url}")`;
-              }
-            }
-          }
-        } catch (e) { }
-      });
-
-      if (!document.querySelector('.editor-ss-overlay')) {
+    const cleanupInterval = setInterval(() => {
+      const activeOverlay = document.querySelector('.editor-ss-overlay');
+      if (!activeOverlay) {
         document.querySelectorAll('[data-is-slideshow="true"]').forEach(el => {
           el._slideshowManual = false;
         });
       }
-    }, 50);
+    }, 200);
 
-    return () => clearInterval(globalSlideshowInterval);
+    return () => clearInterval(cleanupInterval);
   }, []);
 
   // 3. Manual Click Handler: Advances unselected slideshows on click
@@ -1116,6 +1388,14 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
         if (nextIndex >= images.length) nextIndex = infiniteLoop ? 0 : images.length - 1;
         if (nextIndex === currentIndex) return;
 
+        const is3Frame = slideshowEl.getAttribute('data-type') === 'slideshow' || slideshowEl.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)').length >= 3;
+        if (is3Frame) {
+          update3FrameSlideshow(slideshowEl, images, nextIndex, settings);
+          slideshowEl._lastSlideTime = Date.now();
+          window.dispatchEvent(new CustomEvent('slideshow-index-changed', { detail: { id: slideshowEl.id, index: nextIndex } }));
+          return;
+        }
+
         const url = images[nextIndex]?.url;
         if (!url) return;
 
@@ -1132,6 +1412,7 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
 
         slideshowEl.setAttribute('data-active-index', nextIndex.toString());
         slideshowEl._lastSlideTime = Date.now();
+        window.dispatchEvent(new CustomEvent('slideshow-index-changed', { detail: { id: slideshowEl.id, index: nextIndex } }));
       } catch (err) { }
     };
 
@@ -1201,7 +1482,8 @@ export const useElementsEditor = ({
         setMultiSelectedIds,
         multiSelectedIdsRef,
         setSingleSelection,
-        setActiveMainTool
+        setActiveMainTool,
+        drawOverlayHighlight
       });
     };
 

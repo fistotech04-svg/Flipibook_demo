@@ -19,22 +19,27 @@ import {
   MoreVertical,
   Replace,
   Upload,
-  X
-  } from 'lucide-react';
+  X,
+  Plus,
+  Minus,
+  GripVertical,
+  Edit3,
+  Trash2
+} from 'lucide-react';
 import ReplaceMediaModal from '../ReplaceMediaModal';
 import { Icon } from '@iconify/react';
 import { getVisualBBox } from '../MainEditor';
+import PremiumDropdown from '../../CustomizedEditor/PremiumDropdown';
+import NavIconStylesPopup, { NavIconRenderer } from '../../CustomizedEditor/popups/NavIconStylesPopup';
+import DotStylesPopup, { DotRenderer } from '../../CustomizedEditor/popups/DotStylesPopup';
+import { saveToDB, getFromDB } from '../../../utils/dbUtils';
+import ColorPicker from '../ColorPicker';
 
 // Clean up any lingering debuggers from Vite HMR
 ['my-slideshow-debug', 'my-slideshow-debug2', 'my-slideshow-debug3'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.remove();
 });
-import PremiumDropdown from '../../CustomizedEditor/PremiumDropdown';
-import NavIconStylesPopup, { NavIconRenderer } from '../../CustomizedEditor/popups/NavIconStylesPopup';
-import DotStylesPopup, { DotRenderer } from '../../CustomizedEditor/popups/DotStylesPopup';
-import axios from 'axios';
-import ColorPicker from '../ColorPicker';
 
 const DraggableSpan = ({ label, value, onChange, min = 0, max = 100, className }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -175,6 +180,103 @@ const compressImage = (file) => {
   });
 };
 
+const processLocalImageFile = (file) => {
+  return new Promise((resolve) => {
+    if (!file) return resolve(null);
+    if (typeof file === 'string') {
+      if (file.startsWith('blob:')) {
+        fetch(file)
+          .then(res => {
+            if (!res.ok) throw new Error('Blob fetch failed');
+            return res.blob();
+          })
+          .then(blob => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const dataUrl = e.target.result;
+              const img = new Image();
+              img.onload = () => {
+                resolve({
+                  id: Date.now() + Math.random(),
+                  url: dataUrl,
+                  name: 'Image.jpg',
+                  dimensions: `${img.width} X ${img.height}`,
+                  size: `${Math.max(1, Math.round(blob.size / 1024))}KB`,
+                  isUploading: false
+                });
+              };
+              img.onerror = () => {
+                resolve({
+                  id: Date.now() + Math.random(),
+                  url: dataUrl,
+                  name: 'Image.jpg',
+                  dimensions: '1920 X 1080',
+                  size: `${Math.max(1, Math.round(blob.size / 1024))}KB`,
+                  isUploading: false
+                });
+              };
+              img.src = dataUrl;
+            };
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          })
+          .catch(() => {
+            // Dead or expired blob URL from a previous session
+            resolve(null);
+          });
+        return;
+      }
+      return resolve({
+        id: Date.now() + Math.random(),
+        url: file,
+        name: file.split('/').pop()?.split('?')[0] || 'Image.jpg',
+        dimensions: '1920 X 1080',
+        size: '24MB',
+        isUploading: false
+      });
+    }
+    const fileName = file.name || `Image_${Date.now()}.jpg`;
+    const fileSizeFormatted = file.size
+      ? (file.size >= 1024 * 1024
+          ? `${(file.size / (1024 * 1024)).toFixed(0)}MB`
+          : `${Math.max(1, Math.round(file.size / 1024))}KB`)
+      : '24MB';
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      const img = new Image();
+      img.onload = () => {
+        resolve({
+          id: Date.now() + Math.random(),
+          url: dataUrl,
+          name: fileName,
+          heading: '',
+          subtext: '',
+          dimensions: `${img.width} X ${img.height}`,
+          size: fileSizeFormatted,
+          isUploading: false
+        });
+      };
+      img.onerror = () => {
+        resolve({
+          id: Date.now() + Math.random(),
+          url: dataUrl,
+          name: fileName,
+          heading: '',
+          subtext: '',
+          dimensions: '1920 X 1080',
+          size: fileSizeFormatted,
+          isUploading: false
+        });
+      };
+      img.src = dataUrl;
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+};
+
 const MAX_GALLERY_IMAGES = 4;
 
 const fontFamilies = [
@@ -206,12 +308,25 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
     imageFitType: 'Fill All',
     transitionEffect: 'Linear',
     dragToSlide: false,
-    dotColor: '#000000',
+    dotColor: '#EC5137',
     dotOpacity: 100,
     dotStyle: 1,
-    navIconColor: '#000000',
+    dotButtonSize: 100,
+    navIconColor: '#EC5137',
+    navIconOpacity: 100,
     navStyle: 1,
-    autoSlide: true
+    navButtonSize: 100,
+    autoSlide: true,
+    bgColor: '#000000',
+    bgOpacity: 100,
+    strokeColor: '#000000',
+    strokeOpacity: 100,
+    strokeAlignment: 'Center',
+    strokeWidth: 1,
+    strokeLineStyle: 'Solid',
+    strokeDashLength: 8,
+    strokeDashGap: 4,
+    strokeLineCorner: 'Rounded',
   });
   const [slideshowImages, setSlideshowImages] = useState([]);
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
@@ -223,6 +338,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
   const [localSubtext, setLocalSubtext] = useState('');
   const [localFontFamily, setLocalFontFamily] = useState('Arial');
   const [localFontSize, setLocalFontSize] = useState(16);
+  const [editingTextIndex, setEditingTextIndex] = useState(null);
 
   useEffect(() => {
     setLocalOpacity(opacity ?? 100);
@@ -258,24 +374,40 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
     }
   }, [activeSlideIndex]);
 
-  // Automatically persist images to localStorage to prevent loss on unsaved refresh
+  const updateImageAtIndex = useCallback((index, key, value) => {
+    setSlideshowImages(current => {
+      const updated = [...current];
+      if (updated[index]) {
+        updated[index] = { ...updated[index], [key]: value };
+      }
+      return updated;
+    });
+    if (onUpdateRef.current) {
+      if (onUpdateTimerRef.current) clearTimeout(onUpdateTimerRef.current);
+      onUpdateTimerRef.current = setTimeout(() => {
+        if (onUpdateRef.current) onUpdateRef.current({});
+      }, 500);
+    }
+  }, []);
+
+  // Automatically persist images locally to IndexedDB to prevent loss on unsaved refresh
   useEffect(() => {
-    if (selectedElement?.id) {
-      const key = `slideshow_${flipbookVId || 'local'}_${selectedElement.id}`;
-      const toSave = slideshowImages.filter(img => {
-        if (img.isUploading) return false;
-        if (img.url && img.url.startsWith('data:') && img.url.length > 5000) return false;
-        return true;
+    if (selectedElement?.id && slideshowImages.length > 0) {
+      const dbKey = `slideshow_${flipbookVId || 'local'}_${selectedElement.id}`;
+      saveToDB(dbKey, slideshowImages).catch((err) => {
+        console.warn("IndexedDB slideshow save failed:", err);
       });
       try {
-        if (toSave.length > 0) {
-          localStorage.setItem(key, JSON.stringify(toSave));
-        } else if (slideshowImages.length === 0) {
-          localStorage.removeItem(key); // Clear if emptied
-        }
-      } catch (e) {
-        console.warn("Slideshow local storage quota exceeded or failed:", e);
-      }
+        const lightweight = slideshowImages.map(img => ({
+          ...img,
+          url: (img.url && img.url.length < 150000) ? img.url : ''
+        }));
+        localStorage.setItem(dbKey, JSON.stringify(lightweight));
+      } catch (e) {}
+    } else if (selectedElement?.id && slideshowImages.length === 0) {
+      const dbKey = `slideshow_${flipbookVId || 'local'}_${selectedElement.id}`;
+      saveToDB(dbKey, []).catch(() => {});
+      localStorage.removeItem(dbKey);
     }
   }, [selectedElement?.id, slideshowImages, flipbookVId]);
   const isHoveringRef = useRef(false);
@@ -296,6 +428,10 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
   const [showDotStylesPopup, setShowDotStylesPopup] = useState(false);
   const [showNavColorPicker, setShowNavColorPicker] = useState(false);
   const [showNavStylesPopup, setShowNavStylesPopup] = useState(false);
+  const [showBgColorPicker, setShowBgColorPicker] = useState(false);
+  const [showStrokeColorPicker, setShowStrokeColorPicker] = useState(false);
+  const [isAlignOpen, setIsAlignOpen] = useState(false);
+  const [isCornerOpen, setIsCornerOpen] = useState(false);
   const fileInputRef = useRef(null);
 
   const [showReplaceModal, setShowReplaceModal] = useState(false);
@@ -304,8 +440,12 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
   const replaceInputRef = useRef(null);
 
   const [isDisabling, setIsDisabling] = useState(false);
-  const isSlideshowPropOpen = isOpen;
-  const setIsSlideshowPropOpen = () => onToggle();
+  const [internalIsOpen, setInternalIsOpen] = useState(true);
+  const isSlideshowPropOpen = isOpen !== undefined ? isOpen : internalIsOpen;
+  const setIsSlideshowPropOpen = (val) => {
+    if (onToggle) onToggle();
+    else setInternalIsOpen(prev => (typeof val === 'boolean' ? val : !prev));
+  };
   const [isSyncing, setIsSyncing] = useState(false);
   const isUpdatingDOM = useRef(false);
   const isUpdatingDOMTimeoutRef = useRef(null);
@@ -321,6 +461,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
   const setPreviewSrcRef = useRef(setPreviewSrc);
   const isAnimatingRef = useRef(false);
   const resetAutoTimerRef = useRef(null);
+  const applyDesignRef = useRef(null);
 
   const truncateLogData = (data) => {
     if (!data) return data;
@@ -401,21 +542,44 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
         if (savedData) {
           setSlideshowSettings(prev => ({ ...prev, ...savedData.settings }));
           setSlideshowImages(prev => {
-            // NEVER overwrite if we are uploading or have optimistic blob URLs, even if forced
-            const hasOptimistic = prev.some(img => img.isUploading || (img.url && img.url.startsWith('blob:')));
+            // NEVER overwrite if actively uploading
+            const hasOptimistic = prev.some(img => img.isUploading);
             if (hasOptimistic) return prev;
 
             let newImages = (savedData.images || []).slice(0, MAX_GALLERY_IMAGES);
 
-            // Check localStorage fallback ONLY if DOM savedData has no images
+            // Clean up and sanitize any dead blob URLs from prior sessions to avoid ERR_FILE_NOT_FOUND
+            newImages = newImages.map(img => {
+              if (img?.url && img.url.startsWith('blob:')) {
+                return {
+                  ...img,
+                  url: "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22300%22%20viewBox%3D%220%200%20400%20300%22%3E%3Crect%20fill%3D%22%23f3f4f6%22%20width%3D%22400%22%20height%3D%22300%22%2F%3E%3Ctext%20fill%3D%22%239ca3af%22%20font-family%3D%22sans-serif%22%20font-size%3D%2214%22%20dy%3D%2210.5%22%20font-weight%3D%22500%22%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%3ESlide%20Image%3C%2Ftext%3E%3C%2Fsvg%3E"
+                };
+              }
+              return img;
+            });
+
+            // Check IndexedDB / localStorage fallback if DOM savedData has no images or has sanitized placeholders
             const localKey = `slideshow_${flipbookVId || 'local'}_${targetElement.id}`;
-            if (!newImages || newImages.length === 0) {
+            const needsDbCheck = !newImages || newImages.length === 0 || newImages.some(img => img.url?.startsWith('data:image/svg+xml'));
+            if (needsDbCheck) {
+              getFromDB(localKey).then(dbImages => {
+                if (Array.isArray(dbImages) && dbImages.length > 0) {
+                  const validDbImages = dbImages.filter(img => img?.url && !img.url.startsWith('blob:') && !img.url.startsWith('data:image/svg+xml'));
+                  if (validDbImages.length > 0) {
+                    setSlideshowImages(validDbImages);
+                  }
+                }
+              }).catch(() => {});
               const localRaw = localStorage.getItem(localKey);
               if (localRaw) {
                 try {
                   const localImages = JSON.parse(localRaw);
                   if (Array.isArray(localImages) && localImages.length > 0) {
-                    newImages = localImages.slice(0, MAX_GALLERY_IMAGES);
+                    const validLocal = localImages.filter(img => img?.url && !img.url.startsWith('blob:') && !img.url.startsWith('data:image/svg+xml'));
+                    if (validLocal.length > 0) {
+                      newImages = validLocal.slice(0, MAX_GALLERY_IMAGES);
+                    }
                   }
                 } catch (e) { }
               }
@@ -458,11 +622,21 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
         const imgEl = getSvgImageEl(targetElement);
         const currentSrc = (imgEl?.getAttribute('href') || imgEl?.getAttribute('xlink:href') || imgEl?.getAttribute('src') || imgEl?.src || targetElement.getAttribute('href') || targetElement.getAttribute('xlink:href'));
         setSlideshowImages(prev => {
-          const hasOptimistic = prev.some(img => img.isUploading || (img.url && img.url.startsWith('blob:')));
+          const hasOptimistic = prev.some(img => img.isUploading);
           if (hasOptimistic) return prev;
           if (prev.length > 0 && !force) return prev;
-          if (currentSrc && !currentSrc.includes('placehold.co')) {
+          if (currentSrc && !currentSrc.includes('placehold.co') && !currentSrc.startsWith('blob:')) {
             return [{ id: Date.now(), url: currentSrc, name: 'Main Image', isOriginalCrop: true }];
+          }
+          const is3Frame = targetElement.getAttribute('data-type') === 'slideshow' ||
+                           targetElement.getAttribute('data-is-slideshow') === 'true' ||
+                           targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)').length >= 3;
+          if (is3Frame) {
+            return [
+              { id: 1, url: 'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?w=600&auto=format&fit=crop&q=80', name: 'Slide 1', heading: '', subtext: '' },
+              { id: 2, url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&auto=format&fit=crop&q=80', name: 'Slide 2', heading: '', subtext: '' },
+              { id: 3, url: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&auto=format&fit=crop&q=80', name: 'Slide 3', heading: '', subtext: '' }
+            ];
           }
           return [];
         });
@@ -484,12 +658,15 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
     }, 50);
   }, [selectedElement]);
 
-  const applyDesign = useCallback(() => {
+  const applyDesign = useCallback((overrideIndex = null) => {
     if (!selectedElement?.id || isDisabling) return;
 
     const apply = () => {
       const pageContainer = document.querySelector(`.page-svg-container[data-page-index="${activePageIndex}"]`);
       const targetElement = pageContainer?.querySelector(`[id="${selectedElement.id}"]`) || selectedElement;
+      if (!targetElement) return;
+
+      const effectiveIndex = (overrideIndex !== null && overrideIndex !== undefined) ? overrideIndex : activeSlideIndex;
 
       isUpdatingDOM.current = true;
       try {
@@ -526,12 +703,17 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
           }
         }
 
-        targetElement.setAttribute('data-active-index', activeSlideIndex.toString());
+        targetElement.setAttribute('data-active-index', effectiveIndex.toString());
+
+        const is3Frame = targetElement.getAttribute('data-type') === 'slideshow' || targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)').length >= 3;
 
         // Dynamic 3-Frame Carousel Layout Logic
-        if (targetElement.getAttribute('data-type') === 'slideshow') {
+        if (is3Frame) {
           const uniqueId = targetElement.id.replace('slideshow-', '') || Date.now();
-          const newImages = slideshowImages.map(i => i.url);
+          const curImages = (slideshowImages && slideshowImages.length > 0)
+            ? slideshowImages
+            : (liveRunnerImagesRef.current || []);
+          const newImages = curImages.map(i => (typeof i === 'string' ? i : i?.url)).filter(Boolean);
           
           let defs = targetElement.querySelector('defs');
           if (!defs) {
@@ -543,9 +725,9 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
           let leftIndex = -1, centerIndex = -1, rightIndex = -1;
           
           if (len > 0) {
-            centerIndex = activeSlideIndex % len;
-            if (len >= 2) rightIndex = (activeSlideIndex + 1) % len;
-            if (len >= 3) leftIndex = (activeSlideIndex - 1 + len) % len;
+            centerIndex = effectiveIndex % len;
+            if (len >= 2) rightIndex = (effectiveIndex + 1) % len;
+            if (len >= 3) leftIndex = (effectiveIndex - 1 + len) % len;
           }
 
           const rects = targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)');
@@ -609,6 +791,43 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
               rightRect.setAttribute('style', 'transform: perspective(400px) rotateY(-22deg); transform-origin: 0% 50%; transform-box: fill-box; transition: all 0.3s ease;');
             }
           }
+
+          let bboxAnchor = targetElement.querySelector('.bbox-anchor');
+          if (!bboxAnchor) {
+            bboxAnchor = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            bboxAnchor.setAttribute('class', 'bbox-anchor');
+            bboxAnchor.setAttribute('fill', 'transparent');
+            targetElement.appendChild(bboxAnchor);
+          }
+          bboxAnchor.setAttribute('x', '0');
+          bboxAnchor.setAttribute('y', '0');
+          bboxAnchor.setAttribute('width', slideStyle === 'flat' ? '210' : '215');
+          bboxAnchor.setAttribute('height', slideStyle === 'flat' ? '190' : '140');
+
+          // Apply Stroke & Background properties to frames
+          const sColor = slideshowSettings.strokeColor || '#9ca3af';
+          const sWidth = slideshowSettings.strokeWidth !== undefined ? slideshowSettings.strokeWidth : 1;
+          const sOpacity = (slideshowSettings.strokeOpacity !== undefined ? slideshowSettings.strokeOpacity : 100) / 100;
+          let sDash = 'none';
+          if (slideshowSettings.strokeLineStyle === 'Dotted') {
+            sDash = '2,3';
+          } else if (slideshowSettings.strokeLineStyle === 'Dashed') {
+            sDash = `${slideshowSettings.strokeDashLength || 8},${slideshowSettings.strokeDashGap || 4}`;
+          }
+          const sCap = slideshowSettings.strokeLineCorner === 'Rounded' ? 'round' : 'square';
+          const sJoin = slideshowSettings.strokeLineCorner === 'Rounded' ? 'round' : 'miter';
+
+          [centerRect, leftRect, rightRect].forEach(r => {
+            if (r) {
+              r.setAttribute('stroke', sColor);
+              r.setAttribute('stroke-width', sWidth.toString());
+              r.setAttribute('stroke-opacity', sOpacity.toString());
+              if (sDash !== 'none') r.setAttribute('stroke-dasharray', sDash);
+              else r.removeAttribute('stroke-dasharray');
+              r.setAttribute('stroke-linecap', sCap);
+              r.setAttribute('stroke-linejoin', sJoin);
+            }
+          });
           
           // Forcefully hide any legacy static SVG arrows
           paths.forEach(p => p.setAttribute('display', 'none'));
@@ -653,10 +872,15 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
             const pHeight = rect.getAttribute('height');
             pattern.setAttribute('width', pWidth);
             pattern.setAttribute('height', pHeight);
+            pattern.setAttribute('viewBox', `0 0 ${pWidth} ${pHeight}`);
             
             const imgNode = pattern.querySelector('image');
             if (imgNode) {
-              imgNode.setAttribute('href', newImages[imageIndex]);
+              const safeImgSrc = (newImages[imageIndex] && !newImages[imageIndex].startsWith('blob:'))
+                ? newImages[imageIndex]
+                : "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22300%22%20viewBox%3D%220%200%20400%20300%22%3E%3Crect%20fill%3D%22%23f3f4f6%22%20width%3D%22400%22%20height%3D%22300%22%2F%3E%3Ctext%20fill%3D%22%239ca3af%22%20font-family%3D%22sans-serif%22%20font-size%3D%2214%22%20dy%3D%2210.5%22%20font-weight%3D%22500%22%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%3ESlide%20Image%3C%2Ftext%3E%3C%2Fsvg%3E";
+              imgNode.setAttribute('href', safeImgSrc);
+              try { imgNode.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', safeImgSrc); } catch (e) {}
               imgNode.setAttribute('width', pWidth);
               imgNode.setAttribute('height', pHeight);
             }
@@ -665,14 +889,22 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
             if (textGroup) {
               textGroup.innerHTML = '';
               const imgObj = slideshowImages[imageIndex];
-              if (imgObj) {
+              if (imgObj && patternPrefix === 'center') {
                 const fFam = imgObj.fontFamily || 'Arial';
                 const fSize = imgObj.fontSize || 16;
-                if (imgObj.heading) {
+                const pW = parseFloat(pWidth) || 130;
+                const pH = parseFloat(pHeight) || 140;
+                const centerX = pW / 2;
+                const centerY = pH / 2;
+                const hasHeading = Boolean(imgObj.heading);
+                const hasSubtext = Boolean(imgObj.subtext);
+
+                if (hasHeading) {
                   const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                  t.setAttribute('x', '50%');
-                  t.setAttribute('y', '35%');
+                  t.setAttribute('x', centerX.toString());
+                  t.setAttribute('y', (hasSubtext ? centerY - 10 : centerY).toString());
                   t.setAttribute('text-anchor', 'middle');
+                  t.setAttribute('dominant-baseline', 'central');
                   t.setAttribute('fill', 'white');
                   t.setAttribute('font-size', `${fSize}px`);
                   t.setAttribute('font-family', `'${fFam}', sans-serif`);
@@ -681,11 +913,12 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
                   t.textContent = imgObj.heading;
                   textGroup.appendChild(t);
                 }
-                if (imgObj.subtext) {
+                if (hasSubtext) {
                   const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                  t.setAttribute('x', '50%');
-                  t.setAttribute('y', '50%');
+                  t.setAttribute('x', centerX.toString());
+                  t.setAttribute('y', (hasHeading ? centerY + 14 : centerY).toString());
                   t.setAttribute('text-anchor', 'middle');
+                  t.setAttribute('dominant-baseline', 'central');
                   t.setAttribute('fill', 'white');
                   t.setAttribute('font-size', `${Math.max(8, fSize * 0.6)}px`);
                   t.setAttribute('font-family', `'${fFam}', sans-serif`);
@@ -721,11 +954,26 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
             // Adjust pattern translation to match rect position so image doesn't tile weirdly
             pattern.setAttribute('patternTransform', `translate(${rect.getAttribute('x')}, ${rect.getAttribute('y')})`);
             rect.setAttribute('fill', `url(#${patternId})`);
+            rect.style.fill = `url(#${patternId})`;
           };
 
           applyImageToRect(0, leftIndex, 'left');
           applyImageToRect(1, rightIndex, 'right');
           applyImageToRect(2, centerIndex, 'center');
+
+          // If the original placeholder pattern exists, also point its image to current center image so it NEVER renders "Slideshow" text
+          const placeholderPattern = defs.querySelector(`#slideshow-pattern-${uniqueId}`);
+          if (placeholderPattern && centerIndex >= 0 && newImages[centerIndex]) {
+            const phImg = placeholderPattern.querySelector('image');
+            if (phImg) {
+              phImg.setAttribute('href', newImages[centerIndex]);
+              try { phImg.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', newImages[centerIndex]); } catch (e) {}
+            }
+            const phText = placeholderPattern.querySelector('.overlay-text-group');
+            if (phText) {
+              phText.innerHTML = '';
+            }
+          }
           
           if (slideStyle === 'flat') {
             for (let i = 0; i < 5; i++) {
@@ -864,11 +1112,14 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
               textGroup.innerHTML = '';
               const fFam = imgObj.fontFamily || 'Arial';
               const fSize = imgObj.fontSize || 16;
+              const hasHeading = Boolean(imgObj.heading);
+              const hasSubtext = Boolean(imgObj.subtext);
               if (imgObj.heading) {
                 const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 t.setAttribute('x', '50%');
-                t.setAttribute('y', '35%');
+                t.setAttribute('y', hasSubtext ? '46%' : '50%');
                 t.setAttribute('text-anchor', 'middle');
+                t.setAttribute('dominant-baseline', 'central');
                 t.setAttribute('fill', 'white');
                 t.setAttribute('font-size', `${fSize}px`);
                 t.setAttribute('font-family', `'${fFam}', sans-serif`);
@@ -880,8 +1131,9 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
               if (imgObj.subtext) {
                 const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 t.setAttribute('x', '50%');
-                t.setAttribute('y', '50%');
+                t.setAttribute('y', hasHeading ? '56%' : '50%');
                 t.setAttribute('text-anchor', 'middle');
+                t.setAttribute('dominant-baseline', 'central');
                 t.setAttribute('fill', 'white');
                 t.setAttribute('font-size', `${Math.max(8, fSize * 0.6)}px`);
                 t.setAttribute('font-family', `'${fFam}', sans-serif`);
@@ -930,8 +1182,18 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
     };
 
     apply();
-  }, [selectedElement?.id, JSON.stringify(slideshowSettings), JSON.stringify(slideshowImages.map(img => img.url)), activeSlideIndex, opacity, activePageIndex]);
+  }, [
+    selectedElement?.id,
+    JSON.stringify(slideshowSettings),
+    JSON.stringify(slideshowImages.map(img => ({ url: img.url, heading: img.heading, subtext: img.subtext }))),
+    activeSlideIndex,
+    opacity,
+    activePageIndex
+  ]);
 
+  useEffect(() => {
+    applyDesignRef.current = applyDesign;
+  }, [applyDesign]);
 
   useEffect(() => {
     if (!selectedElement) return;
@@ -970,6 +1232,17 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
   useEffect(() => { liveRunnerIndexRef.current = activeSlideIndex; }, [activeSlideIndex]);
   useEffect(() => { liveRunnerImagesRef.current = slideshowImages; }, [slideshowImages]);
 
+  useEffect(() => {
+    const handleIndexChanged = (e) => {
+      if (e.detail?.id === selectedElement?.id && e.detail?.index !== undefined) {
+        setActiveSlideIndex(e.detail.index);
+        liveRunnerIndexRef.current = e.detail.index;
+      }
+    };
+    window.addEventListener('slideshow-index-changed', handleIndexChanged);
+    return () => window.removeEventListener('slideshow-index-changed', handleIndexChanged);
+  }, [selectedElement?.id]);
+
   const performTransition = useCallback((newIdx, dir = 'next') => {
     if (isAnimatingRef.current) return;
 
@@ -978,18 +1251,48 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
     if (!targetElement) return;
 
     // Dynamic 3-Frame Layout Bypasses CSS Transitions
-    if (targetElement.getAttribute('data-type') === 'slideshow') {
+    const is3Frame = targetElement.getAttribute('data-type') === 'slideshow' || targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)').length >= 3;
+    if (is3Frame) {
       liveRunnerIndexRef.current = newIdx;
       setActiveSlideIndex(newIdx);
+      targetElement.setAttribute('data-active-index', newIdx.toString());
       
       const overlay = liveRunnerOverlayRef.current;
       if (overlay && overlay._updateDots) overlay._updateDots(newIdx);
       
       // Let applyDesign handle the DOM update directly
       isUpdatingDOM.current = true;
-      setTimeout(() => {
-        applyDesign();
-      }, 50);
+      (applyDesignRef.current || applyDesign)(newIdx);
+
+      // Apply transition animation to 3-frame carousel frames based on selected effect
+      const effect = (transitionEffectRef.current || slideshowSettings.transitionEffect || 'Linear').toLowerCase();
+      const rects = targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)');
+      const centerRect = rects[2];
+      if (centerRect && effect !== 'linear') {
+        const duration = 380;
+        if (effect === 'fade') {
+          centerRect.animate([{ opacity: 0.2 }, { opacity: 1 }], { duration, easing: 'ease-out' });
+        } else if (effect === 'flip') {
+          centerRect.style.transformBox = 'fill-box';
+          centerRect.style.transformOrigin = '50% 50%';
+          centerRect.animate([
+            { transform: 'perspective(400px) rotateY(90deg)', opacity: 0.3 },
+            { transform: 'perspective(400px) rotateY(0deg)', opacity: 1 }
+          ], { duration, easing: 'ease-out' });
+        } else if (effect === 'reveal') {
+          const startClip = dir === 'next' ? 'inset(0 0 0 100%)' : 'inset(0 100% 0 0)';
+          centerRect.animate([
+            { clipPath: startClip },
+            { clipPath: 'inset(0 0 0 0)' }
+          ], { duration, easing: 'ease-in-out' });
+        } else if (effect === 'slide' || effect === 'push') {
+          const dx = dir === 'next' ? 40 : -40;
+          centerRect.animate([
+            { translate: `${dx}px 0px`, opacity: 0.4 },
+            { translate: '0px 0px', opacity: 1 }
+          ], { duration, easing: 'ease-out' });
+        }
+      }
       return;
     }
 
@@ -1382,6 +1685,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
     } else {
       pageContainer.appendChild(overlay);
     }
+    overlay._targetId = initialTarget?.id || selectedElement?.id;
     liveRunnerOverlayRef.current = overlay;
     positionOverlay();
 
@@ -1405,25 +1709,11 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
     };
 
     const resetAutoTimer = () => {
-      if (liveRunnerAutoTimer.current) clearInterval(liveRunnerAutoTimer.current);
-      if (isHoveringRef.current) return;
-      const { autoSlide = true, autoPlay = true, speed = 3 } = slideshowSettings;
-      if (!autoSlide && !autoPlay) return;
-
-      const intervalMs = (parseFloat(speed) || 3) * 1000;
-      liveRunnerAutoTimer.current = setInterval(() => {
-        if (isAnimatingRef.current) return;
-        // Only skip if mouse is actively over a control button
-        const isHoveringControls = liveRunnerOverlayRef.current?.querySelector('button:hover');
-        if (isHoveringControls) return;
-
-        const images = liveRunnerImagesRef.current;
-        if (!images || images.length < 2) return;
-
-        let next = liveRunnerIndexRef.current + 1;
-        if (next >= images.length) { if (!slideshowSettings.infiniteLoop) return; next = 0; }
-        switchTo(next, 'next');
-      }, intervalMs);
+      if (liveRunnerAutoTimer.current) {
+        clearInterval(liveRunnerAutoTimer.current);
+        liveRunnerAutoTimer.current = null;
+      }
+      // Auto Slide Mode does not run in Template Editor (only works in PreviewArea)
     };
     resetAutoTimerRef.current = resetAutoTimer;
 
@@ -1498,7 +1788,10 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
         btn.addEventListener('mousedown', e => { e.stopPropagation(); e.preventDefault(); });
         btn.addEventListener('click', (e) => {
           e.stopPropagation(); e.preventDefault();
-          const images = liveRunnerImagesRef.current;
+          const images = (liveRunnerImagesRef.current && liveRunnerImagesRef.current.length > 0)
+            ? liveRunnerImagesRef.current
+            : slideshowImages;
+          if (!images || images.length === 0) return;
           const cur = liveRunnerIndexRef.current;
           let newIdx = type === 'prev' ? cur - 1 : cur + 1;
           if (newIdx < 0) newIdx = infiniteLoop ? images.length - 1 : 0;
@@ -1612,13 +1905,16 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
       roots.push(dotsRoot);
 
       const RenderCanvasDots = ({ currentIdx = liveRunnerIndexRef.current }) => {
+        const totalCount = (slideshowImages && slideshowImages.length > 0)
+          ? slideshowImages.length
+          : (liveRunnerImagesRef.current?.length || 0);
         return (
           <DotRenderer
             styleId={slideshowSettings.dotStyle || 1}
             size="8px"
             color={dotColor || '#000000'}
             activeIndex={currentIdx}
-            count={slideshowImages.length}
+            count={totalCount}
             onDotClick={(e, i) => {
               e.stopPropagation(); e.preventDefault();
               if (i === liveRunnerIndexRef.current) return;
@@ -1676,223 +1972,108 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
   }, [selectedElement?.id, slideshowImages.length, runnerSettingsStr, activePageIndex]);
 
 
-  const uploadFile = useCallback(async (file, replacingVideoId = null) => {
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) return null;
-
-    const user = JSON.parse(storedUser);
-    const formData = new FormData();
-    formData.append('emailId', user.emailId);
-    
-    const effectiveVId = flipbookVId || location.state?.v_id || location.state?.flipbook_v_id;
-    if (effectiveVId) formData.append('v_id', effectiveVId);
-
-    const effectiveFolder = folderName || location.state?.folderName || 'My_Flipbooks';
-    const effectiveBook = flipbookName || location.state?.flipbookName || 'Untitled Flipbook';
-
-    formData.append('folderName', effectiveFolder);
-    formData.append('flipbookName', effectiveBook);
-
-    formData.append('type', 'image');
-    formData.append('assetType', 'Image');
-    formData.append('page_v_id', currentPageVId || 'global');
-
-    if (replacingVideoId) {
-      formData.append('replacing_file_v_id', replacingVideoId);
-    }
-    formData.append('file', file);
-
-    try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
-      const res = await axios.post(`${backendUrl}/api/flipbook/upload-asset`, formData);
-      if (res.data.url) {
-        return {
-          url: resolveUploadsPath(res.data.url),
-          file_v_id: res.data.file_v_id,
-          name: res.data.filename
-        };
-      }
-    } catch (err) {
-      console.error("Slideshow image upload failed:", err);
-    }
-    return null;
-  }, [flipbookVId, folderName, flipbookName, currentPageVId, location.state]);
+  const uploadFile = useCallback(async (file) => {
+    return await processLocalImageFile(file);
+  }, []);
 
   const handleFileUpload = useCallback(async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     const remainingSlots = MAX_GALLERY_IMAGES - slideshowImages.length;
-    const filesToUpload = Array.from(files).slice(0, remainingSlots);
+    const filesToUpload = Array.from(files).filter(file => file.type.startsWith('image/')).slice(0, remainingSlots);
 
-    // 1. Create Optimistic State with Blob URLs
-    const optimisticImages = filesToUpload.filter(file => file.type.startsWith('image/')).map((file, idx) => ({
-      id: Date.now() + idx,
-      url: URL.createObjectURL(file),
-      name: file.name,
-      isUploading: true,
-      file_orig: file // Keep reference for upload
-    }));
+    if (filesToUpload.length === 0) return;
 
-    if (optimisticImages.length === 0) return;
+    const processed = await Promise.all(filesToUpload.map(processLocalImageFile));
+    const valid = processed.filter(Boolean);
 
-    setSlideshowImages(prev => [...prev, ...optimisticImages]);
-    e.target.value = '';
-
-    // 2. Upload in Background Concurrently and Update State
-    await Promise.all(optimisticImages.map(async (img) => {
-      const compressedFile = await compressImage(img.file_orig);
-      const uploadedData = await uploadFile(compressedFile);
-
-      setSlideshowImages(prev => prev.map(item => {
-        if (item.id === img.id) {
-          if (uploadedData) {
-            return { ...item, url: uploadedData.url, file_v_id: uploadedData.file_v_id, name: uploadedData.name, isUploading: false };
-          } else {
-            return { ...item, isUploading: false };
-          }
+    if (valid.length > 0) {
+      setSlideshowImages(prev => {
+        const next = [...prev, ...valid];
+        if (selectedElement?.id) {
+          saveToDB(`slideshow_${flipbookVId || 'local'}_${selectedElement.id}`, next).catch(() => {});
         }
-        return item;
-      }));
-    }));
-  }, [slideshowImages, uploadFile]);
+        return next;
+      });
+      if (onUpdateRef.current) onUpdateRef.current({ shouldRefresh: true });
+    }
+    e.target.value = '';
+  }, [slideshowImages.length, selectedElement?.id, flipbookVId]);
 
   const handleReplaceFileChange = useCallback(async (e) => {
     const file = e.target.files?.[0];
     if (!file || replaceTargetIndex === null) return;
 
-    const targetImg = slideshowImages[replaceTargetIndex];
-    if (!targetImg) return;
-
-    // Optimistic update
-    const optimisticUrl = URL.createObjectURL(file);
-    setSlideshowImages(current => {
-      const updated = [...current];
-      if (updated[replaceTargetIndex]) {
-        updated[replaceTargetIndex] = { ...updated[replaceTargetIndex], url: optimisticUrl, isUploading: true };
-      }
-      return updated;
-    });
-
-    e.target.value = '';
-
-    // Upload
-    const compressedFile = await compressImage(file);
-    const uploadedData = await uploadFile(compressedFile, targetImg.file_v_id);
-
-    // Final update
-    setSlideshowImages(current =>
-      current.map((img, idx) => {
-        if (idx === replaceTargetIndex) {
-          return uploadedData
-            ? { ...img, url: uploadedData.url, file_v_id: uploadedData.file_v_id, name: uploadedData.name, isUploading: false }
-            : { ...img, isUploading: false };
+    const localImg = await processLocalImageFile(file);
+    if (localImg) {
+      setSlideshowImages(current => {
+        const updated = [...current];
+        if (updated[replaceTargetIndex]) {
+          updated[replaceTargetIndex] = { ...updated[replaceTargetIndex], ...localImg };
         }
-        return img;
-      })
-    );
+        if (selectedElement?.id) {
+          saveToDB(`slideshow_${flipbookVId || 'local'}_${selectedElement.id}`, updated).catch(() => {});
+        }
+        return updated;
+      });
+      if (onUpdateRef.current) onUpdateRef.current({ shouldRefresh: true });
+    }
+    e.target.value = '';
     setReplaceTargetIndex(null);
-  }, [replaceTargetIndex, slideshowImages, uploadFile]);
-
-
+  }, [replaceTargetIndex, selectedElement?.id, flipbookVId]);
 
   const handleModalReplace = async (file) => {
     if (!file || replaceTargetIndex === null) return;
-    const targetImg = slideshowImages[replaceTargetIndex];
-    if (!targetImg) return;
-
-    const optimisticUrl = file.url || URL.createObjectURL(file);
-    setSlideshowImages(current => {
-      const updated = [...current];
-      if (updated[replaceTargetIndex]) {
-        updated[replaceTargetIndex] = { ...updated[replaceTargetIndex], url: optimisticUrl, isUploading: true };
-      }
-      return updated;
-    });
-
-    setShowReplaceModal(false);
-
-    const compressedFile = await compressImage(file);
-    const uploadedData = await uploadFile(compressedFile, targetImg.file_v_id);
-
-    setSlideshowImages(current =>
-      current.map((img, idx) => {
-        if (idx === replaceTargetIndex) {
-          return uploadedData
-            ? { ...img, url: uploadedData.url, file_v_id: uploadedData.file_v_id, name: uploadedData.name, isUploading: false }
-            : { ...img, isUploading: false };
+    const localImg = await processLocalImageFile(file);
+    if (localImg) {
+      setSlideshowImages(current => {
+        const updated = [...current];
+        if (updated[replaceTargetIndex]) {
+          updated[replaceTargetIndex] = { ...updated[replaceTargetIndex], ...localImg };
         }
-        return img;
-      })
-    );
+        if (selectedElement?.id) {
+          saveToDB(`slideshow_${flipbookVId || 'local'}_${selectedElement.id}`, updated).catch(() => {});
+        }
+        return updated;
+      });
+      if (onUpdateRef.current) onUpdateRef.current({ shouldRefresh: true });
+    }
+    setShowReplaceModal(false);
     setReplaceTargetIndex(null);
   };
 
-
-  const deleteImage = useCallback(async (index) => {
-    const img = slideshowImages[index];
-    if (!img) return;
-
-    // Optimistic remove
-    const updatedImages = slideshowImages.filter((_, idx) => idx !== index);
-    setSlideshowImages(updatedImages);
-    setOpenContextMenu(null);
-
-    // Sync localStorage immediately
-    if (selectedElement?.id) {
-      const key = `slideshow_${flipbookVId || 'local'}_${selectedElement.id}`;
-      try {
-        if (updatedImages.length > 0) {
-          localStorage.setItem(key, JSON.stringify(updatedImages));
-        } else {
-          localStorage.removeItem(key);
-        }
-      } catch (e) {}
-    }
-
-    // Backend delete
-    if (img.file_v_id) {
-      try {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          const user = JSON.parse(storedUser);
-          const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
-          const effectiveFolder = folderName || location.state?.folderName || 'My_Flipbooks';
-          const effectiveBook = flipbookName || location.state?.flipbookName || 'Untitled Flipbook';
-          await axios.post(`${backendUrl}/api/flipbook/delete-asset`, {
-            emailId: user.emailId,
-            file_v_id: img.file_v_id,
-            assetType: 'Image',
-            folderName: effectiveFolder,
-            bookName: effectiveBook
-          });
-        }
-      } catch (error) {
-        console.error("Failed to delete asset from backend:", error);
+  const deleteImage = useCallback((index) => {
+    setSlideshowImages(current => {
+      const updated = current.filter((_, idx) => idx !== index);
+      if (selectedElement?.id) {
+        saveToDB(`slideshow_${flipbookVId || 'local'}_${selectedElement.id}`, updated).catch(() => {});
       }
+      return updated;
+    });
+    setOpenContextMenu(null);
+    if (activeSlideIndex >= index && activeSlideIndex > 0) {
+      setActiveSlideIndex(prev => prev - 1);
     }
-  }, [slideshowImages, folderName, flipbookName, location.state]);
+    if (onUpdateRef.current) onUpdateRef.current({ shouldRefresh: true });
+  }, [selectedElement?.id, flipbookVId, activeSlideIndex]);
 
-  const handleGallerySelect = useCallback((img) => {
+  const handleGallerySelect = useCallback(async (img) => {
     if (!img) return;
+    const targetFile = img.file || (img instanceof File ? img : img.url || img);
+    const localImg = await processLocalImageFile(targetFile);
+    if (!localImg) return;
 
-    // Choose target index: priority to libraryTargetIndex if user clicked a specific slot
     const targetIdx = libraryTargetIndex !== null ? libraryTargetIndex : activeSlideIndex;
-
     setSlideshowImages(prev => {
       const updated = [...prev];
-      const newImgObj = {
-        id: Date.now(),
-        url: img.url,
-        name: img.name,
-        file_v_id: img.file_v_id,
-        isUploading: false
-      };
-
       if (targetIdx < updated.length) {
-        updated[targetIdx] = newImgObj;
+        updated[targetIdx] = localImg;
       } else if (updated.length < MAX_GALLERY_IMAGES) {
-        updated.push(newImgObj);
+        updated.push(localImg);
+      }
+      if (selectedElement?.id) {
+        saveToDB(`slideshow_${flipbookVId || 'local'}_${selectedElement.id}`, updated).catch(() => {});
       }
       return updated;
     });
@@ -1904,15 +2085,12 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
     setLibraryTargetIndex(null);
     setOpenContextMenu(null);
     setShowGallery(false);
-
-    // Immediate canvas update
-    if (onUpdateRef.current) onUpdateRef.current({ shouldRefresh: true });
-  }, [libraryTargetIndex, activeSlideIndex]);
+  }, [libraryTargetIndex, activeSlideIndex, selectedElement?.id, flipbookVId]);
 
   const updateSetting = (key, value) => {
     setSlideshowSettings(prev => ({ ...prev, [key]: value }));
   };
-  const effects = ['Linear', 'Fade', 'Flip', 'Reveal'];
+  const effects = ['Linear', 'Fade', 'Flip', 'Reveal', 'Slide'];
 
   const colorsOnPage = React.useMemo(() => {
     const doc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
@@ -1930,494 +2108,626 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
   }, [activePageIndex]);
 
   return (
-    <div className="space-y-[1vw]">
-      <style>{`
-        .ss-slider { -webkit-appearance: none; width: 100%; background: transparent; position: relative; }
-        .ss-slider::before { content: ""; position: absolute; top: -0.75vw; bottom: -0.75vw; left: 0; right: 0; cursor: pointer; z-index: 1; }
-        .ss-slider::-webkit-slider-runnable-track { height: 0.5vw; border-radius: 9999px; background: inherit; }
-        .ss-slider::-webkit-slider-thumb { -webkit-appearance: none; height: 1.6vw; width: 1.6vw; border-radius: 50%; background: #4D47FF; border: 0.2vw solid #ffffff; box-shadow: 0 0.15vw 0.5vw rgba(77,71,255,0.4); margin-top: -0.55vw; cursor: pointer; transition: box-shadow 0.15s ease; position: relative; z-index: 2; }
-        .ss-slider::-webkit-slider-thumb:hover { box-shadow: 0 0.15vw 0.75vw rgba(77,71,255,0.6); }
-
-        .image-editor-toggle {
-          appearance: none;
-          width: 2.75vw;
-          height: 1.35vw;
-          border-radius: 1vw;
-          position: relative;
-          cursor: pointer;
-          transition: 0.3s;
-          background: #4D47FF;
-        }
-        .image-editor-toggle::before {
-          content: "";
-          position: absolute;
-          width: 1.1vw;
-          height: 1.1vw;
-          border-radius: 50%;
-          top: 50%;
-          left: 1.5vw;
-          transform: translateY(-50%);
-          background: white;
-          transition: 0.3s;
-          box-shadow: 0 0.1vw 0.2vw rgba(0,0,0,0.2);
-        }
-      `}</style>
-      {/* ── Slideshow header ── */}
-      <div className="flex items-center gap-[0.5vw]">
-        <span className="text-[0.9vw] font-semibold text-gray-900 whitespace-nowrap">Slideshow Properties</span>
-        <div className="h-[0.0925vw] bg-gray-200 flex-1" style={{ marginRight: '-1.6vw' }}> </div>
+    <div className="space-y-[1vw] font-sans pb-[2vw]">
+      {/* ── 1. Top Add Images Button ── */}
+      <div
+        onClick={() => fileInputRef.current?.click()}
+        className="w-full border-2 border-dashed border-gray-300 rounded-[0.75vw] bg-gray-50/50 py-[1.1vw] flex items-center justify-center gap-[0.5vw] text-gray-500 hover:text-gray-700 hover:border-gray-400 hover:bg-gray-100/60 cursor-pointer transition-all shadow-2xs"
+      >
+        <Plus size="1vw" className="text-gray-500" />
+        <span className="text-[0.8vw] font-medium text-gray-500">Add Images</span>
       </div>
 
-      {/* ── Slideshow Mode Toggle ── */}
-      <div className="flex items-center justify-between py-[0.25vw]">
-        <span className="text-[0.75vw] text-gray-800">Turn on to Image</span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsDisabling(true);
-            onDisableSlideshow?.();
-          }}
-          className={`relative block w-[2.2vw] h-[1.2vw] rounded-[1vw] transition-all duration-200 ease-in-out shadow-[inset_0_0.05vw_0.1vw_rgba(0,0,0,0.3)] outline-none shrink-0 cursor-pointer ${isDisabling ? 'bg-[#bbbbbb]' : 'bg-[#4A3AFF]'}`}
-        >
-          <div className={`absolute top-[0.1vw] w-[1vw] h-[1vw] bg-white rounded-full transition-all duration-200 ease-in-out shadow-[0_0.05vw_0.1vw_rgba(0,0,0,0.4)] ${isDisabling ? 'left-[0.1vw]' : 'left-[1.1vw]'}`} />
-        </button>
-      </div>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        multiple
+        accept="image/*"
+        className="hidden"
+      />
+      <input
+        type="file"
+        ref={replaceInputRef}
+        onChange={handleReplaceFileChange}
+        accept="image/*"
+        className="hidden"
+      />
 
-      {/* ── Image Fix Type (Top Level) ── */}
-      <div className="flex items-center justify-between relative z-20">
-        <div className="flex items-center gap-[0.5vw] flex-1">
-          <span className="text-[0.8vw] font-semibold text-gray-800 whitespace-nowrap">Image fix type</span>
-          <div className="h-[0px] flex-1 border-t border-dashed border-gray-300 mx-[0.25vw]" />
-        </div>
-        <div className="relative z-50">
-          <button onClick={() => setShowFitDropdown(!showFitDropdown)} className="flex items-center justify-between gap-[0.5vw] w-[6.5vw] px-[0.75vw] py-[0.55vw] bg-white border border-gray-100 rounded-[0.4vw] hover:border-gray-200 shadow-sm transition-all text-[0.8vw] font-semibold text-gray-500 min-w-[5vw]">
-            <span>{slideshowSettings.imageFitType === 'Fill All' ? 'Fill All' : 'Fit All'}</span>
-            <ChevronDown size="0.9vw" className={`text-gray-500 transition-transform ${showFitDropdown ? 'rotate-180' : ''}`} />
-          </button>
-          {showFitDropdown && (
-            <>
-              <div className="fixed inset-0 z-[90]" onClick={() => setShowFitDropdown(false)} />
-              <div className="absolute right-0 top-full mt-[0.25vw] w-full min-w-[5vw] bg-white border border-gray-200 rounded-[0.4vw] shadow-xl z-[100] py-[0.25vw] overflow-hidden">
-                {[{ label: 'Fit All', val: 'Fit All' }, { label: 'Fill All', val: 'Fill All' }].map(type => (
-                  <button key={type.val} onClick={() => { updateSetting('imageFitType', type.val); setShowFitDropdown(false); }} className="w-full text-left px-[0.75vw] py-[0.5vw] text-[0.7vw] font-medium text-gray-600 hover:bg-gray-50 hover:text-indigo-600">{type.label}</button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+      {/* ── 2. Images List ── */}
+      {slideshowImages.length > 0 && (
+        <div className="space-y-[0.5vw]">
+          {slideshowImages.map((img, i) => (
+            <div
+              key={img.id || i}
+              onClick={() => {
+                setActiveSlideIndex(i);
+                performTransition(i, i > activeSlideIndex ? 'next' : 'prev');
+              }}
+              className={`flex flex-col p-[0.6vw] bg-white border rounded-[0.65vw] shadow-xs cursor-pointer transition-all ${
+                activeSlideIndex === i
+                  ? 'border-[#EC5137] ring-1 ring-[#EC5137]/30'
+                  : 'border-gray-100 hover:border-gray-300'
+              }`}
+            >
+              {/* Top Row: Drag Handle, Thumbnail, File Name & Dimensions, Actions */}
+              <div className="flex items-center justify-between">
+                {/* Drag Handle */}
+                <div className="text-gray-300 hover:text-gray-500 cursor-grab px-[0.1vw]">
+                  <GripVertical size="0.95vw" />
+                </div>
 
-      <div className="space-y-7">
+                {/* Thumbnail */}
+                <img
+                  src={img.url}
+                  alt={img.name || `Slide ${i + 1}`}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%2280%22%20viewBox%3D%220%200%20100%2080%22%3E%3Crect%20fill%3D%22%23f3f4f6%22%20width%3D%22100%22%20height%3D%2280%22%2F%3E%3Ctext%20fill%3D%22%239ca3af%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%20dy%3D%223.5%22%3ENo%20Img%3C%2Ftext%3E%3C%2Fsvg%3E";
+                  }}
+                  className="w-[3.2vw] h-[2.2vw] rounded-[0.35vw] object-cover mx-[0.4vw] border border-gray-100 shrink-0"
+                />
 
-       
+                <div className="flex-1" />
 
-        {/* 1. Images Grid */}
-        <div className="grid grid-cols-4 gap-[0.75vw] px-[0.05vw]">
-          {Array.from({ length: Math.min(MAX_GALLERY_IMAGES, slideshowImages.length + 1) }).map((_, i) => (
-            <div key={i} className="relative group/slot">
-              <div
-                className={`aspect-[1/1] w-full rounded-[0.4vw] cursor-pointer border-[0.1vw] transition-all duration-300 relative flex items-center justify-center group/card hover:scale-[0.2vw] hover:-translate-y-[0.2vw] hover:z-20 ${activeSlideIndex === i
-                  ? 'border-gray-500 bg-gray-100 shadow-[0_0.65vw_1.25vw_-0.4vw_rgba(99,102,241,0.3)]'
-                  : (slideshowImages[i] ? 'border-gray-200 hover:border-gray-400 hover:shadow-[0_0.75vw_1.5vw_-0.5vw_rgba(0,0,0,0.15)]' : 'border-gray-400 hover:border-indigo-400 shadow-sm')
-                  } ${!slideshowImages[i] ? 'bg-gray-50/50 border-dashed' : 'bg-white shadow-sm'}`}
-                onClick={() => {
-                  if (activeSlideIndex === i) {
-                    // Toggle fit mode when clicking already selected slide (exact OtherSetup.jsx effect)
-                    const current = slideshowSettings.imageFitType || 'Fill All';
-                    updateSetting('imageFitType', current === 'Fit All' ? 'Fill All' : 'Fit All');
-                  } else {
-                    performTransition(i, i > activeSlideIndex ? 'next' : 'prev');
-                  }
-                }}
-              >
-                {slideshowImages[i] ? (
-                  <>
-                    <img
-                      src={slideshowImages[i].url}
-                      className="w-full h-full rounded-[0.3vw] transition-all duration-300"
-                      style={{
-                        objectFit: (slideshowSettings.imageFitType || 'Fill All') === 'Fill All' ? 'cover' : 'contain',
-                        opacity: localOpacity / 100
-                      }}
-                      alt=""
-                    />
-                    {slideshowImages[i].isUploading && (
-                      <div className="absolute inset-0 bg-black/30 rounded-[0.3vw] flex items-center justify-center z-10">
-                        <div className="w-[1.2vw] h-[1.2vw] border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div
+                {/* Actions: Replace & Delete */}
+                <div className="flex items-center gap-[0.3vw] shrink-0">
+                  <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      const pageContainer = document.querySelector(`.page-svg-container[data-page-index="${activePageIndex}"]`);
-                      const targetElement = pageContainer?.querySelector(`[id="${selectedElement.id}"]`) || selectedElement;
-                      setActiveSlideIndex(i);
-                      targetElement.setAttribute('data-active-index', i.toString());
-                      fileInputRef.current?.click();
+                      setReplaceTargetIndex(i);
+                      replaceInputRef.current?.click();
                     }}
-                    className="flex flex-col items-center justify-center gap-[0.375vw] opacity-30 group-hover/card:opacity-70 transition-all duration-300 w-full h-full"
+                    className="text-gray-400 hover:text-gray-700 transition-colors p-[0.2vw]"
+                    title="Replace Image"
                   >
-                    <Upload size="0.95vw" strokeWidth={1.5} className="text-gray-900" />
-                    <span className="text-[0.6vw] font-semibold text-gray-900">Upload</span>
-                  </div>
-                )}
-
-                <button
-                  onClick={(e) => { e.stopPropagation(); setOpenContextMenu(openContextMenu === i ? null : i); }}
-                  className={`absolute -top-[0.375vw] -right-[0.375vw] w-[1.75vw] h-[1.75vw] rounded-full bg-white shadow-[0_0.1vw_0.5vw_rgba(0,0,0,0.15)] border-[0.1vw] border-gray-200 flex items-center justify-center transition-all duration-200 z-30 ${openContextMenu === i ? 'opacity-100 scale-100' : 'opacity-0 scale-75 group-hover/card:opacity-100 group-hover/card:scale-100'
-                    } hover:bg-gray-50 active:scale-125`}
-                >
-                  <MoreVertical size="0.7vw" className="text-gray-600" strokeWidth={2.5} />
-                </button>
-              </div>
-
-              {openContextMenu === i && (
-                <>
-                  <div className="fixed inset-0 z-[105]" onClick={() => setOpenContextMenu(null)} />
-                  <div className={`absolute top-[1.5vw] w-[9.5vw] z-[110] animate-in fade-in zoom-in-95 duration-150 ${(i % 4) >= 2 ? '-right-[0.375vw] origin-top-right' : 'left-[calc(100%-1.375vw)] origin-top-left'}`}>
-                    <div className="bg-white rounded-[0.5vw] shadow-[0_0.3vw_1vw_rgba(0,0,0,0.15)] border border-gray-100 p-[0.75vw]">
-                      <h3 className="text-[0.85vw] font-medium text-gray-700 truncate mb-[0.2vw]">Slide {i + 1}.jpg</h3>
-                      <p className="text-[0.7vw] text-gray-400 mb-[0.75vw]">1920 X 1080 • 1256KB</p>
-                      <div className="flex items-center gap-[0.4vw]">
-                        <button 
-                          onClick={() => { 
-                            if (slideshowImages[i]) { 
-                              setReplaceTargetIndex(i); 
-                              setShowReplaceModal(true); 
-                              setOpenContextMenu(null); 
-                            } else { 
-                              setActiveSlideIndex(i); 
-                              fileInputRef.current?.click(); 
-                              setOpenContextMenu(null); 
-                            } 
-                          }}
-                          className="flex-1 px-[0.3vw] py-[0.35vw] text-[0.7vw] font-medium text-gray-600 bg-[#f9fafb] border border-gray-200 rounded-[0.3vw] hover:bg-gray-100 transition-colors"
-                        >
-                          {slideshowImages[i] ? 'Replace Image' : 'Add Image'}
-                        </button>
-                        <button 
-                          onClick={() => deleteImage(i)}
-                          className="w-[1.9vw] h-[1.9vw] flex items-center justify-center bg-[#f9fafb] border border-gray-200 rounded-[0.3vw] hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors text-gray-400 shrink-0"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="0.9vw" height="0.9vw" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-        <input type="file" ref={fileInputRef} onChange={handleFileUpload} multiple accept="image/*" className="hidden" />
-        <input type="file" ref={replaceInputRef} onChange={handleReplaceFileChange} accept="image/*" className="hidden" />
-
-         {/* 2. Info Row */}
-        <div className="flex items-center gap-[0.4vw] px-[0.25vw]">
-          <div className="relative">
-            <button
-              className="w-[1vw] h-[1vw] rounded-full border border-gray-400 flex items-center justify-center text-gray-500 text-[0.6vw] font-semibold hover:bg-gray-100 transition-colors"
-              onMouseEnter={() => setShowInfoTooltip(true)}
-              onMouseLeave={() => setShowInfoTooltip(false)}
-            >
-              i
-            </button>
-            {showInfoTooltip && (
-              <div className="absolute left-[1.5vw] top-0 bg-gray-800 text-white text-[0.65vw] px-[0.75vw] py-[0.4vw] rounded-[0.4vw] whitespace-nowrap z-50 shadow-lg">
-                You can add up to 4 images in Gallery
-              </div>
-            )}
-          </div>
-          <span className="text-[0.6vw] text-gray-400 italic">You can add up to 4 images in Gallery</span><span className="text-[0.95vw] text-red-500 "> *</span>
-        </div>
-
-        {/* Opacity */}
-        <div className="flex items-center gap-[1vw] py-[0.5vw] mt-[0.5vw]">
-          <span className="text-[0.85vw] font-semibold text-black whitespace-nowrap">Opacity :</span>
-          <div className="flex-1 flex items-center h-[1.5vw] rounded-full outline-none">
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={localOpacity}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                setLocalOpacity(val);
-                if (selectedElement) {
-                  const pageContainer = document.querySelector(`.page-svg-container[data-page-index="${activePageIndex}"]`);
-                  const targetElement = pageContainer?.querySelector(`[id="${selectedElement.id}"]`) || selectedElement;
-                  if (targetElement) {
-                    targetElement.setAttribute('opacity', (val / 100).toString());
-                    targetElement.style.opacity = (val / 100).toString();
-
-                    const imgEl = getSvgImageEl(targetElement);
-                    if (imgEl && imgEl !== targetElement) {
-                      imgEl.setAttribute('opacity', (val / 100).toString());
-                      imgEl.style.setProperty('opacity', (val / 100).toString(), 'important');
-                    }
-                  }
-                }
-              }}
-              onMouseUp={(e) => onUpdateOpacity(Number(e.target.value))}
-              onTouchEnd={(e) => onUpdateOpacity(Number(e.target.value))}
-              className="w-full cursor-pointer custom-range-slider"
-              style={{ backgroundImage: `linear-gradient(to right, #4D47FF 0%, #4D47FF ${localOpacity}%, #E2E8F0 ${localOpacity}%, #E2E8F0 100%)` }}
-            />
-          </div>
-          <div className="min-w-[3.5vw] h-[2vw] border-[0.1vw] border-gray-200 rounded-[0.3vw] flex items-center justify-center text-[0.8vw] font-medium text-black bg-white shadow-sm px-[0.5vw]">
-            {localOpacity} %
-          </div>
-        </div>
-
-        {/* Contrast */}
-        <div className="flex items-center gap-[1vw] py-[0.5vw] mt-[0.5vw]">
-          <span className="text-[0.85vw] font-semibold text-black whitespace-nowrap w-[3.5vw]">Contrast :</span>
-          <div className="flex-1 flex items-center h-[1.5vw] rounded-full outline-none">
-            <input
-              type="range"
-              min="0"
-              max="200"
-              value={localContrast}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                setLocalContrast(val);
-                if (selectedElement) {
-                  const pageContainer = document.querySelector(`.page-svg-container[data-page-index="${activePageIndex}"]`);
-                  const targetElement = pageContainer?.querySelector(`[id="${selectedElement.id}"]`) || selectedElement;
-                  if (targetElement) {
-                    const blurVal = localBlur;
-                    const brightnessVal = localBrightness;
-                    let filterString = '';
-                    if (blurVal > 0) filterString += `blur(${blurVal}px) `;
-                    if (brightnessVal !== 100) filterString += `brightness(${brightnessVal}%) `;
-                    if (val !== 100) filterString += `contrast(${val}%)`;
-                    filterString = filterString.trim();
-
-                    if (targetElement.getAttribute('data-type') === 'slideshow') {
-                       const rects = targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)');
-                       const centerRect = rects[2]; // active frame
-                       if (centerRect) {
-                           if (filterString) centerRect.style.filter = filterString;
-                           else centerRect.style.removeProperty('filter');
-                       }
-                    } else {
-                       const imgEl = getSvgImageEl(targetElement);
-                       const elToFilter = (imgEl && imgEl !== targetElement) ? imgEl : targetElement;
-                       if (filterString) {
-                           elToFilter.style.filter = filterString;
-                       } else {
-                           elToFilter.style.removeProperty('filter');
-                       }
-                    }
-                  }
-                }
-              }}
-              onMouseUp={(e) => updateImageSetting('contrast', Number(e.target.value))}
-              onTouchEnd={(e) => updateImageSetting('contrast', Number(e.target.value))}
-              className="w-full cursor-pointer custom-range-slider"
-              style={{ backgroundImage: `linear-gradient(to right, #4D47FF 0%, #4D47FF ${(localContrast / 2)}%, #E2E8F0 ${(localContrast / 2)}%, #E2E8F0 100%)` }}
-            />
-          </div>
-          <div className="min-w-[3.5vw] h-[2vw] border-[0.1vw] border-gray-200 rounded-[0.3vw] flex items-center justify-center text-[0.8vw] font-medium text-black bg-white shadow-sm px-[0.5vw]">
-            {localContrast} %
-          </div>
-        </div>
-
-        {/* Brightness */}
-        <div className="flex items-center gap-[1vw] py-[0.5vw] mt-[0.5vw]">
-          <span className="text-[0.85vw] font-semibold text-black whitespace-nowrap w-[4vw]">Brightness :</span>
-          <div className="flex-1 flex items-center h-[1.5vw] rounded-full outline-none">
-            <input
-              type="range"
-              min="0"
-              max="200"
-              value={localBrightness}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                setLocalBrightness(val);
-                if (selectedElement) {
-                  const pageContainer = document.querySelector(`.page-svg-container[data-page-index="${activePageIndex}"]`);
-                  const targetElement = pageContainer?.querySelector(`[id="${selectedElement.id}"]`) || selectedElement;
-                  if (targetElement) {
-                    const blurVal = localBlur;
-                    const contrastVal = localContrast; 
-                    let filterString = '';
-                    if (blurVal > 0) filterString += `blur(${blurVal}px) `;
-                    if (val !== 100) filterString += `brightness(${val}%) `;
-                    if (contrastVal !== 100) filterString += `contrast(${contrastVal}%)`;
-                    filterString = filterString.trim();
-
-                    if (targetElement.getAttribute('data-type') === 'slideshow') {
-                       const rects = targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)');
-                       const centerRect = rects[2]; // active frame
-                       if (centerRect) {
-                           if (filterString) centerRect.style.filter = filterString;
-                           else centerRect.style.removeProperty('filter');
-                       }
-                    } else {
-                       const imgEl = getSvgImageEl(targetElement);
-                       const elToFilter = (imgEl && imgEl !== targetElement) ? imgEl : targetElement;
-                       if (filterString) {
-                           elToFilter.style.filter = filterString;
-                       } else {
-                           elToFilter.style.removeProperty('filter');
-                       }
-                    }
-                  }
-                }
-              }}
-              onMouseUp={(e) => updateImageSetting('brightness', Number(e.target.value))}
-              onTouchEnd={(e) => updateImageSetting('brightness', Number(e.target.value))}
-              className="w-full cursor-pointer custom-range-slider"
-              style={{ backgroundImage: `linear-gradient(to right, #4D47FF 0%, #4D47FF ${(localBrightness / 2)}%, #E2E8F0 ${(localBrightness / 2)}%, #E2E8F0 100%)` }}
-            />
-          </div>
-          <div className="min-w-[3.5vw] h-[2vw] border-[0.1vw] border-gray-200 rounded-[0.3vw] flex items-center justify-center text-[0.8vw] font-medium text-black bg-white shadow-sm px-[0.5vw]">
-            {localBrightness} %
-          </div>
-        </div>
-
-        {/* Blur */}
-        <div className="flex items-center gap-[1vw] py-[0.5vw] mt-[0.5vw]">
-          <span className="text-[0.85vw] font-semibold text-black whitespace-nowrap w-[3.5vw]">Blur :</span>
-          <div className="flex-1 flex items-center h-[1.5vw] rounded-full outline-none">
-            <input
-              type="range"
-              min="0"
-              max="20"
-              value={localBlur}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                setLocalBlur(val);
-                if (selectedElement) {
-                  const pageContainer = document.querySelector(`.page-svg-container[data-page-index="${activePageIndex}"]`);
-                  const targetElement = pageContainer?.querySelector(`[id="${selectedElement.id}"]`) || selectedElement;
-                  if (targetElement) {
-                    const brightnessVal = localBrightness;
-                    const contrastVal = localContrast;
-                    let filterString = '';
-                    if (val > 0) filterString += `blur(${val}px) `;
-                    if (brightnessVal !== 100) filterString += `brightness(${brightnessVal}%) `;
-                    if (contrastVal !== 100) filterString += `contrast(${contrastVal}%)`;
-                    filterString = filterString.trim();
-
-                    if (targetElement.getAttribute('data-type') === 'slideshow') {
-                       const rects = targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)');
-                       const centerRect = rects[2]; // active frame
-                       if (centerRect) {
-                           if (filterString) centerRect.style.filter = filterString;
-                           else centerRect.style.removeProperty('filter');
-                       }
-                    } else {
-                       const imgEl = getSvgImageEl(targetElement);
-                       const elToFilter = (imgEl && imgEl !== targetElement) ? imgEl : targetElement;
-                       if (filterString) {
-                           elToFilter.style.filter = filterString;
-                       } else {
-                           elToFilter.style.removeProperty('filter');
-                       }
-                    }
-                  }
-                }
-              }}
-              onMouseUp={(e) => updateImageSetting('blur', Number(e.target.value))}
-              onTouchEnd={(e) => updateImageSetting('blur', Number(e.target.value))}
-              className="w-full cursor-pointer custom-range-slider"
-              style={{ backgroundImage: `linear-gradient(to right, #4D47FF 0%, #4D47FF ${(localBlur / 20) * 100}%, #E2E8F0 ${(localBlur / 20) * 100}%, #E2E8F0 100%)` }}
-            />
-          </div>
-          <div className="min-w-[3.5vw] h-[2vw] border-[0.1vw] border-gray-200 rounded-[0.3vw] flex items-center justify-center text-[0.8vw] font-medium text-black bg-white shadow-sm px-[0.5vw]">
-            {localBlur} px
-          </div>
-        </div>
-
-        {/* Text Overlay Settings */}
-        {slideshowImages[activeSlideIndex] && (
-          <div className="flex flex-col gap-[0.5vw] py-[0.5vw] mt-[1vw] border-t border-gray-200 pt-[1vw]">
-            <span className="text-[0.85vw] font-semibold text-black">Image Text Overlay</span>
-            <div className="flex flex-col gap-[0.3vw]">
-              <span className="text-[0.7vw] text-gray-500">Heading</span>
-              <input
-                type="text"
-                value={localHeading}
-                onChange={(e) => {
-                  setLocalHeading(e.target.value);
-                  updateImageSetting('heading', e.target.value);
-                }}
-                className="w-full h-[2vw] rounded-[0.3vw] border border-gray-300 px-[0.5vw] text-[0.8vw] outline-none focus:border-blue-500"
-                placeholder="Enter heading..."
-              />
-            </div>
-            <div className="flex flex-col gap-[0.3vw]">
-              <span className="text-[0.7vw] text-gray-500">Subtext</span>
-              <input
-                type="text"
-                value={localSubtext}
-                onChange={(e) => {
-                  setLocalSubtext(e.target.value);
-                  updateImageSetting('subtext', e.target.value);
-                }}
-                className="w-full h-[2vw] rounded-[0.3vw] border border-gray-300 px-[0.5vw] text-[0.8vw] outline-none focus:border-blue-500"
-                placeholder="Enter subtext..."
-              />
-            </div>
-            
-            <div className="flex gap-[0.5vw] mt-[0.3vw]">
-              <div className="flex-1 flex flex-col gap-[0.3vw]">
-                <span className="text-[0.7vw] text-gray-500">Font</span>
-                <div className="border border-gray-300 rounded-[0.3vw] bg-white overflow-hidden h-[2vw] flex items-center hover:border-blue-500 focus-within:border-blue-500 transition-colors">
-                  <select 
-                    value={localFontFamily} 
-                    onChange={(e) => {
-                      setLocalFontFamily(e.target.value);
-                      updateImageSetting('fontFamily', e.target.value);
-                      
-                      const styleTag = document.getElementById('template-styles');
-                      if (styleTag) {
-                        const currentCss = styleTag.innerHTML;
-                        if (!currentCss.includes(`family=${e.target.value.replace(/ /g, '+')}&`)) {
-                          styleTag.innerHTML = `@import url('https://fonts.googleapis.com/css2?family=${e.target.value.replace(/ /g, '+')}&display=swap');\n` + currentCss;
-                        }
-                      }
+                    <Replace size="0.9vw" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteImage(i);
                     }}
-                    className="w-full h-full px-[0.5vw] text-[0.75vw] text-gray-700 bg-transparent outline-none cursor-pointer appearance-none truncate"
-                    style={{ background: 'url("data:image/svg+xml;utf8,<svg fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%236B7280\' width=\'12\' height=\'12\' xmlns=\'http://www.w3.org/2000/svg\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'></path></svg>") no-repeat right 0.5vw center' }}
+                    className="text-red-500 hover:text-red-600 transition-colors p-[0.2vw]"
+                    title="Delete Image"
                   >
-                    {fontFamilies.map(font => (
-                      <option key={font} value={font}>{font}</option>
-                    ))}
-                  </select>
+                    <Trash2 size="0.9vw" />
+                  </button>
                 </div>
               </div>
 
-              <div className="flex-[0.5] flex flex-col gap-[0.3vw]">
-                <span className="text-[0.7vw] text-gray-500">Size</span>
-                <div className="border border-gray-300 rounded-[0.3vw] bg-white overflow-hidden h-[2vw] flex items-center hover:border-blue-500 focus-within:border-blue-500 transition-colors">
-                  <select 
-                    value={localFontSize} 
-                    onChange={(e) => {
-                      setLocalFontSize(Number(e.target.value));
-                      updateImageSetting('fontSize', Number(e.target.value));
-                    }}
-                    className="w-full h-full px-[0.5vw] text-[0.75vw] text-gray-700 bg-transparent outline-none cursor-pointer appearance-none"
-                    style={{ background: 'url("data:image/svg+xml;utf8,<svg fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%236B7280\' width=\'12\' height=\'12\' xmlns=\'http://www.w3.org/2000/svg\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'></path></svg>") no-repeat right 0.5vw center' }}
-                  >
-                    {fontSizes.map(size => (
-                      <option key={size} value={size}>{size}</option>
-                    ))}
-                  </select>
+              {/* Bottom Section: Heading and Subheading Input Boxes */}
+              <div
+                className="mt-[0.45vw] pt-[0.4vw] border-t border-gray-100 flex flex-col gap-[0.3vw]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-[0.4vw]">
+                  <span className="text-[0.65vw] font-semibold text-gray-500 w-[4.5vw] shrink-0">Heading</span>
+                  <input
+                    type="text"
+                    value={img.heading !== undefined ? img.heading : ''}
+                    onChange={(e) => updateImageAtIndex(i, 'heading', e.target.value)}
+                    placeholder="Enter slide heading..."
+                    className="flex-1 h-[1.6vw] rounded-[0.3vw] border border-gray-200 px-[0.4vw] text-[0.7vw] font-medium text-gray-800 outline-none focus:border-blue-500 bg-gray-50/50 focus:bg-white shadow-2xs transition-all"
+                  />
+                </div>
+                <div className="flex items-center gap-[0.4vw]">
+                  <span className="text-[0.65vw] font-semibold text-gray-500 w-[4.5vw] shrink-0">Subheading</span>
+                  <input
+                    type="text"
+                    value={img.subtext !== undefined ? img.subtext : ''}
+                    onChange={(e) => updateImageAtIndex(i, 'subtext', e.target.value)}
+                    placeholder="Enter slide subheading..."
+                    className="flex-1 h-[1.6vw] rounded-[0.3vw] border border-gray-200 px-[0.4vw] text-[0.7vw] text-gray-700 outline-none focus:border-blue-500 bg-gray-50/50 focus:bg-white shadow-2xs transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── 3. Slideshow Properties Header ── */}
+      <div className="flex items-center gap-[0.5vw] pt-[0.4vw]">
+        <span className="text-[0.85vw] font-bold text-gray-900 whitespace-nowrap">Slideshow Properties</span>
+        <div className="h-[0.0925vw] bg-gray-200 flex-1" style={{ marginRight: '-1.5vw' }}></div>
+      </div>
+
+      {/* Auto Slide Duration */}
+      <div className="flex items-center justify-between">
+        <span className="text-[0.75vw] font-semibold text-gray-800 whitespace-nowrap">Auto Slide Duration</span>
+        <div className="flex-1 border-b border-dashed border-gray-200 mx-[0.75vw]" />
+        <div className="relative">
+          <select
+            value={slideshowSettings.speed || 3}
+            onChange={(e) => updateSetting('speed', Number(e.target.value))}
+            className="h-[2vw] px-[0.75vw] pr-[1.8vw] border border-gray-200 rounded-[0.4vw] text-[0.75vw] font-medium text-gray-700 bg-white outline-none cursor-pointer appearance-none hover:border-gray-300 shadow-2xs"
+            style={{
+              background: `url("data:image/svg+xml;utf8,<svg fill='%236B7280' viewBox='0 0 24 24' width='14' height='14' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>") no-repeat right 0.4vw center`
+            }}
+          >
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20].map((s) => (
+              <option key={s} value={s}>{s} sec</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Infinity Loop Mode */}
+      <div className="flex items-center justify-between">
+        <span className="text-[0.75vw] font-semibold text-gray-800 whitespace-nowrap">Infinity Loop Mode</span>
+        <div className="flex-1 border-b border-dashed border-gray-200 mx-[0.75vw]" />
+        <button
+          type="button"
+          onClick={() => updateSetting('infiniteLoop', !(slideshowSettings.infiniteLoop ?? true))}
+          className={`relative block w-[2.2vw] h-[1.2vw] rounded-[1vw] transition-all duration-200 ease-in-out outline-none shrink-0 cursor-pointer ${
+            (slideshowSettings.infiniteLoop ?? true) ? 'bg-[#EC5137]' : 'bg-[#e5e7eb]'
+          }`}
+        >
+          <div
+            className={`absolute top-[0.12vw] w-[0.96vw] h-[0.96vw] bg-white rounded-full transition-all duration-200 ease-in-out shadow-[0_0.05vw_0.1vw_rgba(0,0,0,0.25)] ${
+              (slideshowSettings.infiniteLoop ?? true) ? 'left-[1.1vw]' : 'left-[0.12vw]'
+            }`}
+          />
+        </button>
+      </div>
+
+      {/* Slide Effect */}
+      <div className="flex items-center justify-between">
+        <span className="text-[0.75vw] font-semibold text-gray-800 whitespace-nowrap">Slide Effect</span>
+        <div className="flex-1 border-b border-dashed border-gray-200 mx-[0.75vw]" />
+        <div className="relative">
+          <PremiumDropdown
+            options={['Linear', 'Fade', 'Flip', 'Reveal', 'Slide']}
+            value={slideshowSettings.transitionEffect || 'Linear'}
+            onChange={(val) => updateSetting('transitionEffect', val)}
+            width="6.8vw"
+            align="right"
+            buttonClassName="!border-gray-200 !border !rounded-[0.4vw] !text-[0.75vw] !font-medium !h-[2vw] !bg-white shadow-2xs"
+          />
+        </div>
+      </div>
+
+      {/* Manual Navigation Button */}
+      <div className="space-y-[0.75vw]">
+        <div className="flex items-center justify-between">
+          <span className="text-[0.75vw] font-semibold text-gray-800 whitespace-nowrap">Manual Navigation Button</span>
+          <div className="flex-1 border-b border-dashed border-gray-200 mx-[0.75vw]" />
+          <button
+            type="button"
+            onClick={() => {
+              const next = !(slideshowSettings.showArrows ?? true);
+              updateSetting('showArrows', next);
+              updateSetting('showNav', next);
+            }}
+            className={`relative block w-[2.2vw] h-[1.2vw] rounded-[1vw] transition-all duration-200 ease-in-out outline-none shrink-0 cursor-pointer ${
+              (slideshowSettings.showArrows ?? true) ? 'bg-[#EC5137]' : 'bg-[#e5e7eb]'
+            }`}
+          >
+            <div
+              className={`absolute top-[0.12vw] w-[0.96vw] h-[0.96vw] bg-white rounded-full transition-all duration-200 ease-in-out shadow-[0_0.05vw_0.1vw_rgba(0,0,0,0.25)] ${
+                (slideshowSettings.showArrows ?? true) ? 'left-[1.1vw]' : 'left-[0.12vw]'
+              }`}
+            />
+          </button>
+        </div>
+
+        {(slideshowSettings.showArrows ?? true) && (
+          <div className="flex items-center justify-between gap-[1vw] pt-[0.2vw]">
+            {/* Left Column: Size & Color */}
+            <div className="flex-1 flex flex-col gap-[0.55vw]">
+              <div className="flex items-center gap-[0.5vw]">
+                <span className="text-[0.7vw] font-medium text-gray-700">Button Size :</span>
+                <span className="text-[0.65vw] px-[0.4vw] py-[0.05vw] bg-gray-100 rounded text-gray-600 font-medium">
+                  {slideshowSettings.navButtonSize || 100}%
+                </span>
+              </div>
+              {/* Range Slider */}
+              <input
+                type="range"
+                min="50"
+                max="200"
+                value={slideshowSettings.navButtonSize || 100}
+                onChange={(e) => updateSetting('navButtonSize', Number(e.target.value))}
+                className="w-full cursor-pointer h-[0.25vw] rounded-full accent-[#EC5137]"
+                style={{
+                  backgroundImage: `linear-gradient(to right, #EC5137 0%, #EC5137 ${((slideshowSettings.navButtonSize || 100) - 50) / 1.5}%, #e5e7eb ${((slideshowSettings.navButtonSize || 100) - 50) / 1.5}%, #e5e7eb 100%)`
+                }}
+              />
+              {/* Color Swatch & HEX box */}
+              <div className="flex items-center gap-[0.4vw] mt-[0.1vw]">
+                <div
+                  className="w-[2vw] h-[2vw] rounded-[0.4vw] cursor-pointer shadow-2xs border border-gray-200 shrink-0"
+                  style={{ background: slideshowSettings.navIconColor || '#EC5137' }}
+                  onClick={() => setShowNavColorPicker(true)}
+                />
+                <div className="flex-1 h-[2vw] border border-gray-200 rounded-[0.4vw] px-[0.6vw] flex items-center justify-between bg-white shadow-2xs">
+                  <span className="text-[0.75vw] text-gray-700 font-medium uppercase truncate">
+                    {slideshowSettings.navIconColor || '#EC5137'}
+                  </span>
+                  <span className="text-[0.7vw] text-gray-400">100%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Preview Card */}
+            <div
+              onClick={() => setShowNavStylesPopup(true)}
+              className="w-[7.8vw] h-[4.8vw] bg-white border border-gray-200 rounded-[0.5vw] relative flex items-center justify-center cursor-pointer hover:border-gray-400 shadow-2xs shrink-0 group/nav"
+            >
+              <div className="absolute top-[0.35vw] right-[0.4vw] text-gray-400 group-hover/nav:text-gray-600 transition-colors">
+                <Icon icon="lucide:arrow-right-left" className="w-[0.85vw] h-[0.85vw]" />
+              </div>
+              <div className="flex items-center justify-center gap-[0.9vw]">
+                <div className="flex items-center justify-center">
+                  {NavIconRenderer({ styleId: slideshowSettings.navStyle || 1, size: '1.4vw', color: slideshowSettings.navIconColor || '#EC5137' }).left}
+                </div>
+                <div className="flex items-center justify-center">
+                  {NavIconRenderer({ styleId: slideshowSettings.navStyle || 1, size: '1.4vw', color: slideshowSettings.navIconColor || '#EC5137' }).right}
                 </div>
               </div>
             </div>
           </div>
         )}
+      </div>
 
+      {/* Pagination Dots */}
+      <div className="space-y-[0.75vw]">
+        <div className="flex items-center justify-between">
+          <span className="text-[0.75vw] font-semibold text-gray-800 whitespace-nowrap">Pagination Dots</span>
+          <div className="flex-1 border-b border-dashed border-gray-200 mx-[0.75vw]" />
+          <button
+            type="button"
+            onClick={() => updateSetting('showDots', !(slideshowSettings.showDots ?? true))}
+            className={`relative block w-[2.2vw] h-[1.2vw] rounded-[1vw] transition-all duration-200 ease-in-out outline-none shrink-0 cursor-pointer ${
+              (slideshowSettings.showDots ?? true) ? 'bg-[#EC5137]' : 'bg-[#e5e7eb]'
+            }`}
+          >
+            <div
+              className={`absolute top-[0.12vw] w-[0.96vw] h-[0.96vw] bg-white rounded-full transition-all duration-200 ease-in-out shadow-[0_0.05vw_0.1vw_rgba(0,0,0,0.25)] ${
+                (slideshowSettings.showDots ?? true) ? 'left-[1.1vw]' : 'left-[0.12vw]'
+              }`}
+            />
+          </button>
+        </div>
+
+        {(slideshowSettings.showDots ?? true) && (
+          <div className="flex items-center justify-between gap-[1vw] pt-[0.2vw]">
+            {/* Left Column: Size & Color */}
+            <div className="flex-1 flex flex-col gap-[0.55vw]">
+              <div className="flex items-center gap-[0.5vw]">
+                <span className="text-[0.7vw] font-medium text-gray-700">Button Size :</span>
+                <span className="text-[0.65vw] px-[0.4vw] py-[0.05vw] bg-gray-100 rounded text-gray-600 font-medium">
+                  {slideshowSettings.dotButtonSize || 100}%
+                </span>
+              </div>
+              {/* Range Slider */}
+              <input
+                type="range"
+                min="50"
+                max="200"
+                value={slideshowSettings.dotButtonSize || 100}
+                onChange={(e) => updateSetting('dotButtonSize', Number(e.target.value))}
+                className="w-full cursor-pointer h-[0.25vw] rounded-full accent-[#EC5137]"
+                style={{
+                  backgroundImage: `linear-gradient(to right, #EC5137 0%, #EC5137 ${((slideshowSettings.dotButtonSize || 100) - 50) / 1.5}%, #e5e7eb ${((slideshowSettings.dotButtonSize || 100) - 50) / 1.5}%, #e5e7eb 100%)`
+                }}
+              />
+              {/* Color Swatch & HEX box */}
+              <div className="flex items-center gap-[0.4vw] mt-[0.1vw]">
+                <div
+                  className="w-[2vw] h-[2vw] rounded-[0.4vw] cursor-pointer shadow-2xs border border-gray-200 shrink-0"
+                  style={{ background: slideshowSettings.dotColor || '#EC5137' }}
+                  onClick={() => setShowDotColorPicker(true)}
+                />
+                <div className="flex-1 h-[2vw] border border-gray-200 rounded-[0.4vw] px-[0.6vw] flex items-center justify-between bg-white shadow-2xs">
+                  <span className="text-[0.75vw] text-gray-700 font-medium uppercase truncate">
+                    {slideshowSettings.dotColor || '#EC5137'}
+                  </span>
+                  <span className="text-[0.7vw] text-gray-400">100%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Preview Card */}
+            <div
+              onClick={() => setShowDotStylesPopup(true)}
+              className="w-[7.8vw] h-[4.8vw] bg-white border border-gray-200 rounded-[0.5vw] relative flex items-center justify-center cursor-pointer hover:border-gray-400 shadow-2xs shrink-0 group/dots"
+            >
+              <div className="absolute top-[0.35vw] right-[0.4vw] text-gray-400 group-hover/dots:text-gray-600 transition-colors">
+                <Icon icon="lucide:arrow-right-left" className="w-[0.85vw] h-[0.85vw]" />
+              </div>
+              <div className="flex items-center justify-center">
+                <DotRenderer
+                  styleId={slideshowSettings.dotStyle || 1}
+                  size="0.6vw"
+                  color={slideshowSettings.dotColor || '#EC5137'}
+                  activeIndex={0}
+                  count={3}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── 4. Background Color ── */}
+      <div className="space-y-[0.6vw] pt-[0.4vw]">
+        <div className="flex items-center gap-[0.5vw]">
+          <span className="text-[0.85vw] font-bold text-gray-900 whitespace-nowrap">Background Color</span>
+          <div className="h-[0.0925vw] bg-gray-200 flex-1" style={{ marginRight: '-1.5vw' }}></div>
+        </div>
+        <div className="flex items-center justify-between gap-[0.5vw]">
+          <div
+            className="w-[2vw] h-[2vw] rounded-[0.4vw] cursor-pointer shadow-2xs border border-gray-200 shrink-0"
+            style={{ background: slideshowSettings.bgColor || '#000000' }}
+            onClick={() => setShowBgColorPicker(true)}
+          />
+          <div className="flex-1 h-[2vw] border border-gray-200 rounded-[0.4vw] px-[0.75vw] flex items-center justify-between bg-white shadow-2xs">
+            <span className="text-[0.75vw] text-gray-700 font-medium uppercase">
+              {slideshowSettings.bgColor || '#000000'}
+            </span>
+            <span className="text-[0.7vw] text-gray-400 font-medium">
+              {slideshowSettings.bgOpacity ?? 100}%
+            </span>
+          </div>
+          <div className="h-[2vw] px-[0.75vw] border border-gray-200 rounded-[0.4vw] flex items-center justify-between text-[0.75vw] font-medium text-gray-600 bg-white cursor-pointer hover:bg-gray-50 shadow-2xs">
+            <span>HEX</span>
+            <ChevronDown size="0.75vw" className="text-gray-400 ml-[0.3vw]" />
+          </div>
+        </div>
+      </div>
+
+      {/* ── 5. Stoke Color ── */}
+      <div className="space-y-[0.75vw] pt-[0.4vw]">
+        <div className="flex items-center gap-[0.5vw]">
+          <span className="text-[0.85vw] font-bold text-gray-900 whitespace-nowrap">Stoke Color</span>
+          <div className="h-[0.0925vw] bg-gray-200 flex-1" style={{ marginRight: '-1.5vw' }}></div>
+        </div>
+        {/* Swatch & Hex input row */}
+        <div className="flex items-center justify-between gap-[0.5vw]">
+          <div
+            className="w-[2vw] h-[2vw] rounded-[0.4vw] cursor-pointer shadow-2xs border border-gray-200 shrink-0"
+            style={{ background: slideshowSettings.strokeColor || '#000000' }}
+            onClick={() => setShowStrokeColorPicker(true)}
+          />
+          <div className="flex-1 h-[2vw] border border-gray-200 rounded-[0.4vw] px-[0.75vw] flex items-center justify-between bg-white shadow-2xs">
+            <span className="text-[0.75vw] text-gray-700 font-medium uppercase">
+              {slideshowSettings.strokeColor || '#000000'}
+            </span>
+            <span className="text-[0.7vw] text-gray-400 font-medium">
+              {slideshowSettings.strokeOpacity ?? 100}%
+            </span>
+          </div>
+          <div className="h-[2vw] px-[0.75vw] border border-gray-200 rounded-[0.4vw] flex items-center justify-between text-[0.75vw] font-medium text-gray-600 bg-white cursor-pointer hover:bg-gray-50 shadow-2xs">
+            <span>HEX</span>
+            <ChevronDown size="0.75vw" className="text-gray-400 ml-[0.3vw]" />
+          </div>
+        </div>
+
+        {/* Row 1: Alignment & Stoke Width */}
+        <div className="flex items-center gap-[1vw]">
+          {/* Alignment */}
+          <div className="flex-1 flex flex-col gap-[0.25vw]">
+            <span className="text-[0.7vw] text-gray-500 font-medium">Alignment</span>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsAlignOpen(!isAlignOpen)}
+                className="w-full h-[2vw] px-[0.6vw] border border-gray-200 rounded-[0.4vw] flex items-center justify-between bg-white text-[0.75vw] text-gray-700 hover:bg-gray-50 shadow-2xs"
+              >
+                <span>{slideshowSettings.strokeAlignment || 'Center'}</span>
+                <ChevronDown size="0.75vw" className="text-gray-400" />
+              </button>
+              {isAlignOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setIsAlignOpen(false)} />
+                  <div className="absolute top-full left-0 right-0 mt-[0.2vw] bg-white border border-gray-200 rounded-[0.4vw] shadow-lg z-40 py-1">
+                    {['Inside', 'Center', 'Outside'].map((pos) => (
+                      <div
+                        key={pos}
+                        onClick={() => {
+                          updateSetting('strokeAlignment', pos);
+                          setIsAlignOpen(false);
+                        }}
+                        className="px-[0.75vw] py-[0.35vw] text-[0.7vw] text-gray-700 hover:bg-blue-50 hover:text-blue-600 cursor-pointer"
+                      >
+                        {pos}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Stoke Width */}
+          <div className="flex-1 flex flex-col gap-[0.25vw]">
+            <span className="text-[0.7vw] text-gray-500 font-medium">Stoke Width</span>
+            <div className="flex items-center gap-[0.25vw] h-[2vw]">
+              <button
+                type="button"
+                onClick={() => updateSetting('strokeWidth', Math.max(0, (slideshowSettings.strokeWidth || 1) - 1))}
+                className="w-[2vw] h-full flex items-center justify-center bg-gray-100 rounded-[0.3vw] text-gray-600 hover:bg-gray-200 transition-colors"
+              >
+                <Minus size="0.75vw" />
+              </button>
+              <input
+                type="number"
+                value={slideshowSettings.strokeWidth ?? 1}
+                onChange={(e) => updateSetting('strokeWidth', Math.max(0, Number(e.target.value)))}
+                className="flex-1 h-full bg-white border border-gray-200 rounded-[0.4vw] text-center text-[0.75vw] font-medium text-gray-700 outline-none shadow-2xs no-spin"
+              />
+              <button
+                type="button"
+                onClick={() => updateSetting('strokeWidth', (slideshowSettings.strokeWidth || 1) + 1)}
+                className="w-[2vw] h-full flex items-center justify-center bg-gray-100 rounded-[0.3vw] text-gray-600 hover:bg-gray-200 transition-colors"
+              >
+                <Plus size="0.75vw" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: Line style & Dash Property */}
+        <div className="flex items-center gap-[1vw]">
+          {/* Line style */}
+          <div className="flex-1 flex flex-col gap-[0.25vw]">
+            <span className="text-[0.7vw] text-gray-500 font-medium">Line style</span>
+            <div className="flex items-center justify-between gap-[0.3vw] h-[2vw]">
+              {/* Solid */}
+              <button
+                type="button"
+                onClick={() => updateSetting('strokeLineStyle', 'Solid')}
+                className={`flex-1 h-full flex items-center justify-center rounded-[0.4vw] border transition-colors ${
+                  (slideshowSettings.strokeLineStyle || 'Solid') === 'Solid'
+                    ? 'bg-white border-gray-400 shadow-2xs'
+                    : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                <div className="w-[1.2vw] h-[0.1vw] bg-gray-700 rounded-full" />
+              </button>
+              {/* Dotted */}
+              <button
+                type="button"
+                onClick={() => updateSetting('strokeLineStyle', 'Dotted')}
+                className={`flex-1 h-full flex items-center justify-center rounded-[0.4vw] border transition-colors ${
+                  slideshowSettings.strokeLineStyle === 'Dotted'
+                    ? 'bg-white border-gray-400 shadow-2xs'
+                    : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                <div className="flex gap-[0.1vw]">
+                  <div className="w-[0.2vw] h-[0.1vw] bg-gray-700 rounded-full" />
+                  <div className="w-[0.2vw] h-[0.1vw] bg-gray-700 rounded-full" />
+                  <div className="w-[0.2vw] h-[0.1vw] bg-gray-700 rounded-full" />
+                </div>
+              </button>
+              {/* Dashed */}
+              <button
+                type="button"
+                onClick={() => updateSetting('strokeLineStyle', 'Dashed')}
+                className={`flex-1 h-full flex items-center justify-center rounded-[0.4vw] border transition-colors ${
+                  slideshowSettings.strokeLineStyle === 'Dashed'
+                    ? 'bg-white border-gray-400 shadow-2xs'
+                    : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                <div className="flex gap-[0.12vw]">
+                  <div className="w-[0.4vw] h-[0.1vw] bg-gray-700 rounded-full" />
+                  <div className="w-[0.4vw] h-[0.1vw] bg-gray-700 rounded-full" />
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Dash Property */}
+          <div className="flex-1 flex flex-col gap-[0.25vw]">
+            <span className="text-[0.7vw] text-gray-500 font-medium">Dash Property</span>
+            <div className="flex items-center gap-[0.3vw] h-[2vw]">
+              <div className="flex-1 flex items-center justify-between border border-gray-200 rounded-[0.4vw] bg-white h-full px-[0.5vw] shadow-2xs">
+                <span className="text-[0.7vw] text-gray-400 font-medium">L</span>
+                <input
+                  type="number"
+                  value={slideshowSettings.strokeDashLength ?? 8}
+                  onChange={(e) => updateSetting('strokeDashLength', Math.max(1, Number(e.target.value)))}
+                  className="w-[1.8vw] bg-transparent outline-none text-[0.75vw] text-gray-700 font-medium text-center no-spin"
+                />
+              </div>
+              <span className="text-[0.7vw] text-gray-400 font-bold">:</span>
+              <div className="flex-1 flex items-center justify-between border border-gray-200 rounded-[0.4vw] bg-white h-full px-[0.5vw] shadow-2xs">
+                <span className="text-[0.7vw] text-gray-400 font-medium">G</span>
+                <input
+                  type="number"
+                  value={slideshowSettings.strokeDashGap ?? 4}
+                  onChange={(e) => updateSetting('strokeDashGap', Math.max(1, Number(e.target.value)))}
+                  className="w-[1.8vw] bg-transparent outline-none text-[0.75vw] text-gray-700 font-medium text-center no-spin"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 3: Line Corner */}
+        <div className="flex items-center gap-[1vw]">
+          <div className="flex-1 flex flex-col gap-[0.25vw]">
+            <span className="text-[0.7vw] text-gray-500 font-medium">Line Corner</span>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsCornerOpen(!isCornerOpen)}
+                className="w-full h-[2vw] px-[0.6vw] border border-gray-200 rounded-[0.4vw] flex items-center justify-between bg-white text-[0.75vw] text-gray-700 hover:bg-gray-50 shadow-2xs"
+              >
+                <span>{slideshowSettings.strokeLineCorner || 'Rounded'}</span>
+                <ChevronDown size="0.75vw" className="text-gray-400" />
+              </button>
+              {isCornerOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setIsCornerOpen(false)} />
+                  <div className="absolute top-full left-0 right-0 mt-[0.2vw] bg-white border border-gray-200 rounded-[0.4vw] shadow-lg z-40 py-1">
+                    {['Rounded', 'Square'].map((c) => (
+                      <div
+                        key={c}
+                        onClick={() => {
+                          updateSetting('strokeLineCorner', c);
+                          setIsCornerOpen(false);
+                        }}
+                        className="px-[0.75vw] py-[0.35vw] text-[0.7vw] text-gray-700 hover:bg-blue-50 hover:text-blue-600 cursor-pointer"
+                      >
+                        {c}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="flex-1" />
+        </div>
       </div>
 
 
+
+
       {/* Popups & Pickers */}
+      {showBgColorPicker && createPortal(
+        <div id="slideshow-bg-color-picker" className="fixed z-[9999]" style={{ top: '160px', right: '10.5vw' }}>
+          <div className="relative">
+            <div className="fixed inset-0" onClick={() => setShowBgColorPicker(false)} />
+            <ColorPicker
+              color={slideshowSettings.bgColor || '#000000'}
+              onChange={(val) => updateSetting('bgColor', val)}
+              opacity={slideshowSettings.bgOpacity ?? 100}
+              onOpacityChange={(val) => updateSetting('bgOpacity', val)}
+              onClose={() => setShowBgColorPicker(false)}
+              className="relative z-[10000]"
+              colorsOnPage={colorsOnPage}
+            />
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showStrokeColorPicker && createPortal(
+        <div id="slideshow-stroke-color-picker" className="fixed z-[9999]" style={{ top: '160px', right: '10.5vw' }}>
+          <div className="relative">
+            <div className="fixed inset-0" onClick={() => setShowStrokeColorPicker(false)} />
+            <ColorPicker
+              color={slideshowSettings.strokeColor || '#000000'}
+              onChange={(val) => updateSetting('strokeColor', val)}
+              opacity={slideshowSettings.strokeOpacity ?? 100}
+              onOpacityChange={(val) => updateSetting('strokeOpacity', val)}
+              onClose={() => setShowStrokeColorPicker(false)}
+              className="relative z-[10000]"
+              colorsOnPage={colorsOnPage}
+            />
+          </div>
+        </div>,
+        document.body
+      )}
+
       {showDotColorPicker && createPortal(
         <div id="slideshow-color-picker" className="fixed z-[9999]" style={{ top: '160px', right: '10.5vw' }}>
           <div className="relative">
@@ -2495,7 +2805,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
           if (showReplaceModal) {
             handleModalReplace(file);
           } else {
-            handleGallerySelect({ url: URL.createObjectURL(file), file });
+            handleGallerySelect(file);
           }
         }}
       />

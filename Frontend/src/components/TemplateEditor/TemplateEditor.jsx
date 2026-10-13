@@ -1057,26 +1057,32 @@ const TemplateEditor = () => {
             }
 
             if (actualDataUri) {
-              let blob;
-              if (actualDataUri.startsWith('blob:')) {
-                const res = await fetch(actualDataUri);
-                blob = await res.blob();
-              } else {
-                const parts = actualDataUri.split(',');
-                const mimeString = parts[0].split(':')[1].split(';')[0];
-                let byteString;
-                if (parts[0].indexOf('base64') >= 0) {
-                  byteString = atob(parts[1]);
+              let blob = null;
+              try {
+                if (actualDataUri.startsWith('blob:')) {
+                  const res = await fetch(actualDataUri);
+                  if (res.ok) blob = await res.blob();
                 } else {
-                  byteString = decodeURI(parts[1]);
+                  const parts = actualDataUri.split(',');
+                  const mimeString = parts[0].split(':')[1].split(';')[0];
+                  let byteString;
+                  if (parts[0].indexOf('base64') >= 0) {
+                    byteString = atob(parts[1]);
+                  } else {
+                    byteString = decodeURI(parts[1]);
+                  }
+                  const ab = new ArrayBuffer(byteString.length);
+                  const ia = new Uint8Array(ab);
+                  for (let i = 0; i < byteString.length; i++) {
+                    ia[i] = byteString.charCodeAt(i);
+                  }
+                  blob = new Blob([ab], { type: mimeString });
                 }
-                const ab = new ArrayBuffer(byteString.length);
-                const ia = new Uint8Array(ab);
-                for (let i = 0; i < byteString.length; i++) {
-                  ia[i] = byteString.charCodeAt(i);
-                }
-                blob = new Blob([ab], { type: mimeString });
+              } catch (blobErr) {
+                console.warn("[Save] Skipped unresolvable asset data URI:", blobErr);
               }
+
+              if (!blob) continue;
 
               const formData = new FormData();
               formData.append('emailId', user?.emailId);
