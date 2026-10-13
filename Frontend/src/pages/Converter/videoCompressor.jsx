@@ -74,14 +74,17 @@ const VideoCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
-  // Dynamic estimated size matching the screenshot badge (e.g., 52 MB -> 18 MB at 70%)
+  // Dynamic estimated size matching realistic H.264 compression (e.g. 2.6 MB -> 1.2-1.3 MB at 100%)
   const calculateEstimatedSize = () => {
     const origBytes = getOriginalBytes();
-    // 70% compression means file is reduced by ~65-70% (leaving ~30-35% remaining)
-    let remainingRatio = Math.max(0.12, (100 - compressionLevel * 0.85) / 100);
+    // Realistic video compression ratio:
+    // At 0% slider: ~90% remaining
+    // At 50% slider: ~65% remaining
+    // At 100% slider: ~48% remaining (approx 50-52% size reduction)
+    let remainingRatio = 0.90 - (compressionLevel / 100) * 0.42;
 
-    if (resolution.includes('720p')) remainingRatio *= 0.8;
-    else if (resolution.includes('480p')) remainingRatio *= 0.55;
+    if (resolution.includes('720p')) remainingRatio *= 0.85;
+    else if (resolution.includes('480p')) remainingRatio *= 0.65;
 
     const estBytes = Math.round(origBytes * remainingRatio);
     return formatBytes(estBytes);
