@@ -25,6 +25,7 @@ import MapEditor from './Elements/MapEditor';
 import SlideshowEditor from './Elements/slideshowEditor';
 import TextElementEditor from './Elements/TextElementEditor';
 import ButtonEditor from './Elements/ButtonEdtitor';
+import AnimatedDecoratorsProperties from './Elements/Animated_Decorators_Properties';
 import ImageFramingProperties from './Elements/ImageFramingProperties';
 import ColorPicker, { parseGradient } from './ColorPicker';
 import MediaGalleryPopup from './MediaGalleryPopup';
@@ -856,6 +857,14 @@ const RightSidebar = ({
           props.typographyId = typographyParent ? typographyParent.id : selectedLayerId;
         }
 
+        const decoratorParent = el.closest('[data-type="decorator"], [id^="decorator-"]');
+        const isDecorator = dataType === 'decorator' || lowerId.includes('decorator') || !!decoratorParent;
+        if (isDecorator) {
+          props.decoratorId = decoratorParent ? decoratorParent.id : selectedLayerId;
+          props.isDecorator = true;
+          return props;
+        }
+
         const buttonParent = el.closest('[data-type="button"], [id^="button-"]');
         const isButton = dataType === 'button' || lowerId.includes('button') || !!buttonParent;
         if (isButton) {
@@ -1485,6 +1494,15 @@ const RightSidebar = ({
                             const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
                             return editorDoc.getElementById(selectedLayerId);
                           })()}
+                          activePageIndex={activePageIndex}
+                          currentPageVId={pages[activePageIndex]?.v_id || pages[activePageIndex]?.id || ''}
+                          folderName={effectiveFolder}
+                          flipbookName={effectiveBook}
+                          flipbookVId={effectiveVId}
+                          opacity={selectedElementProps?.opacity !== undefined ? Math.round(parseFloat(selectedElementProps.opacity) * 100) : 100}
+                          onUpdateOpacity={(newOpacity) => {
+                            updateElementAttribute(activePageIndex, selectedLayerId, 'opacity', (newOpacity / 100).toString());
+                          }}
                           onDeleteLayer={() => deleteLayer?.(activePageIndex, selectedLayerId)}
                           onUpdate={(newHtml) => {
                             window.__skipCanvasUpdateForPage = activePageIndex;
@@ -1503,6 +1521,46 @@ const RightSidebar = ({
                             window.__skipCanvasUpdateForPage = activePageIndex;
                             if (typeof newHtml === 'string') {
                               updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', newHtml);
+                            }
+                          }}
+                        />
+                      ) : selectedElementProps?.isDecorator ? (
+                        <AnimatedDecoratorsProperties
+                          selectedElement={(() => {
+                            const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                            return editorDoc.getElementById(selectedElementProps.decoratorId || selectedLayerId);
+                          })()}
+                          selectedLayerId={selectedElementProps.decoratorId || selectedLayerId}
+                          activePageIndex={activePageIndex}
+                          updateElementAttribute={updateElementAttribute}
+                          onUpdate={(newHtml) => {
+                            window.__skipCanvasUpdateForPage = activePageIndex;
+                            if (typeof newHtml === 'string') {
+                              updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', newHtml);
+                            } else {
+                              const svgRoot = (() => {
+                                const targetId = selectedElementProps?.decoratorId || selectedLayerId;
+                                const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                                const el = (targetId ? editorDoc.getElementById(targetId) : null) || (targetId ? document.getElementById(targetId) : null);
+                                if (!el) return null;
+                                const container = el.closest('.page-svg-container');
+                                if (container) {
+                                  const canvasContent = container.querySelector('[id^="canvas-content-"]');
+                                  return canvasContent ? canvasContent.querySelector('svg') : container.querySelector('svg');
+                                }
+                                let node = el;
+                                let lastSvg = null;
+                                while (node) {
+                                  if (node.tagName?.toLowerCase() === 'svg') lastSvg = node;
+                                  node = node.parentElement;
+                                }
+                                return lastSvg;
+                              })();
+                              if (svgRoot) {
+                                const serializer = new XMLSerializer();
+                                const html = serializer.serializeToString(svgRoot);
+                                updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', html);
+                              }
                             }
                           }}
                         />

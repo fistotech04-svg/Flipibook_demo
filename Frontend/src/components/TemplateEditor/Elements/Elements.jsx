@@ -10,6 +10,7 @@ import ThirdPartyEmbed from './3rdPartyEmbed';
 import TextElementStyle from './TextElementStyle';
 import SlideShowStyle from './slideShowstyle';
 import ButtonStyle from './ButtonStyle';
+import AnimatedDecorators from './Animated_Decorators';
 
 // Map element as inline component (your work)
 const MapElement = ({ isFullView }) => {
@@ -77,6 +78,7 @@ const sectionData = [
   { id: 'typography',    title: 'Typography',       component: TypographyElement },
   { id: 'buttons',       title: 'Buttons',          component: ButtonStyle },
   { id: 'slideshow',     title: 'Slideshow',        component: SlideShowStyle },
+  { id: 'decorators',    title: 'Animated Decorators', component: AnimatedDecorators },
 ];
 
 const Elements = () => {
