@@ -260,6 +260,190 @@ foreignObject[data-type="video"] * {
   pointer-events: auto !important;
 }
 
+/* Map Element Overrides & Container Responsiveness */
+[data-type="map"] foreignObject {
+  overflow: hidden !important;
+  border-radius: 0px !important;
+}
+[data-type="map"] foreignObject > div.map-root-container,
+[data-type="map"] foreignObject > div:first-child {
+  border-radius: 0px !important;
+  width: 100% !important;
+  height: 100% !important;
+  white-space: normal !important;
+  overflow: hidden !important;
+  line-height: normal !important;
+  position: relative !important;
+  container-type: size !important;
+}
+[data-type="map"] foreignObject div,
+[data-type="map"] foreignObject span,
+[data-type="map"] foreignObject a,
+[data-type="map"] foreignObject p {
+  white-space: normal !important;
+  word-wrap: normal !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+}
+[data-type="map"] foreignObject .map-stage {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  transform-origin: 0 0 !important;
+  overflow: hidden !important;
+}
+[data-type="map"] foreignObject .map-overlay-wrapper {
+  position: absolute !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+}
+[data-type="map"] foreignObject iframe {
+  pointer-events: none !important;
+  border: none !important;
+  display: block !important;
+}
+.page-svg-container [data-type="map"] foreignObject svg,
+[data-type="map"] foreignObject svg,
+[data-type="map"] foreignObject svg.svg-icon-override {
+  width: auto !important;
+  height: auto !important;
+  max-width: none !important;
+  max-height: none !important;
+  display: inline-block !important;
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+[data-type="map"] foreignObject .map-card-overlay {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  pointer-events: auto !important;
+  box-sizing: border-box !important;
+}
+[data-type="map"] foreignObject .map-card-overlay * {
+  line-height: normal;
+  box-sizing: border-box;
+}
+[data-type="map"] foreignObject .map-nowrap,
+[data-type="map"] foreignObject [data-nowrap="true"] {
+  white-space: nowrap !important;
+}
+
+/* Fluid map responsive rules */
+[data-type="map"] foreignObject .map-top-badge {
+  max-width: 88% !important;
+}
+[data-type="map"] foreignObject .map-top-badge .map-badge-title,
+[data-type="map"] foreignObject .map-top-badge .map-badge-subtitle {
+  max-width: clamp(90px, 45cqw, 160px) !important;
+}
+[data-type="map"] foreignObject .map-card-actions {
+  max-height: 52% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-end !important;
+}
+[data-type="map"] foreignObject .map-actions-row {
+  display: flex !important;
+  gap: clamp(2px, 1.5cqw, 5px) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+[data-type="map"] foreignObject .map-action-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: clamp(2px, 1cqw, 4px) !important;
+  padding: clamp(3px, 1.2cqh, 5px) clamp(2px, 1cqw, 5px) !important;
+  border-radius: clamp(4px, 1.5cqw, 6px) !important;
+  font-size: clamp(7.5px, 2.7cqw, 9.5px) !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  min-width: 0 !important;
+}
+[data-type="map"] foreignObject .map-btn-text {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: inherit !important;
+}
+
+/* Container Queries for compact map elements */
+@container (max-height: 190px) {
+  [data-type="map"] foreignObject .map-drag-pill {
+    display: none !important;
+  }
+  [data-type="map"] foreignObject .map-biz-category {
+    display: none !important;
+  }
+  [data-type="map"] foreignObject .map-top-badge .map-badge-subtitle {
+    display: none !important;
+  }
+  [data-type="map"] foreignObject .map-top-badge {
+    padding: 2px 6px 2px 3px !important;
+    top: 4px !important;
+  }
+  [data-type="map"] foreignObject .map-biz-row {
+    margin-bottom: 2px !important;
+    gap: 4px !important;
+  }
+  [data-type="map"] foreignObject .map-biz-img {
+    width: 26px !important;
+    height: 26px !important;
+  }
+  [data-type="map"] foreignObject .map-card-actions {
+    padding: 4px 6px 5px !important;
+  }
+}
+
+@container (max-height: 140px) {
+  [data-type="map"] foreignObject .map-top-badge {
+    display: none !important;
+  }
+  [data-type="map"] foreignObject .map-biz-meta {
+    display: none !important;
+  }
+  [data-type="map"] foreignObject .map-biz-img {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  [data-type="map"] foreignObject .map-card-actions {
+    padding: 3px 5px 3px !important;
+  }
+}
+
+@container (max-width: 230px) {
+  [data-type="map"] foreignObject .map-actions-row {
+    gap: 2px !important;
+  }
+  [data-type="map"] foreignObject .map-action-btn {
+    padding: 3px 2px !important;
+    font-size: 7.5px !important;
+  }
+  [data-type="map"] foreignObject .map-action-btn svg {
+    width: 8px !important;
+    height: 8px !important;
+    min-width: 8px !important;
+    max-width: 8px !important;
+    min-height: 8px !important;
+    max-height: 8px !important;
+  }
+}
+
+@container (max-width: 175px) {
+  [data-type="map"] foreignObject .map-action-btn-secondary:last-child {
+    display: none !important;
+  }
+  [data-type="map"] foreignObject .map-action-btn-primary {
+    flex: 1.2 !important;
+  }
+  [data-type="map"] foreignObject .map-action-btn-secondary {
+    flex: 1 !important;
+  }
+}
+
 .hide-controls::-webkit-media-controls {
   opacity: 0;
   pointer-events: none;

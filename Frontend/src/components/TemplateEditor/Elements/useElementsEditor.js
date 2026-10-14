@@ -68,13 +68,79 @@ export const handleAddElementToSvg = ({
   }
 
   // Positioning logic if dropped or added
-  const foChild = importedElement.querySelector('foreignObject, rect');
-  const elW = foChild ? parseFloat(foChild.getAttribute('width') || '100') : 100;
-  const elH = foChild ? parseFloat(foChild.getAttribute('height') || '100') : 100;
+  let pw = 297, ph = 210;
+  const vbStr = svg.getAttribute('viewBox');
+  if (vbStr) {
+    const parts = vbStr.trim().split(/[\s,]+/).map(parseFloat);
+    if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+      pw = parts[2];
+      ph = parts[3];
+    }
+  }
+
+  // If map element is added with small default size (<= 180), adapt to page canvas size
+  const isMap = importedElement.getAttribute('data-type') === 'map' || importedElement.id?.startsWith('map-');
+  let foChild = importedElement.querySelector('foreignObject, rect');
+  let elW = foChild ? parseFloat(foChild.getAttribute('width') || '100') : 100;
+  let elH = foChild ? parseFloat(foChild.getAttribute('height') || '100') : 100;
+
+  if (isMap && elW <= 180) {
+    let targetW, targetH;
+    if (pw > ph) {
+      targetW = Math.round(pw * 0.65);
+      targetH = Math.round(targetW * (190 / 240));
+      if (targetH > ph * 0.82) {
+        targetH = Math.round(ph * 0.80);
+        targetW = Math.round(targetH * (240 / 190));
+      }
+    } else {
+      targetW = Math.round(pw * 0.82);
+      targetH = Math.round(targetW * (190 / 240));
+      if (targetH > ph * 0.60) {
+        targetH = Math.round(ph * 0.58);
+        targetW = Math.round(targetH * (240 / 190));
+      }
+    }
+    targetW = Math.min(targetW, pw - (pw > 400 ? 40 : 10));
+    targetH = Math.min(targetH, ph - (ph > 400 ? 40 : 10));
+
+    elW = targetW;
+    elH = targetH;
+
+    const fo = importedElement.querySelector('foreignObject');
+    if (fo) {
+      fo.setAttribute('width', targetW.toString());
+      fo.setAttribute('height', targetH.toString());
+    }
+    const rect = importedElement.querySelector('rect');
+    if (rect) {
+      rect.setAttribute('width', targetW.toString());
+      rect.setAttribute('height', targetH.toString());
+    }
+    const iframe = importedElement.querySelector('iframe');
+    if (iframe) {
+      iframe.setAttribute('width', targetW.toString());
+      iframe.setAttribute('height', targetH.toString());
+      iframe.setAttribute('data-original-width', targetW.toString());
+      iframe.setAttribute('data-original-height', targetH.toString());
+      iframe.style.setProperty('width', targetW + 'px', 'important');
+      iframe.style.setProperty('height', targetH + 'px', 'important');
+      iframe.style.setProperty('transform-origin', '0 0', 'important');
+      iframe.style.setProperty('transform', 'scale(1, 1)', 'important');
+      iframe.style.setProperty('border', 'none', 'important');
+      iframe.style.setProperty('display', 'block', 'important');
+      iframe.style.setProperty('pointer-events', 'none', 'important');
+    }
+  }
 
   if (dropPoint) {
     const currentTransform = importedElement.getAttribute('transform') || '';
-    importedElement.setAttribute('transform', `translate(${dropPoint.x - (elW / 2)}, ${dropPoint.y - (elH / 2)}) ${currentTransform}`);
+    // Strip old translate if replacing
+    importedElement.setAttribute('transform', `translate(${Math.round(dropPoint.x - (elW / 2))}, ${Math.round(dropPoint.y - (elH / 2))})`);
+  } else if (!importedElement.getAttribute('transform') || (isMap && importedElement.getAttribute('transform')?.includes('15'))) {
+    const cx = Math.round(Math.max(0, (pw - elW) / 2));
+    const cy = Math.round(Math.max(0, (ph - elH) / 2));
+    importedElement.setAttribute('transform', `translate(${cx}, ${cy})`);
   }
 
   const targetContainer = svg.querySelector('[data-type="frame"]') || svg.querySelector('[data-name="Overlay"]') || svg;
@@ -427,6 +493,15 @@ export const getElementCompoundTarget = (current) => {
       decoratorGroup.id = `decorator-${Date.now()}`;
     }
     return decoratorGroup;
+  }
+
+  // Maps are compound elements; drag/select the whole map!
+  const mapGroup = current.closest('[data-type="map"], [id^="map-"]');
+  if (mapGroup) {
+    if (!mapGroup.id) {
+      mapGroup.id = `map-${Date.now()}`;
+    }
+    return mapGroup;
   }
 
   // Embed frames are single compound elements; drag the whole wrapper!
