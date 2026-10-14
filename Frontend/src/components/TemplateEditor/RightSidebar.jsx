@@ -1483,7 +1483,30 @@ const RightSidebar = ({
                           })()}
                           onUpdate={(newHtml) => {
                             window.__skipCanvasUpdateForPage = activePageIndex;
-                            if (typeof newHtml === 'string') {
+                            const svgRoot = (() => {
+                              const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                              const el = editorDoc.getElementById(selectedLayerId);
+                              if (!el) return null;
+                              const container = el.closest('.page-svg-container');
+                              if (container) {
+                                const canvasContent = container.querySelector('[id^="canvas-content-"]');
+                                return canvasContent ? canvasContent.querySelector('svg') : container.querySelector('svg');
+                              }
+                              let node = el;
+                              let lastSvg = null;
+                              while (node) {
+                                if (node.tagName?.toLowerCase() === 'svg') lastSvg = node;
+                                node = node.parentElement;
+                              }
+                              return lastSvg;
+                            })();
+                            if (svgRoot) {
+                              const cloneSvg = svgRoot.cloneNode(true);
+                              cloneSvg.querySelectorAll('[data-highlight-id], .frame-boundary').forEach(el => el.remove());
+                              const serializer = new XMLSerializer();
+                              const html = serializer.serializeToString(cloneSvg);
+                              updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', html);
+                            } else if (typeof newHtml === 'string' && newHtml.includes('<svg')) {
                               updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', newHtml);
                             }
                           }}
