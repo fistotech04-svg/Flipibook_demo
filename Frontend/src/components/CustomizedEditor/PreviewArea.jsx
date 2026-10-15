@@ -74,7 +74,7 @@ const getSlideshowScript = () => `
 
             const is3Frame = el.getAttribute('data-type') === 'slideshow' ||
                              el.getAttribute('data-is-slideshow') === 'true' ||
-                             el.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)').length >= 3;
+                             el.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor):not(.slideshow-container-bg)').length >= 3;
 
             let isAnimating = false;
             let autoTimer = null;
@@ -101,7 +101,7 @@ const getSlideshowScript = () => `
               const rightIndex = len >= 2 ? (activeIdx + 1) % len : -1;
               const leftIndex = len >= 3 ? (activeIdx - 1 + len) % len : (len === 2 ? (activeIdx + 1) % len : -1);
 
-              const rects = el.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)');
+              const rects = el.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor):not(.slideshow-container-bg)');
               const leftRect = rects[0];
               const rightRect = rects[1];
               const centerRect = rects[2];
@@ -244,6 +244,79 @@ const getSlideshowScript = () => `
                   const maxTrack = 160;
                   const thumbPos = 20 + Math.round((activeIdx / (len - 1)) * maxTrack);
                   scrollThumb.setAttribute('x', thumbPos.toString());
+                }
+              }
+
+              // Container background
+              let containerBg = el.querySelector('.slideshow-container-bg');
+              if (!containerBg && (settings.bgColor && settings.bgColor !== 'transparent' && settings.bgColor !== 'none')) {
+                containerBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                containerBg.setAttribute('class', 'slideshow-container-bg');
+                if (defs && defs.nextSibling) el.insertBefore(containerBg, defs.nextSibling);
+                else el.insertBefore(containerBg, el.firstChild);
+              }
+              if (containerBg) {
+                const pad = 5;
+                const sColor = settings.strokeColor || '#9ca3af';
+                const sWidth = settings.strokeWidth !== undefined ? settings.strokeWidth : 1;
+                const sOpacity = (settings.strokeOpacity !== undefined ? settings.strokeOpacity : 100) / 100;
+                let sDash = 'none';
+                if (settings.strokeLineStyle === 'Dotted') {
+                  sDash = '2,3';
+                } else if (settings.strokeLineStyle === 'Dashed') {
+                  sDash = (settings.strokeDashLength || 8) + ',' + (settings.strokeDashGap || 4);
+                }
+                const sCap = settings.strokeLineCorner === 'Rounded' ? 'round' : 'square';
+                const sJoin = settings.strokeLineCorner === 'Rounded' ? 'round' : 'miter';
+                const sAlign = settings.strokeAlignment || 'Center';
+                let alignOffset = 0;
+                if (sAlign === 'Inside') alignOffset = sWidth / 2;
+                else if (sAlign === 'Outside') alignOffset = -sWidth / 2;
+
+                const baseW = slideStyle === 'flat' ? 210 : 210;
+                const baseH = slideStyle === 'flat' ? 190 : 140;
+                containerBg.setAttribute('x', (-pad + alignOffset).toString());
+                containerBg.setAttribute('y', (-pad + alignOffset).toString());
+                containerBg.setAttribute('width', (baseW + pad * 2 - alignOffset * 2).toString());
+                containerBg.setAttribute('height', (baseH + pad * 2 - alignOffset * 2).toString());
+                const bgCornerRadius = settings.strokeLineCorner === 'Square' ? 0 : 12;
+                containerBg.setAttribute('rx', bgCornerRadius.toString());
+                containerBg.setAttribute('ry', bgCornerRadius.toString());
+                const bgColor = settings.bgColor || '#000000';
+                const bgOpacity = (settings.bgOpacity !== undefined ? settings.bgOpacity : 100) / 100;
+                if (bgColor === 'transparent' || bgColor === 'none' || bgOpacity === 0) {
+                  containerBg.setAttribute('fill', 'none');
+                  containerBg.setAttribute('fill-opacity', '0');
+                  containerBg.style.fill = 'none';
+                  containerBg.style.fillOpacity = '0';
+                } else {
+                  containerBg.setAttribute('fill', bgColor);
+                  containerBg.setAttribute('fill-opacity', bgOpacity.toString());
+                  containerBg.style.fill = bgColor;
+                  containerBg.style.fillOpacity = bgOpacity.toString();
+                }
+
+                if (sColor === 'transparent' || sColor === 'none' || sWidth === 0 || sOpacity === 0) {
+                  containerBg.setAttribute('stroke', 'none');
+                  containerBg.setAttribute('stroke-width', '0');
+                  containerBg.style.stroke = 'none';
+                  containerBg.style.strokeWidth = '0';
+                } else {
+                  containerBg.setAttribute('stroke', sColor);
+                  containerBg.setAttribute('stroke-width', sWidth.toString());
+                  containerBg.setAttribute('stroke-opacity', sOpacity.toString());
+                  containerBg.style.stroke = sColor;
+                  containerBg.style.strokeWidth = sWidth + 'px';
+                  containerBg.style.strokeOpacity = sOpacity.toString();
+                  if (sDash !== 'none') {
+                    containerBg.setAttribute('stroke-dasharray', sDash);
+                    containerBg.style.strokeDasharray = sDash;
+                  } else {
+                    containerBg.removeAttribute('stroke-dasharray');
+                    containerBg.style.removeProperty('stroke-dasharray');
+                  }
+                  containerBg.setAttribute('stroke-linecap', sCap);
+                  containerBg.setAttribute('stroke-linejoin', sJoin);
                 }
               }
 
@@ -536,10 +609,11 @@ const getSlideshowScript = () => `
             };
 
             if (showArrows && images.length > 1) {
+              const navScale = (settings.navButtonSize || 100) / 100;
               ['prev','next'].forEach(type => {
                 const btn = document.createElement('button');
                 btn.className = 'ss-nav-btn ss-' + type;
-                const btnSize = 38 * scaleFactor;
+                const btnSize = 38 * scaleFactor * navScale;
                 const offset = 6 * scaleFactor;
                 btn.style.cssText = [
                   'position:absolute',
@@ -563,7 +637,7 @@ const getSlideshowScript = () => `
                   'pointer-events:auto',
                   'opacity:0'
                 ].join(';');
-                const svgSize = 22 * scaleFactor;
+                const svgSize = 22 * scaleFactor * navScale;
                 btn.innerHTML = '<svg width="' + svgSize + '" height="' + svgSize + '" viewBox="0 0 24 24" fill="none" stroke="' + navColor + '" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="overflow:visible;"><path d="' + getArrowPath(type) + '"/></svg>';
                 btn.addEventListener('click', (e) => {
                   e.stopPropagation();
@@ -585,7 +659,7 @@ const getSlideshowScript = () => `
 
             // --- Direct Frame Clicks for 3D Carousel ---
             if (is3Frame) {
-              const rects = el.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)');
+              const rects = el.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor):not(.slideshow-container-bg)');
               const leftRect = rects[0];
               const rightRect = rects[1];
               if (leftRect) {
@@ -617,15 +691,16 @@ const getSlideshowScript = () => `
             const dotColor = settings.dotColor || '#4F46E5';
 
             if (showDots && images.length > 1) {
+              const dotScale = (settings.dotButtonSize || 100) / 100;
               const dotsContainer = document.createElement('div');
               dotsContainer.className = 'ss-dots-container';
               const bottomOffset = 8 * scaleFactor;
-              const gap = 5 * scaleFactor;
+              const gap = 5 * scaleFactor * dotScale;
               dotsContainer.style.cssText = 'position:absolute;bottom:' + bottomOffset + 'px;left:50%;transform:translateX(-50%);display:flex;gap:' + gap + 'px;z-index:100;align-items:center;pointer-events:auto;';
               images.forEach((_, i) => {
                 const dot = document.createElement('div');
                 dot.className = 'ss-dot';
-                const dotSize = 7 * scaleFactor;
+                const dotSize = 7 * scaleFactor * dotScale;
                 dot.style.cssText = [
                   'width:' + dotSize + 'px',
                   'height:' + dotSize + 'px',

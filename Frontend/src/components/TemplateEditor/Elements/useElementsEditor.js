@@ -440,16 +440,12 @@ export const getSlideshowBBox = (el) => {
     const ay = parseFloat(anchor.getAttribute('y') || '0');
     let aw = parseFloat(anchor.getAttribute('width') || '0');
     const ah = parseFloat(anchor.getAttribute('height') || '0');
-    if (!isFlat && aw >= 225) {
-      // Correct legacy unrotated 230 width down to 205 to match actual 3D visual projection
-      aw = 205;
-      anchor.setAttribute('width', '210');
-    }
     if (aw > 0 && ah > 0) {
       return { x: ax, y: ay, width: aw, height: ah };
     }
   }
-  return { x: 0, y: 0, width: isFlat ? 210 : 210, height: isFlat ? 190 : 140 };
+  const pad = 5;
+  return { x: -pad, y: -pad, width: (isFlat ? 210 : 210) + pad * 2, height: (isFlat ? 190 : 140) + pad * 2 };
 };
 
 /**
@@ -853,7 +849,7 @@ export const update3FrameSlideshow = (el, images = [], activeIdx = 0, settings =
     if (len >= 3) leftIndex = (activeIdx - 1 + len) % len;
   }
 
-  const rects = el.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)');
+  const rects = el.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor):not(.slideshow-container-bg)');
   const leftRect = rects[0];
   const rightRect = rects[1];
   const centerRect = rects[2];
@@ -913,20 +909,86 @@ export const update3FrameSlideshow = (el, images = [], activeIdx = 0, settings =
     bboxAnchor.setAttribute('fill', 'transparent');
     el.appendChild(bboxAnchor);
   }
-  bboxAnchor.setAttribute('x', '0');
-  bboxAnchor.setAttribute('y', '0');
-  bboxAnchor.setAttribute('width', slideStyle === 'flat' ? '210' : '205');
-  bboxAnchor.setAttribute('height', slideStyle === 'flat' ? '190' : '140');
+  const pad = 5;
+  const baseW = slideStyle === 'flat' ? 210 : 210;
+  const baseH = slideStyle === 'flat' ? 190 : 140;
 
-  // Stroke / styling
-  const sColor = settings.strokeColor || '#000000';
+  bboxAnchor.setAttribute('x', (-pad).toString());
+  bboxAnchor.setAttribute('y', (-pad).toString());
+  bboxAnchor.setAttribute('width', (baseW + pad * 2).toString());
+  bboxAnchor.setAttribute('height', (baseH + pad * 2).toString());
+
+  // Apply Container Background behind all frames and controls
+  let containerBg = el.querySelector('.slideshow-container-bg');
+  if (!containerBg) {
+    containerBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    containerBg.setAttribute('class', 'slideshow-container-bg');
+    if (defs && defs.nextSibling) {
+      el.insertBefore(containerBg, defs.nextSibling);
+    } else {
+      el.insertBefore(containerBg, el.firstChild);
+    }
+  } else {
+    if (defs && defs.nextSibling && defs.nextSibling !== containerBg) {
+      el.insertBefore(containerBg, defs.nextSibling);
+    }
+  }
+
+  const sColor = settings.strokeColor || '#9ca3af';
   const sWidth = settings.strokeWidth !== undefined ? settings.strokeWidth : 1;
   const sOpacity = (settings.strokeOpacity !== undefined ? settings.strokeOpacity : 100) / 100;
-  [centerRect, leftRect, rightRect].forEach(r => {
+  let sDash = 'none';
+  if (settings.strokeLineStyle === 'Dotted') {
+    sDash = '2,3';
+  } else if (settings.strokeLineStyle === 'Dashed') {
+    sDash = `${settings.strokeDashLength || 8},${settings.strokeDashGap || 4}`;
+  }
+  const sCap = settings.strokeLineCorner === 'Rounded' ? 'round' : 'square';
+  const sJoin = settings.strokeLineCorner === 'Rounded' ? 'round' : 'miter';
+  const sAlign = settings.strokeAlignment || 'Center';
+  let alignOffset = 0;
+  if (sAlign === 'Inside') alignOffset = sWidth / 2;
+  else if (sAlign === 'Outside') alignOffset = -sWidth / 2;
+
+  containerBg.setAttribute('x', (-pad + alignOffset).toString());
+  containerBg.setAttribute('y', (-pad + alignOffset).toString());
+  containerBg.setAttribute('width', (baseW + pad * 2 - alignOffset * 2).toString());
+  containerBg.setAttribute('height', (baseH + pad * 2 - alignOffset * 2).toString());
+
+  const bgCornerRadius = settings.strokeLineCorner === 'Square' ? 0 : 12;
+  containerBg.setAttribute('rx', bgCornerRadius.toString());
+  containerBg.setAttribute('ry', bgCornerRadius.toString());
+
+  const bgColor = settings.bgColor || '#000000';
+  const bgOpacity = (settings.bgOpacity !== undefined ? settings.bgOpacity : 100) / 100;
+
+  if (bgColor === 'transparent' || bgColor === 'none' || bgOpacity === 0) {
+    containerBg.setAttribute('fill', 'none');
+    containerBg.setAttribute('fill-opacity', '0');
+    containerBg.style.fill = 'none';
+    containerBg.style.fillOpacity = '0';
+  } else {
+    containerBg.setAttribute('fill', bgColor);
+    containerBg.setAttribute('fill-opacity', bgOpacity.toString());
+    containerBg.style.fill = bgColor;
+    containerBg.style.fillOpacity = bgOpacity.toString();
+  }
+
+  // Stroke / styling on container frame and cards
+  [containerBg, centerRect, leftRect, rightRect].forEach(r => {
     if (r) {
-      r.setAttribute('stroke', sColor);
-      r.setAttribute('stroke-width', sWidth.toString());
-      r.setAttribute('stroke-opacity', sOpacity.toString());
+      if (sColor === 'transparent' || sColor === 'none' || sWidth === 0 || sOpacity === 0) {
+        r.setAttribute('stroke', 'none');
+        r.setAttribute('stroke-width', '0');
+      } else {
+        r.setAttribute('stroke', sColor);
+        r.setAttribute('stroke-width', sWidth.toString());
+        r.setAttribute('stroke-opacity', sOpacity.toString());
+        if (sDash !== 'none') r.setAttribute('stroke-dasharray', sDash);
+        else r.removeAttribute('stroke-dasharray');
+        r.setAttribute('stroke-linecap', sCap);
+        r.setAttribute('stroke-linejoin', sJoin);
+      }
     }
   });
 
@@ -1180,10 +1242,11 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
 
           const showNavArrows = showArrows !== false && showNav !== false;
           if (showNavArrows) {
+            const navScale = (settings.navButtonSize || 100) / 100;
             ['prev', 'next'].forEach(type => {
               const btn = document.createElement('button');
               btn.className = 'editor-ss-nav editor-ss-nav-' + type;
-              const size = 48 * scaleFactor;
+              const size = 48 * scaleFactor * navScale;
               const offset = 12 * scaleFactor;
               Object.assign(btn.style, {
                 position: 'absolute',
@@ -1206,7 +1269,7 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
                 opacity: '0',
                 transition: 'transform 0.15s, opacity 0.2s',
               });
-              const svgSize = 32 * scaleFactor;
+              const svgSize = 32 * scaleFactor * navScale;
 
               const iconContainer = document.createElement('div');
               Object.assign(iconContainer.style, {
@@ -1242,6 +1305,7 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
           }
 
           if (showDots) {
+            const dotScale = (settings.dotButtonSize || 100) / 100;
             let dotsWrap = overlay.querySelector('.editor-ss-dots-wrap');
             if (!dotsWrap) {
               dotsWrap = document.createElement('div');
@@ -1250,13 +1314,16 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
                 position: 'absolute',
                 bottom: (8 * scaleFactor) + 'px',
                 left: '50%',
-                transform: 'translateX(-50%)',
+                transform: `translateX(-50%) scale(${Math.max(0.3, scaleFactor * dotScale)})`,
+                transformOrigin: 'bottom center',
                 display: 'flex',
                 gap: (5 * scaleFactor) + 'px',
                 alignItems: 'center',
                 pointerEvents: 'auto',
               });
               overlay.appendChild(dotsWrap);
+            } else {
+              dotsWrap.style.transform = `translateX(-50%) scale(${Math.max(0.3, scaleFactor * dotScale)})`;
             }
 
             if (!dotsWrap._reactRoot) {
@@ -1264,7 +1331,7 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
             }
 
             const dotStyleId = settings.dotStyle || 1;
-            const dotsSig = `${dotStyleId}-${activeIndex}-${images.length}-${dotColor}-${scaleFactor.toFixed(2)}`;
+            const dotsSig = `${dotStyleId}-${activeIndex}-${images.length}-${dotColor}-${scaleFactor.toFixed(2)}-${dotScale}`;
 
             if (dotsWrap._lastSig !== dotsSig) {
               dotsWrap._lastSig = dotsSig;
@@ -1320,7 +1387,7 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
         const images = data.images || [];
         if (images.length === 0) return;
 
-        const is3Frame = el.getAttribute('data-type') === 'slideshow' || el.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)').length >= 3;
+        const is3Frame = el.getAttribute('data-type') === 'slideshow' || el.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor):not(.slideshow-container-bg)').length >= 3;
         if (is3Frame) {
           update3FrameSlideshow(el, images, nextIndex, data.settings || {});
           window.dispatchEvent(new CustomEvent('slideshow-index-changed', { detail: { id: el.id, index: nextIndex } }));
@@ -1463,7 +1530,7 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
         if (nextIndex >= images.length) nextIndex = infiniteLoop ? 0 : images.length - 1;
         if (nextIndex === currentIndex) return;
 
-        const is3Frame = slideshowEl.getAttribute('data-type') === 'slideshow' || slideshowEl.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)').length >= 3;
+        const is3Frame = slideshowEl.getAttribute('data-type') === 'slideshow' || slideshowEl.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor):not(.slideshow-container-bg)').length >= 3;
         if (is3Frame) {
           update3FrameSlideshow(slideshowEl, images, nextIndex, settings);
           slideshowEl._lastSlideTime = Date.now();
