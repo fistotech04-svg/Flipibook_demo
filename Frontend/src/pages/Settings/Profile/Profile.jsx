@@ -127,12 +127,16 @@ export const getAvatarColor = (identifier, customColor) => {
 
 const defaultProfile = {
   name: 'User',
+  displayName: '',
   email: '',
   emailId: '',
   picture: null,
   avatarBgColor: '#E8D4C8',
   about: '',
+  profileType: 'Individual',
   mobile: '',
+  countryCode: '+91',
+  contactNumbers: [],
   companyName: '',
   industryType: '',
   companyEmail: '',
@@ -189,7 +193,7 @@ const Profile = () => {
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const [activeStatsBookId, setActiveStatsBookId] = useState(null);
   const [isAvatarPopupOpen, setIsAvatarPopupOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('Your IDC');
+  const [activeTab, setActiveTab] = useState('Edit Profile');
   const [bannerBg, setBannerBg] = useState(() => {
     try {
       const cached = localStorage.getItem('user_profile');
@@ -266,6 +270,14 @@ const Profile = () => {
                 email: p.emailId || prev.email || effectiveEmail,
                 emailId: p.emailId || prev.emailId || effectiveEmail,
                 name: p.name || prev.name || (effectiveEmail.split('@')[0]),
+                displayName: p.displayName !== undefined ? p.displayName : (prev.displayName || ''),
+                profileType: p.profileType !== undefined ? p.profileType : (prev.profileType || 'Individual'),
+                companyName: p.companyName !== undefined ? p.companyName : (prev.companyName || ''),
+                industryType: p.industryType !== undefined ? p.industryType : (prev.industryType || ''),
+                companyEmail: p.companyEmail !== undefined ? p.companyEmail : (prev.companyEmail || ''),
+                website: p.website !== undefined ? p.website : (prev.website || ''),
+                contactNumbers: Array.isArray(p.contactNumbers) ? p.contactNumbers : (prev.contactNumbers || []),
+                countryCode: p.countryCode || prev.countryCode || '+91',
                 picture: p.picture || prev.picture || null,
                 company_logo_url: p.company_logo_url || p.companyLogo || prev.company_logo_url || prev.companyLogo || '',
                 companyLogo: p.company_logo_url || p.companyLogo || prev.company_logo_url || prev.companyLogo || '',
@@ -684,31 +696,70 @@ const Profile = () => {
               </div>
 
               {/* Name and Email */}
-              <h1 className="text-[1.5vw] font-semibold text-gray-900 mt-[1vw] truncate max-w-[18vw]">{user.name}</h1>
+              <h1 className="text-[1.5vw] font-semibold text-gray-900 mt-[0.5vw] truncate max-w-[18vw]">
+                {user.displayName?.trim() ? user.displayName.trim() : (user.name || 'User')}
+              </h1>
               <div className="flex items-center gap-[0.4vw] text-[0.8vw] text-gray-500 mt-[0.2vw] truncate max-w-[18vw]">
                 <Icon icon="mdi:check-decagram" className="w-[1vw] h-[1vw] text-[#22c55e] flex-shrink-0" />
                 <span className="truncate font-medium">{user.email}</span>
               </div>
 
-              {/* Followers & Following Count */}
-              <div className="flex items-center justify-center gap-[1.2vw] mt-[0.8vw] w-full px-[1vw]">
-                <div className="flex items-center gap-[0.35vw]">
-                  <span className="text-[0.9vw] font-bold text-gray-900 leading-none">
-                    {user.followers?.length || 0}
-                  </span>
-                  <span className="text-[0.75vw] text-gray-500 font-medium leading-none">Followers</span>
-                </div>
-                <div className="w-[1px] h-[0.9vw] bg-gray-300"></div>
-                <div className="flex items-center gap-[0.35vw]">
-                  <span className="text-[0.9vw] font-bold text-gray-900 leading-none">
-                    {user.following?.length || 0}
-                  </span>
-                  <span className="text-[0.75vw] text-gray-500 font-medium leading-none">Following</span>
-                </div>
-              </div>
+              {/* Stats: Flipbooks | Followers | Views */}
+              {(() => {
+                const flipbooksCount = Array.isArray(flipbooks) ? flipbooks.length : 0;
+                const followersCount = Array.isArray(user.followers) ? user.followers.length : (typeof user.followers === 'number' ? user.followers : 0);
+                const totalViews = Array.isArray(flipbooks)
+                  ? flipbooks.reduce((acc, book) => acc + (Number(book?.viewsCount ?? book?.views ?? 0) || 0), 0)
+                  : (Number(user.views || 0));
+
+                const formatStat = (num) => {
+                  if (num >= 1000000) {
+                    return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+                  }
+                  if (num >= 1000) {
+                    return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+                  }
+                  return num.toString();
+                };
+
+                return (
+                  <div className="flex items-center justify-center w-full px-[1.5vw] mt-[0.9vw]">
+                    <div className="flex-1 flex flex-col items-center">
+                      <span className="text-[1.2vw] font-bold text-gray-900 leading-tight">
+                        {formatStat(flipbooksCount)}
+                      </span>
+                      <span className="text-[0.75vw] text-gray-500 font-normal mt-[0.1vw]">
+                        Flipbooks
+                      </span>
+                    </div>
+
+                    <div className="w-[1px] h-[2vw] bg-gray-200"></div>
+
+                    <div className="flex-1 flex flex-col items-center">
+                      <span className="text-[1.2vw] font-bold text-gray-900 leading-tight">
+                        {formatStat(followersCount)}
+                      </span>
+                      <span className="text-[0.75vw] text-gray-500 font-normal mt-[0.1vw]">
+                        Followers
+                      </span>
+                    </div>
+
+                    <div className="w-[1px] h-[2vw] bg-gray-200"></div>
+
+                    <div className="flex-1 flex flex-col items-center">
+                      <span className="text-[1.2vw] font-bold text-gray-900 leading-tight">
+                        {formatStat(totalViews)}
+                      </span>
+                      <span className="text-[0.75vw] text-gray-500 font-normal mt-[0.1vw]">
+                        Views
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Info Cards Container */}
-              <div id="left-scroll-container" className={`w-full mt-[1.2vw] pb-[2vw] flex flex-col flex-1 min-h-0 hide-scrollbar rounded-b-[1vw] ${isChildScrollable ? 'overflow-y-scroll' : 'overflow-hidden'}`}>
+              <div id="left-scroll-container" className="w-full mt-[1.2vw] pb-[2vw] flex flex-col flex-1 min-h-0 custom-scrollbar overflow-y-auto rounded-b-[1vw]">
 
                 <div className="p-[1vw] border-b border-gray-100">
                   <h3 className="flex items-center gap-[0.5vw] text-[0.85vw] font-semibold text-gray-700 mb-[0.5vw]">
@@ -723,24 +774,86 @@ const Profile = () => {
                   <h3 className="flex items-center gap-[0.5vw] text-[0.85vw] font-semibold text-gray-700 mb-[0.5vw]">
                     <Phone size="1vw" /> Contact Number
                   </h3>
-                  <p className="text-[0.75vw] text-gray-500">{user.mobile}</p>
+                  <div className="flex flex-col gap-[0.2vw] text-[0.75vw] text-gray-500">
+                    {user.mobile && (
+                      <p>{user.countryCode ? user.countryCode + ' ' : ''}{user.mobile}</p>
+                    )}
+                    {Array.isArray(user.contactNumbers) && user.contactNumbers.map((c, i) => c?.number ? (
+                      <p key={i}>
+                        <span className="text-gray-400 text-[0.7vw]">{c.label ? `${c.label}: ` : ''}</span>
+                        {c.countryCode ? c.countryCode + ' ' : ''}{c.number}
+                      </p>
+                    ) : null)}
+                  </div>
                 </div>
 
                 <div className="p-[1vw] border-b border-gray-100">
-                  <h3 className="flex items-center gap-[0.5vw] text-[0.85vw] font-semibold text-gray-700 mb-[0.5vw]">
+                  <h3 className="flex items-center gap-[0.5vw] text-[0.85vw] font-semibold text-gray-700 mb-[0.6vw]">
                     {(user.company_logo_url || user.companyLogo) ? (
                       <img src={user.company_logo_url || user.companyLogo} alt="Company Logo" className="w-[1.2vw] h-[1.2vw] object-contain rounded-[0.2vw]" />
                     ) : (
                       <Building size="1vw" />
                     )}
-                    Company / Organization Details
+                    Professional Details
                   </h3>
-                  <div className="flex flex-col gap-[0.3vw] text-[0.75vw]">
-                    {user.companyName && <p><span className="font-semibold text-gray-700">Name :</span> <span className="text-gray-500">{user.companyName}</span></p>}
-                    {user.industryType && <p><span className="font-semibold text-gray-700">Industry Type :</span> <span className="text-gray-500">{user.industryType}</span></p>}
-                    {user.companyEmail && <p><span className="font-semibold text-gray-700">Gmail :</span> <span className="text-gray-500">{user.companyEmail}</span></p>}
-                    {user.website && <p><span className="font-semibold text-gray-700">Website :</span> <a href={user.website?.startsWith('http') ? user.website : `https://${user.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">{user.website}</a></p>}
-                    {user.services?.length > 0 && <p><span className="font-semibold text-gray-700">Services :</span> <span className="text-gray-500">{Array.isArray(user.services) ? user.services.join(', ') : user.services}</span></p>}
+                  <div className="flex flex-col gap-[0.35vw] text-[0.75vw]">
+                    {user.profileType && (
+                      <p className="flex items-baseline gap-[0.3vw]">
+                        <span className="font-semibold text-gray-800">Profile :</span>
+                        <span className="text-gray-500">{user.profileType}</span>
+                      </p>
+                    )}
+                    {user.companyName && (
+                      <p className="flex items-baseline gap-[0.3vw]">
+                        <span className="font-semibold text-gray-800">Company Name :</span>
+                        <span className="text-gray-500">{user.companyName}</span>
+                      </p>
+                    )}
+                    {user.industryType && (
+                      <p className="flex items-baseline gap-[0.3vw]">
+                        <span className="font-semibold text-gray-800">Industry Type :</span>
+                        <span className="text-gray-500">{user.industryType}</span>
+                      </p>
+                    )}
+                    {user.companyEmail && (
+                      <p className="flex items-baseline gap-[0.3vw]">
+                        <span className="font-semibold text-gray-800">Company Gmail :</span>
+                        <span className="text-gray-500">{user.companyEmail}</span>
+                      </p>
+                    )}
+                    {user.website && (
+                      <p className="flex items-baseline gap-[0.3vw]">
+                        <span className="font-semibold text-gray-800">Website :</span>
+                        <a
+                          href={user.website?.startsWith('http') ? user.website : `https://${user.website}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#4f46e5] underline hover:text-[#4338ca] transition-colors"
+                        >
+                          {user.website.replace(/^https?:\/\//i, '')}
+                        </a>
+                      </p>
+                    )}
+                    {((Array.isArray(user.services) && user.services.length > 0) || (typeof user.services === 'string' && user.services.trim())) && (
+                      <p className="flex items-baseline gap-[0.3vw]">
+                        <span className="font-semibold text-gray-800">Services :</span>
+                        <span className="text-gray-500 leading-snug">
+                          {Array.isArray(user.services) ? user.services.join(', ') : user.services}
+                        </span>
+                      </p>
+                    )}
+                    {Array.isArray(user.contactNumbers) && user.contactNumbers.some(c => c?.number) && (
+                      <div className="flex items-start gap-[0.3vw] mt-[0.1vw]">
+                        <span className="font-semibold text-gray-800">Contact :</span>
+                        <div className="flex flex-col text-gray-500">
+                          {user.contactNumbers.filter(c => c?.number).map((c, i) => (
+                            <span key={i} className="leading-snug">
+                              {c.number}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -755,33 +868,68 @@ const Profile = () => {
                   </div>
                 </div>
 
-                <div className="p-[1vw] flex gap-[0.5vw] justify-center items-center">
-                  {user.socials?.website && (
-                    <div onClick={() => window.open(user.socials.website.startsWith('http') ? user.socials.website : `https://${user.socials.website}`, '_blank')} className="w-[2vw] h-[2vw] bg-[#1a1a1a] rounded-[0.4vw] flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity">
-                      <Globe className="w-[1.2vw] h-[1.2vw] text-white" />
+                {(() => {
+                  const socials = user?.socials || {};
+                  const hasAny = Boolean(
+                    socials.website?.trim() ||
+                    socials.linkedin?.trim() ||
+                    socials.instagram?.trim() ||
+                    socials.facebook?.trim() ||
+                    socials.whatsapp?.trim()
+                  );
+
+                  if (!hasAny) return null;
+
+                  return (
+                    <div className="p-[1vw] flex gap-[0.6vw] justify-center items-center flex-wrap">
+                      {socials.website?.trim() && (
+                        <div
+                          title="Website"
+                          onClick={() => window.open(socials.website.startsWith('http') ? socials.website : `https://${socials.website}`, '_blank')}
+                          className="w-[2.2vw] h-[2.2vw] bg-[#1a1a1a] rounded-[0.45vw] flex items-center justify-center cursor-pointer hover:opacity-85 hover:scale-105 transition-all shadow-sm"
+                        >
+                          <Globe className="w-[1.2vw] h-[1.2vw] text-white" />
+                        </div>
+                      )}
+                      {socials.linkedin?.trim() && (
+                        <div
+                          title="LinkedIn"
+                          onClick={() => window.open(socials.linkedin.startsWith('http') ? socials.linkedin : `https://${socials.linkedin}`, '_blank')}
+                          className="w-[2.2vw] h-[2.2vw] bg-[#0077b5] rounded-[0.45vw] flex items-center justify-center cursor-pointer hover:opacity-85 hover:scale-105 transition-all shadow-sm"
+                        >
+                          <Icon icon="mdi:linkedin" className="w-[1.4vw] h-[1.4vw] text-white" />
+                        </div>
+                      )}
+                      {socials.instagram?.trim() && (
+                        <div
+                          title="Instagram"
+                          onClick={() => window.open(socials.instagram.startsWith('http') ? socials.instagram : `https://${socials.instagram}`, '_blank')}
+                          className="w-[2.2vw] h-[2.2vw] bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500 rounded-[0.45vw] flex items-center justify-center cursor-pointer hover:opacity-85 hover:scale-105 transition-all shadow-sm"
+                        >
+                          <Icon icon="mdi:instagram" className="w-[1.3vw] h-[1.3vw] text-white" />
+                        </div>
+                      )}
+                      {socials.facebook?.trim() && (
+                        <div
+                          title="Facebook"
+                          onClick={() => window.open(socials.facebook.startsWith('http') ? socials.facebook : `https://${socials.facebook}`, '_blank')}
+                          className="w-[2.2vw] h-[2.2vw] bg-[#1877f2] rounded-[0.45vw] flex items-center justify-center cursor-pointer hover:opacity-85 hover:scale-105 transition-all shadow-sm"
+                        >
+                          <Icon icon="mdi:facebook" className="w-[1.4vw] h-[1.4vw] text-white" />
+                        </div>
+                      )}
+                      {socials.whatsapp?.trim() && (
+                        <div
+                          title="WhatsApp"
+                          onClick={() => window.open(socials.whatsapp.startsWith('http') ? socials.whatsapp : `https://wa.me/${socials.whatsapp.replace(/[^0-9]/g, '')}`, '_blank')}
+                          className="w-[2.2vw] h-[2.2vw] bg-[#25d366] rounded-[0.45vw] flex items-center justify-center cursor-pointer hover:opacity-85 hover:scale-105 transition-all shadow-sm"
+                        >
+                          <Icon icon="mdi:whatsapp" className="w-[1.4vw] h-[1.4vw] text-white" />
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {user.socials?.linkedin && (
-                    <div onClick={() => window.open(user.socials.linkedin.startsWith('http') ? user.socials.linkedin : `https://${user.socials.linkedin}`, '_blank')} className="w-[2vw] h-[2vw] bg-[#0077b5] rounded-[0.4vw] flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity">
-                      <Icon icon="mdi:linkedin" className="w-[1.4vw] h-[1.4vw] text-white" />
-                    </div>
-                  )}
-                  {user.socials?.instagram && (
-                    <div onClick={() => window.open(user.socials.instagram.startsWith('http') ? user.socials.instagram : `https://${user.socials.instagram}`, '_blank')} className="w-[2vw] h-[2vw] bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500 rounded-[0.4vw] flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity">
-                      <Icon icon="mdi:instagram" className="w-[1.3vw] h-[1.3vw] text-white" />
-                    </div>
-                  )}
-                  {user.socials?.facebook && (
-                    <div onClick={() => window.open(user.socials.facebook.startsWith('http') ? user.socials.facebook : `https://${user.socials.facebook}`, '_blank')} className="w-[2vw] h-[2vw] bg-[#1877f2] rounded-[0.4vw] flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity">
-                      <Icon icon="mdi:facebook" className="w-[1.4vw] h-[1.4vw] text-white" />
-                    </div>
-                  )}
-                  {user.socials?.whatsapp && (
-                    <div onClick={() => window.open(user.socials.whatsapp.startsWith('http') ? user.socials.whatsapp : `https://wa.me/${user.socials.whatsapp.replace(/[^0-9]/g, '')}`, '_blank')} className="w-[2vw] h-[2vw] bg-[#25d366] rounded-[0.4vw] flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity">
-                      <Icon icon="mdi:whatsapp" className="w-[1.4vw] h-[1.4vw] text-white" />
-                    </div>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -796,16 +944,16 @@ const Profile = () => {
                 <div className="flex justify-between items-center w-full relative z-[60]">
                   <div className="flex gap-[0.5vw]">
                     <button
-                      onClick={() => setActiveTab('Your IDC')}
-                      className={`px-[1vw] py-[0.59vw] text-[0.9vw] font-semibold rounded-[0.5vw] transition-all border border-transparent bg-white ${activeTab === 'Your IDC' ? 'text-gray-900 shadow-[inset_0.2vw_0.2vw_0.4vw_rgba(0,0,0,0.08),inset_-0.2vw_-0.2vw_0.4vw_rgba(255,255,255,0.9)]' : 'text-gray-400 shadow-[0.2vw_0.2vw_0.5vw_rgba(0,0,0,0.05),-0.1vw_-0.1vw_0.3vw_rgba(255,255,255,1)] hover:shadow-[0.3vw_0.3vw_0.7vw_rgba(0,0,0,0.08)]'}`}
-                    >
-                      Your IDC
-                    </button>
-                    <button
                       onClick={() => setActiveTab('Edit Profile')}
                       className={`px-[1vw] py-[0.59vw] text-[0.9vw] font-semibold rounded-[0.5vw] transition-all border border-transparent bg-white ${activeTab === 'Edit Profile' ? 'text-gray-900 shadow-[inset_0.2vw_0.2vw_0.4vw_rgba(0,0,0,0.08),inset_-0.2vw_-0.2vw_0.4vw_rgba(255,255,255,0.9)]' : 'text-gray-400 shadow-[0.2vw_0.2vw_0.5vw_rgba(0,0,0,0.05),-0.1vw_-0.1vw_0.3vw_rgba(255,255,255,1)] hover:shadow-[0.3vw_0.3vw_0.7vw_rgba(0,0,0,0.08)]'}`}
                     >
                       Edit Profile
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('Your IDC')}
+                      className={`px-[1vw] py-[0.59vw] text-[0.9vw] font-semibold rounded-[0.5vw] transition-all border border-transparent bg-white ${activeTab === 'Your IDC' ? 'text-gray-900 shadow-[inset_0.2vw_0.2vw_0.4vw_rgba(0,0,0,0.08),inset_-0.2vw_-0.2vw_0.4vw_rgba(255,255,255,0.9)]' : 'text-gray-400 shadow-[0.2vw_0.2vw_0.5vw_rgba(0,0,0,0.05),-0.1vw_-0.1vw_0.3vw_rgba(255,255,255,1)] hover:shadow-[0.3vw_0.3vw_0.7vw_rgba(0,0,0,0.08)]'}`}
+                    >
+                      Your IDC
                     </button>
                     <button
                       onClick={() => setActiveTab('Activity')}

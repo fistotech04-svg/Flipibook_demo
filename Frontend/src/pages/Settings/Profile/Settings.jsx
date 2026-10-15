@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
+import { ArrowRight } from 'lucide-react';
+import { resolveUploadsPath } from '../../../utils/supabaseUtils';
+import crownImg from '../../../assets/settings/Crown img.svg';
 import p1 from '../../../assets/settings/p1.png';
 
 const defaultColors = [
@@ -155,76 +158,110 @@ const SettingsLayout = () => {
     {
       title: 'General',
       items: [
-        { path: profilePath, id: 'profile', label: 'Profile', icon: 'mingcute:profile-line' },
-        { path: 'account', id: 'account', label: 'Account', icon: 'iconamoon:profile' },
-        { path: 'notifications', id: 'notifications', label: 'Notifications', icon: 'basil:notification-on-outline' },
+        { path: profilePath, id: 'profile', label: 'Profile', icon: 'solar:user-id-linear' },
+        { path: 'account', id: 'account', label: 'Account', icon: 'lucide:user' },
+        { path: 'notifications', id: 'notifications', label: 'Notifications', icon: 'lucide:bell' },
         { path: 'my-shelf', id: 'my-shelf', label: 'My Shelf', icon: 'clarity:library-line' },
-      ]
-    },
-    {
-      title: 'Workspace',
-      items: [
-        { path: 'editor-defaults', id: 'editor-defaults', label: 'Editor Defaults', icon: 'vaadin:edit' },
-        { path: 'library', id: 'library', label: 'Library', icon: 'clarity:library-line' },
-        { path: 'integrations', id: 'integrations', label: 'Integrations', icon: 'oui:integration-general' },
       ]
     },
     {
       title: 'System & Billing',
       items: [
-        { path: 'privacy-access', id: 'privacy-access', label: 'Privacy & Access', icon: 'line-md:security' },
-        { path: 'analytics', id: 'analytics', label: 'Analytics', icon: 'carbon:analytics' },
-        { path: 'billing', id: 'billing', label: 'Billing', icon: 'tdesign:bill' },
-        { path: 'advanced', id: 'advanced', label: 'Advanced', icon: 'gcp:advanced-solutions-lab' },
-        { path: 'account-management', id: 'account-management', label: 'Account Management', icon: 'material-symbols:manage-accounts-outline-rounded' },
+        { path: 'virtual-stall', id: 'virtual-stall', label: 'Virtual Stall', icon: 'lucide:store' },
+        { path: 'billing-and-invoice', id: 'billing-and-invoice', label: 'Billing and Invoice', icon: 'lucide:receipt' },
+        { path: 'support', id: 'support', label: 'Support', icon: 'lucide:headset' },
       ]
     }
   ];
+
+  const avatarSrc = user?.picture && user.picture !== 'color_only'
+    ? (user.picture.startsWith('blob:') || user.picture.startsWith('data:') ? user.picture : resolveUploadsPath(user.picture))
+    : null;
 
   return (
     <div className="flex h-full bg-white font-sans overflow-hidden">
       
       {/* Sidebar */}
-      <aside className="w-[16vw] mt-[1.5vw] flex-shrink-0 border-r border-gray-100 flex flex-col">
+      <aside className="w-[18vw] flex-shrink-0 border-r border-gray-100 flex flex-col bg-white">
         
+        {/* User Profile Header in Sidebar (as shown in screenshot) */}
+        <div className="flex items-center justify-between px-[1.2vw] pt-[1.2vw] pb-[1.4vw] border-b border-gray-100">
+          <div className="flex items-center gap-[0.8vw] min-w-0">
+            <div 
+              className="w-[3.2vw] h-[3.2vw] rounded-full overflow-hidden flex items-center justify-center shrink-0 shadow-sm"
+              style={{ backgroundColor: avatarSrc ? '#ffffff' : (user?.avatarBgColor || getAvatarColor(user?.name || userEmail || 'User')) }}
+            >
+              {avatarSrc ? (
+                <img 
+                  src={avatarSrc} 
+                  alt={user?.name || 'User'} 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              ) : (
+                <span className="text-white text-[1.4vw] font-semibold">
+                  {user?.name ? user.name.charAt(0).toUpperCase() : (userEmail ? userEmail.charAt(0).toUpperCase() : 'U')}
+                </span>
+              )}
+            </div>
+            <div className="min-w-0 flex flex-col">
+              <h3 className="text-[1.1vw] font-bold text-gray-900 truncate leading-tight">
+                {user?.name || (userEmail ? userEmail.split('@')[0] : 'User')}
+              </h3>
+              <p className="text-[0.78vw] text-gray-500 truncate leading-normal">
+                {userEmail}
+              </p>
+            </div>
+          </div>
+
+          <Link
+            to={profilePath}
+            title="Edit Profile"
+            className="p-[0.35vw] text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-[0.4vw] transition-colors shrink-0"
+          >
+            <Icon icon="lucide:square-pen" className="w-[1.2vw] h-[1.2vw]" />
+          </Link>
+        </div>
+
         {/* Navigation Links */}
-        <div className="flex-1 px-[1vw] pb-[2vw] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="flex-1 px-[1vw] pt-[1.2vw] pb-[2vw] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {sidebarGroups.map((group, index) => (
-            <div key={index} className="mb-[1vw]">
+            <div key={index} className="mb-[1.6vw]">
               
               {/* Group Title with Line */}
-              <div className="flex items-center gap-[1vw] mb-[0.8vw] px-[0.5vw]">
-                <h4 className="text-[0.95vw] font-semibold text-gray-700 whitespace-nowrap">
+              <div className="flex items-center gap-[0.8vw] mb-[0.8vw] px-[0.5vw]">
+                <h4 className="text-[0.88vw] font-medium text-gray-600 whitespace-nowrap">
                   {group.title}
                 </h4>
-                <div className="h-[0.0925vw] bg-gray-200 flex-1" style={{ marginRight: '-1.5vw' }}> </div>
+                <div className="h-[1px] bg-gray-100 flex-1"></div>
               </div>
 
-              <div className="flex flex-col gap-[0.2vw]">
+              <div className="flex flex-col gap-[0.25vw]">
                 {group.items.map((item) => {
                   const isProfile = item.id === 'profile';
                   const isActive = isProfile 
                     ? location.pathname.startsWith('/settings/profile')
-                    : location.pathname === `/settings/${item.path}` || location.pathname.startsWith(`/settings/${item.path}/`);
+                    : location.pathname === `/settings/${item.path}` || location.pathname.startsWith(`/settings/${item.path}/`) || (item.id === 'billing-and-invoice' && location.pathname === '/settings/billing');
 
                   return (
                     <Link
                       key={item.id || item.path}
                       to={item.path}
                       className={`
-                        flex items-center gap-[1vw] px-[0.75vw] py-[0.4vw] rounded-[0.5vw] text-[0.8125vw] font-semibold transition-colors
+                        flex items-center gap-[0.9vw] px-[0.9vw] py-[0.55vw] rounded-[0.5vw] text-[0.85vw] font-normal transition-colors
                         ${isActive 
-                          ? 'bg-[#F2F2F2] text-gray-800' 
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
+                          ? 'bg-[#F2F2F2] text-gray-900 font-medium' 
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                         }
                       `}
                     >
                       <Icon 
                         icon={item.icon} 
-                        className={`w-[1vw] h-[1vw] flex-shrink-0 text-gray-700 ${item.icon.startsWith('gcp:') ? 'grayscale brightness-0 opacity-90' : ''}`} 
-                        style={{ strokeWidth: '1.2px' }}
+                        className="w-[1.15vw] h-[1.15vw] flex-shrink-0 text-gray-700" 
+                        strokeWidth="1.8"
                       />
-                      {item.label}
+                      <span>{item.label}</span>
                     </Link>
                   );
                 })}
@@ -233,15 +270,31 @@ const SettingsLayout = () => {
           ))}
         </div>
 
-        {/* Log Out Button */}
-        <div className="p-[0.5vw] mb-[0.5vw]">
-          <button 
-            onClick={handleLogout}
-            className="w-full relative overflow-hidden bg-transparent border-2 border-red-600 text-red-600 hover:bg-red-600 hover:border-red-600 hover:text-white active:scale-[0.98] rounded-[0.8vw] py-[0.65vw] flex items-center justify-center gap-[0.5vw] transition-all duration-200 cursor-pointer font-semibold text-[0.85vw] shadow-xs hover:shadow-md hover:shadow-red-500/20 group"
-          >
-            <Icon icon="lucide:log-out" className="w-[1.05vw] h-[1.05vw] transition-transform group-hover:-translate-x-0.5" />
-            <span>Log Out</span>
-          </button>
+        {/* Upgrade Profile Card with Royal Gold Crown (Matching screenshot) */}
+        <div className="p-[0.8vw] mb-[0.6vw]">
+          <div className="relative">
+            {/* 3D Realistic Royal Gold Crown on Top-Right */}
+            <div className="absolute -top-[1.1vw] -right-[0.5vw] w-[2.8vw] h-[2.3vw] rotate-[14deg] z-20 select-none pointer-events-none drop-shadow-[0_4px_10px_rgba(0,0,0,0.35)]">
+              <img 
+                src={crownImg} 
+                alt="Crown" 
+                className="w-full h-full object-contain" 
+              />
+            </div>
+
+            {/* Dark Textured / Speckled Upgrade Profile Button */}
+            <button
+              onClick={() => navigate('/settings/billing-and-invoice')}
+              className="w-full relative overflow-hidden py-[0.7vw] px-[1vw] rounded-[0.7vw] text-[0.88vw] font-semibold text-white flex items-center justify-center gap-[0.5vw] shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_22px_rgba(0,0,0,0.4)] active:scale-[0.98] transition-all cursor-pointer group"
+              style={{
+                background: 'radial-gradient(ellipse at 50% 20%, #2b2e35 0%, #17181c 65%, #0f1013 100%)',
+                boxShadow: '0 4px 15px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12)'
+              }}
+            >
+              <span className="tracking-wide text-gray-100 font-medium">Upgrade Profile</span>
+              <ArrowRight size="1vw" strokeWidth={2.4} className="text-gray-200 transition-transform group-hover:translate-x-[0.2vw]" />
+            </button>
+          </div>
         </div>
 
       </aside>
