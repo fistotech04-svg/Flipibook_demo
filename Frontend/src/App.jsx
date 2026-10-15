@@ -11,14 +11,10 @@ import Profile from './pages/Settings/Profile/Profile';
 import Account from './pages/Settings/Account';
 import Notifications from './pages/Settings/Notifications';
 import MyShelf from './pages/Settings/MyShelf';
-import EditorDefaults from './pages/Settings/EditorDefaults';
-import Library from './pages/Settings/Library';
-import Integrations from './pages/Settings/Integrations';
-import PrivacyAccess from './pages/Settings/PrivacyAccess';
 import Analytics from './pages/Settings/Analytics';
 import Billing from './pages/Settings/Billing';
-import Advanced from './pages/Settings/Advanced';
-import AccountManagement from './pages/Settings/AccountManagement';
+import VirtualStall from './pages/Settings/VirtualStall';
+import Support from './pages/Settings/Support';
 import About from './pages/About';
 import Explore from './pages/Explore';
 import Template from './pages/Template';
@@ -110,14 +106,11 @@ function App() {
                 <Route path="account" element={<Account />} />
                 <Route path="notifications" element={<Notifications />} />
                 <Route path="my-shelf" element={<MyShelf />} />
-                <Route path="editor-defaults" element={<EditorDefaults />} />
-                <Route path="library" element={<Library />} />
-                <Route path="integrations" element={<Integrations />} />
-                <Route path="privacy-access" element={<PrivacyAccess />} />
                 <Route path="analytics" element={<Analytics />} />
                 <Route path="billing" element={<Billing />} />
-                <Route path="advanced" element={<Advanced />} />
-                <Route path="account-management" element={<AccountManagement />} />
+                <Route path="billing-and-invoice" element={<Billing />} />
+                <Route path="virtual-stall" element={<VirtualStall />} />
+                <Route path="support" element={<Support />} />
               </Route>
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<ContactUs />} />
