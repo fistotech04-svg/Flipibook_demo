@@ -986,6 +986,27 @@ const getInteractionScript = (pageNumber) => `
             };
             let lastInteractionTime = 0;
             const handleStart = (e) => {
+               // 1. Direct handling for map action links (Directions, Call, Share) or anchors inside map elements
+               const mapLink = e.target.closest('a[href]');
+               if (mapLink && mapLink.closest('[data-type="map"], [id^="map-"], .map-card-overlay, .map-root-container')) {
+                   e.stopPropagation();
+                   const href = mapLink.getAttribute('href');
+                   if (href && (e.type === 'click' || e.type === 'mouseup')) {
+                       if (href.startsWith('tel:')) {
+                           window.location.href = href;
+                       } else {
+                           window.open(href, '_blank', 'noopener,noreferrer');
+                       }
+                   }
+                   return;
+               }
+
+               // 2. If click/touch is inside a map container, iframe, or map controls, don't initiate page drag
+               const isInsideMap = e.target.closest('[data-type="map"], [id^="map-"], .map-root-container, .map-card-overlay, .map-action-btn, iframe');
+               if (isInsideMap) {
+                   return;
+               }
+
                const el = findInteractionEl(e.target);
                if (el) {
                    e.preventDefault();
@@ -1353,6 +1374,10 @@ const getInteractionScript = (pageNumber) => `
             };
 
             const handleEnd = (e) => {
+                if (e.target.closest('[data-type="map"], [id^="map-"], .map-root-container, .map-card-overlay, .map-action-btn, iframe')) {
+                    window._isIframeDragging = false;
+                    return;
+                }
                 const el = findInteractionEl(e.target);
                 if (el) {
                     e.stopPropagation();
@@ -2060,6 +2085,42 @@ const sanitizeHtmlForPreview = (rawHtml) => {
             } else if (!allow.includes('fullscreen')) {
                 iframe.setAttribute('allow', `${allow}; fullscreen`);
             }
+
+            // Ensure map iframe scaling fits the frame proportionally in preview
+            if (fo) {
+                const isMap = fo.closest('[data-type="map"]') || fo.closest('[id^="map-"]') || fo.getAttribute('data-type') === 'map' || (fo.id && fo.id.startsWith('map-')) || (src && src.includes('maps.google.com'));
+                if (isMap) {
+                    const foW = parseFloat(fo.getAttribute('width') || '0') || 240;
+                    const foH = parseFloat(fo.getAttribute('height') || '0') || 150;
+                    const baseW = 320;
+                    const scale = foW < baseW ? (foW / baseW) : 1;
+                    const innerW = foW < baseW ? baseW : foW;
+                    const innerH = Math.round(foH / scale);
+
+                    const stage = fo.querySelector('.map-stage');
+                    if (stage) {
+                        stage.style.setProperty('width', innerW + 'px', 'important');
+                        stage.style.setProperty('height', innerH + 'px', 'important');
+                        stage.style.setProperty('transform', `scale(${scale})`, 'important');
+                        stage.style.setProperty('transform-origin', '0 0', 'important');
+                    }
+                    iframe.setAttribute('width', innerW.toString());
+                    iframe.setAttribute('height', innerH.toString());
+                    iframe.style.setProperty('width', innerW + 'px', 'important');
+                    iframe.style.setProperty('height', innerH + 'px', 'important');
+                    iframe.style.setProperty('transform', 'none', 'important');
+                    iframe.style.setProperty('pointer-events', 'auto', 'important');
+                    iframe.style.setProperty('border', 'none', 'important');
+                    iframe.style.setProperty('display', 'block', 'important');
+
+                    const mapGroup = fo.closest('[data-type="map"]') || fo.closest('[id^="map-"]') || fo.parentElement;
+                    const rect = mapGroup?.querySelector(':scope > rect') || mapGroup?.querySelector('rect');
+                    if (rect) {
+                        rect.style.setProperty('pointer-events', 'none', 'important');
+                        rect.style.setProperty('display', 'none', 'important');
+                    }
+                }
+            }
         });
 
         return doc.body.innerHTML || rawHtml;
@@ -2196,6 +2257,255 @@ const getIframeContent = (html, pageNumber, watermarkSettings = null, pagesCount
                         pointer-events: auto !important;
                     }
 
+                    /* Map Element Overrides & Container Responsiveness in Flipbook */
+                    [data-type="map"] rect,
+                    [data-type="map"] > rect,
+                    [id^="map-"] rect,
+                    [id^="map-"] > rect {
+                        pointer-events: none !important;
+                        display: none !important;
+                    }
+
+                    [data-type="map"] foreignObject,
+                    [id^="map-"] foreignObject {
+                        overflow: hidden !important;
+                        border-radius: 0px !important;
+                        pointer-events: auto !important;
+                    }
+
+                    [data-type="map"] foreignObject > div.map-root-container,
+                    [data-type="map"] foreignObject > div:first-child,
+                    [id^="map-"] foreignObject > div.map-root-container,
+                    [id^="map-"] foreignObject > div:first-child {
+                        border-radius: 0px !important;
+                        width: 100% !important;
+                        height: 100% !important;
+                        white-space: normal !important;
+                        overflow: hidden !important;
+                        line-height: normal !important;
+                        position: relative !important;
+                        container-type: size !important;
+                        display: block !important;
+                    }
+
+                    [data-type="map"] foreignObject div,
+                    [data-type="map"] foreignObject span,
+                    [data-type="map"] foreignObject a,
+                    [data-type="map"] foreignObject p,
+                    [id^="map-"] foreignObject div,
+                    [id^="map-"] foreignObject span,
+                    [id^="map-"] foreignObject a,
+                    [id^="map-"] foreignObject p {
+                        white-space: normal !important;
+                        word-wrap: normal !important;
+                        word-break: normal !important;
+                        overflow-wrap: normal !important;
+                    }
+
+                    [data-type="map"] foreignObject .map-stage,
+                    [id^="map-"] foreignObject .map-stage {
+                        position: absolute !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        transform-origin: 0 0 !important;
+                        overflow: hidden !important;
+                    }
+
+                    [data-type="map"] foreignObject .map-overlay-wrapper,
+                    [id^="map-"] foreignObject .map-overlay-wrapper {
+                        position: absolute !important;
+                        inset: 0 !important;
+                        pointer-events: none !important;
+                    }
+
+                    [data-type="map"] foreignObject iframe,
+                    [id^="map-"] foreignObject iframe {
+                        pointer-events: auto !important;
+                        border: none !important;
+                        display: block !important;
+                    }
+
+                    [data-type="map"] foreignObject svg,
+                    [data-type="map"] foreignObject svg.svg-icon-override,
+                    [id^="map-"] foreignObject svg,
+                    [id^="map-"] foreignObject svg.svg-icon-override {
+                        width: auto !important;
+                        height: auto !important;
+                        max-width: none !important;
+                        max-height: none !important;
+                        display: inline-block !important;
+                        flex-shrink: 0 !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                    }
+
+                    [data-type="map"] foreignObject .map-card-overlay,
+                    [id^="map-"] foreignObject .map-card-overlay {
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+                        pointer-events: auto !important;
+                        box-sizing: border-box !important;
+                    }
+
+                    [data-type="map"] foreignObject .map-card-overlay *,
+                    [id^="map-"] foreignObject .map-card-overlay * {
+                        line-height: normal;
+                        box-sizing: border-box;
+                    }
+
+                    [data-type="map"] foreignObject .map-nowrap,
+                    [data-type="map"] foreignObject [data-nowrap="true"],
+                    [id^="map-"] foreignObject .map-nowrap,
+                    [id^="map-"] foreignObject [data-nowrap="true"] {
+                        white-space: nowrap !important;
+                    }
+
+                    /* Fluid map responsive rules */
+                    [data-type="map"] foreignObject .map-top-badge,
+                    [id^="map-"] foreignObject .map-top-badge {
+                        max-width: 88% !important;
+                        pointer-events: auto !important;
+                    }
+                    [data-type="map"] foreignObject .map-top-badge .map-badge-title,
+                    [data-type="map"] foreignObject .map-top-badge .map-badge-subtitle,
+                    [id^="map-"] foreignObject .map-top-badge .map-badge-title,
+                    [id^="map-"] foreignObject .map-top-badge .map-badge-subtitle {
+                        max-width: clamp(90px, 45cqw, 160px) !important;
+                    }
+                    [data-type="map"] foreignObject .map-card-actions,
+                    [id^="map-"] foreignObject .map-card-actions {
+                        max-height: 52% !important;
+                        display: flex !important;
+                        flex-direction: column !important;
+                        justify-content: flex-end !important;
+                        pointer-events: auto !important;
+                    }
+                    [data-type="map"] foreignObject .map-actions-row,
+                    [id^="map-"] foreignObject .map-actions-row {
+                        display: flex !important;
+                        gap: clamp(2px, 1.5cqw, 5px) !important;
+                        width: 100% !important;
+                        box-sizing: border-box !important;
+                        pointer-events: auto !important;
+                    }
+                    [data-type="map"] foreignObject .map-action-btn,
+                    [id^="map-"] foreignObject .map-action-btn {
+                        display: flex !important;
+                        align-items: center !important;
+                        justify-content: center !important;
+                        gap: clamp(2px, 1cqw, 4px) !important;
+                        padding: clamp(3px, 1.2cqh, 5px) clamp(2px, 1cqw, 5px) !important;
+                        border-radius: clamp(4px, 1.5cqw, 6px) !important;
+                        font-size: clamp(7.5px, 2.7cqw, 9.5px) !important;
+                        font-weight: 600 !important;
+                        text-decoration: none !important;
+                        cursor: pointer !important;
+                        pointer-events: auto !important;
+                    }
+                    [data-type="map"] foreignObject .map-action-btn svg,
+                    [id^="map-"] foreignObject .map-action-btn svg {
+                        width: clamp(8px, 2.8cqw, 10px) !important;
+                        height: clamp(8px, 2.8cqw, 10px) !important;
+                    }
+                    [data-type="map"] foreignObject .map-btn-text,
+                    [id^="map-"] foreignObject .map-btn-text {
+                        white-space: nowrap !important;
+                        overflow: hidden !important;
+                        text-overflow: ellipsis !important;
+                        font-size: inherit !important;
+                        pointer-events: auto !important;
+                    }
+
+                    /* Container Queries for compact map elements */
+                    @container (max-height: 190px) {
+                        [data-type="map"] foreignObject .map-drag-pill,
+                        [id^="map-"] foreignObject .map-drag-pill {
+                            display: none !important;
+                        }
+                        [data-type="map"] foreignObject .map-biz-category,
+                        [id^="map-"] foreignObject .map-biz-category {
+                            display: none !important;
+                        }
+                        [data-type="map"] foreignObject .map-top-badge .map-badge-subtitle,
+                        [id^="map-"] foreignObject .map-top-badge .map-badge-subtitle {
+                            display: none !important;
+                        }
+                        [data-type="map"] foreignObject .map-top-badge,
+                        [id^="map-"] foreignObject .map-top-badge {
+                            padding: 2px 6px 2px 3px !important;
+                            top: 4px !important;
+                        }
+                        [data-type="map"] foreignObject .map-biz-row,
+                        [id^="map-"] foreignObject .map-biz-row {
+                            margin-bottom: 2px !important;
+                            gap: 4px !important;
+                        }
+                        [data-type="map"] foreignObject .map-biz-img,
+                        [id^="map-"] foreignObject .map-biz-img {
+                            width: 26px !important;
+                            height: 26px !important;
+                        }
+                        [data-type="map"] foreignObject .map-card-actions,
+                        [id^="map-"] foreignObject .map-card-actions {
+                            padding: 4px 6px 5px !important;
+                        }
+                    }
+
+                    @container (max-height: 140px) {
+                        [data-type="map"] foreignObject .map-top-badge,
+                        [id^="map-"] foreignObject .map-top-badge {
+                            display: none !important;
+                        }
+                        [data-type="map"] foreignObject .map-biz-meta,
+                        [id^="map-"] foreignObject .map-biz-meta {
+                            display: none !important;
+                        }
+                        [data-type="map"] foreignObject .map-biz-img,
+                        [id^="map-"] foreignObject .map-biz-img {
+                            width: 20px !important;
+                            height: 20px !important;
+                        }
+                        [data-type="map"] foreignObject .map-card-actions,
+                        [id^="map-"] foreignObject .map-card-actions {
+                            padding: 3px 5px 3px !important;
+                        }
+                    }
+
+                    @container (max-width: 230px) {
+                        [data-type="map"] foreignObject .map-actions-row,
+                        [id^="map-"] foreignObject .map-actions-row {
+                            gap: 2px !important;
+                        }
+                        [data-type="map"] foreignObject .map-action-btn,
+                        [id^="map-"] foreignObject .map-action-btn {
+                            padding: 3px 2px !important;
+                            font-size: 7.5px !important;
+                        }
+                        [data-type="map"] foreignObject .map-action-btn svg,
+                        [id^="map-"] foreignObject .map-action-btn svg {
+                            width: 8px !important;
+                            height: 8px !important;
+                            min-width: 8px !important;
+                            max-width: 8px !important;
+                            min-height: 8px !important;
+                            max-height: 8px !important;
+                        }
+                    }
+
+                    @container (max-width: 175px) {
+                        [data-type="map"] foreignObject .map-action-btn-secondary:last-child,
+                        [id^="map-"] foreignObject .map-action-btn-secondary:last-child {
+                            display: none !important;
+                        }
+                        [data-type="map"] foreignObject .map-action-btn-primary,
+                        [id^="map-"] foreignObject .map-action-btn-primary {
+                            flex: 1.2 !important;
+                        }
+                        [data-type="map"] foreignObject .map-action-btn-secondary,
+                        [id^="map-"] foreignObject .map-action-btn-secondary {
+                            flex: 1 !important;
+                        }
+                    }
+
                     .flipbook-text-scrollbar::-webkit-scrollbar,
                     [data-scrollable="true"]::-webkit-scrollbar,
                     [data-scrollable="true"] *::-webkit-scrollbar {
@@ -2233,7 +2543,7 @@ const getIframeContent = (html, pageNumber, watermarkSettings = null, pagesCount
                         background: #1F2937 !important;
                     }
 
-                    foreignObject:not([data-scrollable="true"]):not([data-editing="true"])>div {
+                    foreignObject:not([data-scrollable="true"]):not([data-editing="true"])>div:not(.map-root-container) {
                         width: 100% !important;
                         height: auto !important;
                     }

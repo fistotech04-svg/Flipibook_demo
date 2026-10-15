@@ -145,7 +145,7 @@ export const generateOverlayHtml = (style, data = {}) => {
       <div class="map-card-overlay map-card-actions" style="position: absolute; bottom: 0; left: 0; right: 0; background: #ffffff; border-radius: 14px 14px 0 0; padding: 5px 8px 6px; box-shadow: 0 -4px 16px rgba(0,0,0,0.15); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; pointer-events: auto; z-index: 10; box-sizing: border-box; max-height: 52%; display: flex; flex-direction: column; justify-content: flex-end;">
         <div class="map-drag-pill" style="width: 24px; height: 2.5px; background: #d1d5db; border-radius: 999px; margin: 0 auto 4px; flex-shrink: 0;"></div>
         <div class="map-biz-row" style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px; min-width: 0;">
-          <img class="map-biz-img" src="${image}" alt="${name}" style="width: 32px; height: 32px; border-radius: 5px; object-fit: cover; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08);" />
+          <img class="map-biz-img" src="${image}" alt="${name}" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1524661135-423995f22d0b?w=400&amp;auto=format&amp;fit=crop&amp;q=80';" style="width: 32px; height: 32px; border-radius: 5px; object-fit: cover; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08);" />
           <div class="map-biz-info" style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
             <div class="map-nowrap map-biz-name" data-nowrap="true" style="font-weight: 700; font-size: 10px; color: #111827; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; line-height: 1.15;">${name}</div>
             <div class="map-nowrap map-biz-addr" data-nowrap="true" style="font-size: 8px; color: #4b5563; margin-top: 1px; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; line-height: 1.1;">${address}</div>
@@ -180,7 +180,7 @@ export const generateOverlayHtml = (style, data = {}) => {
       <!-- Tooltip Speech Bubble -->
       <div class="map-card-overlay map-card-callout" style="position: absolute; top: 8%; left: 50%; transform: translateX(-50%); width: 85%; max-width: 220px; background: #ffffff; border-radius: 10px; padding: 5px 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.18); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; pointer-events: auto; z-index: 10; box-sizing: border-box;">
         <div class="map-biz-row" style="display: flex; align-items: center; gap: 6px;">
-          <img class="map-biz-img" src="${image}" alt="${name}" style="width: 32px; height: 32px; border-radius: 5px; object-fit: cover; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);" />
+          <img class="map-biz-img" src="${image}" alt="${name}" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1524661135-423995f22d0b?w=400&amp;auto=format&amp;fit=crop&amp;q=80';" style="width: 32px; height: 32px; border-radius: 5px; object-fit: cover; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);" />
           <div class="map-biz-info" style="flex: 1; min-width: 0;">
             <div class="map-nowrap map-biz-name" data-nowrap="true" style="font-weight: 700; font-size: 10px; color: #111827; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; line-height: 1.15;">${name}</div>
             <div class="map-nowrap map-biz-addr" data-nowrap="true" style="font-size: 8px; color: #4b5563; margin-top: 1px; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis;">${address}</div>
@@ -223,7 +223,7 @@ export const generateOverlayHtml = (style, data = {}) => {
       <div class="map-card-overlay map-card-gallery" style="position: absolute; bottom: 0; left: 0; right: 0; background: #ffffff; border-radius: 14px 14px 0 0; padding: 5px 8px 6px; box-shadow: 0 -4px 16px rgba(0,0,0,0.15); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; pointer-events: auto; z-index: 10; box-sizing: border-box; max-height: 52%; display: flex; flex-direction: column; justify-content: flex-end;">
         <div class="map-drag-pill" style="width: 24px; height: 2.5px; background: #d1d5db; border-radius: 999px; margin: 0 auto 4px; flex-shrink: 0;"></div>
         <div class="map-biz-row" style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px; min-width: 0;">
-          <img class="map-biz-img" src="${image}" alt="${name}" style="width: 30px; height: 30px; border-radius: 5px; object-fit: cover; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08);" />
+          <img class="map-biz-img" src="${image}" alt="${name}" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1524661135-423995f22d0b?w=400&amp;auto=format&amp;fit=crop&amp;q=80';" style="width: 30px; height: 30px; border-radius: 5px; object-fit: cover; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08);" />
           <div class="map-biz-info" style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
             <div class="map-nowrap map-biz-name" data-nowrap="true" style="font-weight: 700; font-size: 10px; color: #111827; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; line-height: 1.15;">${name}</div>
             <div class="map-nowrap map-biz-addr" data-nowrap="true" style="font-size: 8px; color: #4b5563; margin-top: 1px; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis;">${address}</div>
@@ -239,10 +239,10 @@ export const generateOverlayHtml = (style, data = {}) => {
         <!-- Gallery Strip -->
         <div class="map-gallery-strip" style="display: flex; gap: 3px; margin-bottom: 4px; width: 100%;">
           ${galleryItems.slice(0, 4).map((img, i) => `
-            <img key="${i}" class="map-gallery-thumb" src="${img}" alt="Preview ${i+1}" style="flex: 1; height: 24px; border-radius: 3px; object-fit: cover; min-width: 0;" />
+            <img key="${i}" class="map-gallery-thumb" src="${img}" alt="Preview ${i+1}" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1524661135-423995f22d0b?w=400&amp;auto=format&amp;fit=crop&amp;q=80';" style="flex: 1; height: 24px; border-radius: 3px; object-fit: cover; min-width: 0;" />
           `).join('')}
           <div class="map-gallery-thumb" style="position: relative; flex: 1; height: 24px; border-radius: 3px; overflow: hidden; min-width: 0;">
-            <img src="${galleryItems[4] || galleryItems[0]}" alt="More" style="width: 100%; height: 100%; object-fit: cover;" />
+            <img src="${galleryItems[4] || galleryItems[0]}" alt="More" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1524661135-423995f22d0b?w=400&amp;auto=format&amp;fit=crop&amp;q=80';" style="width: 100%; height: 100%; object-fit: cover;" />
             <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.52); display: flex; align-items: center; justify-content: center; color: #ffffff; font-weight: 700; font-size: 9px;">+</div>
           </div>
         </div>
@@ -268,7 +268,7 @@ export const generateOverlayHtml = (style, data = {}) => {
     <!-- Floating Card -->
     <div class="map-card-overlay map-card-carousel" style="position: absolute; bottom: 14px; left: 6px; right: 6px; background: #ffffff; border-radius: 8px; padding: 5px 7px; box-shadow: 0 4px 14px rgba(0,0,0,0.15); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; pointer-events: auto; z-index: 10; box-sizing: border-box; max-height: 50%;">
       <div class="map-biz-row" style="display: flex; align-items: center; gap: 6px;">
-        <img class="map-biz-img" src="${image}" alt="${name}" style="width: 32px; height: 32px; border-radius: 5px; object-fit: cover; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08);" />
+        <img class="map-biz-img" src="${image}" alt="${name}" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1524661135-423995f22d0b?w=400&amp;auto=format&amp;fit=crop&amp;q=80';" style="width: 32px; height: 32px; border-radius: 5px; object-fit: cover; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08);" />
         <div class="map-biz-info" style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
           <div class="map-nowrap map-biz-name" data-nowrap="true" style="font-weight: 700; font-size: 9.5px; color: #111827; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; line-height: 1.15;">${name}</div>
           <div class="map-nowrap map-biz-addr" data-nowrap="true" style="font-size: 7.5px; color: #4b5563; margin-top: 1px; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis;">${address}</div>

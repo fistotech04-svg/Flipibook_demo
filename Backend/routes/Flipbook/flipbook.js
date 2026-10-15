@@ -137,11 +137,13 @@ const extractGoogleMapsDetails = (finalUrl, html, fallbackPlace = "") => {
     }
 
     // Parts split by " · "
+    // Parts split by " · "
     const descParts = desc.split(' · ');
     for (const part of descParts) {
       const p = part.trim();
       if (!p || p.includes('★') || p.includes('☆')) continue;
       if (/^\(?[\d,]+\)?$/.test(p)) continue;
+      if (/Find local businesses, view maps and get driving directions/i.test(p)) continue;
       if (!category && p.length < 40 && !/\d{5,}/.test(p)) {
         category = p;
       } else if (!address && p.length > 5) {
@@ -211,6 +213,7 @@ const extractGoogleMapsDetails = (finalUrl, html, fallbackPlace = "") => {
 
   if (!name && fallbackPlace) name = fallbackPlace;
   if (!name) name = "Google Maps Location";
+  if (address && /Find local businesses, view maps/i.test(address)) address = "";
   if (!address && coords) address = coords;
   if (!address) address = name;
   if (!rating) rating = "4.8";
@@ -285,8 +288,9 @@ router.get("/resolve-map-url", async (req, res) => {
       embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(finalUrl)}&t=&z=13&ie=UTF8&iwloc=near&output=embed`;
     }
 
-    // Secondary fallback: if address is identical to name, try Nominatim to enrich address details
-    if (details.name && details.name === details.address) {
+    // Secondary fallback: if address is identical to name, try Nominatim to enrich address details (skip generic query names like "Google Maps")
+    const isGenericName = !details.name || /^google\s*maps?(\s*location)?$/i.test(details.name.trim());
+    if (!isGenericName && details.name && details.name === details.address) {
       try {
         const nomRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(details.name)}&limit=1`, {
           headers: { 'User-Agent': 'FlipbookEditor/1.0' }
@@ -303,6 +307,10 @@ router.get("/resolve-map-url", async (req, res) => {
           }
         }
       } catch (e) {}
+    } else if (isGenericName) {
+      details.name = "Google Maps Location";
+      details.address = "Location Details";
+      details.category = "Location";
     }
 
     return res.json({
