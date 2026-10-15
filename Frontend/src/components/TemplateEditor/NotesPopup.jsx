@@ -1,18 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icon } from '@iconify/react';
-import { X, Plus, Copy, Check, Trash2, Edit3, Search, Sparkles, FileText, CornerDownLeft } from 'lucide-react';
+import { X, Plus, Copy, Check, Trash2, Edit3, Search, Sparkles, FileText, CornerDownLeft, Pipette } from 'lucide-react';
 
 const STORAGE_KEY = 'fisto_template_editor_notes';
+
+export const isColorCode = (input) => {
+  if (!input || typeof input !== 'string') return false;
+  const s = input.trim();
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/i.test(s) ||
+         /^rgba?\((\s*\d+\s*,){2,3}\s*[\d.]+\s*\)$/i.test(s) ||
+         /^hsla?\((\s*\d+\s*,){2,3}\s*[\d.]+\s*\)$/i.test(s);
+};
 
 /**
  * Robust cleaner that guarantees only plain text string is saved:
  * - Strips all SVG/HTML tags (<text>, <style>, <div>, etc.)
  * - Strips CSS rules and inline properties (e.g. --stroke-width, color: ..., fill: ...)
- * - Strips color codes (Hex #ffffff, rgb(), rgba(), hsl())
  * - Decodes HTML entities and normalizes whitespace while preserving paragraphs
+ * - Preserves hex / rgb color codes
  */
 export const cleanNoteText = (input) => {
   if (!input || typeof input !== 'string') return '';
+  const trimmed = input.trim();
+  if (isColorCode(trimmed)) {
+    return trimmed.toUpperCase();
+  }
   let text = input;
 
   // 1. Remove style and script blocks completely
@@ -25,13 +37,7 @@ export const cleanNoteText = (input) => {
   // 3. Remove CSS declarations like color: #...; background: ...; or --var: ...;
   text = text.replace(/--?[a-zA-Z-]+:\s*[^;]+;?/gi, '');
 
-  // 4. Remove hex color codes (#FFF, #FFFFFF, #FFFFFFFF)
-  text = text.replace(/#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b/g, '');
-
-  // 5. Remove rgb/rgba/hsl/hsla color notations
-  text = text.replace(/(?:rgb|hsl)a?\([^)]*\)/gi, '');
-
-  // 6. Decode common HTML entities
+  // 4. Decode common HTML entities
   text = text
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
@@ -40,7 +46,7 @@ export const cleanNoteText = (input) => {
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ');
 
-  // 7. Clean up whitespace per line and preserve paragraphs
+  // 5. Clean up whitespace per line and preserve paragraphs
   text = text
     .split('\n')
     .map(line => line.replace(/[ \t]+/g, ' ').trim())
@@ -48,6 +54,40 @@ export const cleanNoteText = (input) => {
     .join('\n');
 
   return text.trim();
+};
+
+/**
+ * Automatically cleans and adds color into persistent Notes storage
+ */
+export const addColorToNotes = (colorCode) => {
+  if (!colorCode || typeof colorCode !== 'string') return;
+  const hex = colorCode.trim().toUpperCase();
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    let notes = [];
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) notes = parsed;
+    }
+
+    if (notes.length > 0 && notes[0].text === hex) {
+      return;
+    }
+
+    const newNote = {
+      id: 'note_' + Date.now(),
+      text: hex,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    const updated = [newNote, ...notes];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('notes-updated', { detail: { notes: updated } }));
+    window.dispatchEvent(new Event('storage'));
+  } catch (e) {
+    console.error('Failed to add color to notes:', e);
+  }
 };
 
 /**
@@ -111,6 +151,7 @@ const NotesPopup = ({ isOpen, onClose, selectedLayerId }) => {
   const [canvasText, setCanvasText] = useState('');
 
   const textareaRef = useRef(null);
+  const colorInputRef = useRef(null);
 
   // Load persisted notes and listen for live updates
   useEffect(() => {
@@ -182,7 +223,6 @@ const NotesPopup = ({ isOpen, onClose, selectedLayerId }) => {
 
       if (copiedText && copiedText.trim()) {
         addTextToNotes(copiedText);
-        showToast('Copied text automatically added to Notes!');
       }
     };
 
@@ -301,7 +341,47 @@ const NotesPopup = ({ isOpen, onClose, selectedLayerId }) => {
       updatedAt: Date.now()
     };
     persistNotes([newNote, ...notes]);
-    showToast('Saved selection to Notes');
+  };
+
+  // Save Picked Color directly to Notes
+  const saveColorToNotes = (colorCode) => {
+    if (!colorCode) return;
+    const hex = colorCode.trim().toUpperCase();
+    const newNote = {
+      id: 'note_' + Date.now(),
+      text: hex,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    const updated = [newNote, ...notes];
+    persistNotes(updated);
+    if (isAdding && !noteInput.trim()) {
+      setIsAdding(false);
+    }
+    try {
+      window.dispatchEvent(new CustomEvent('notes-updated', { detail: { notes: updated } }));
+      window.dispatchEvent(new Event('storage'));
+    } catch (e) {}
+  };
+
+  // Handle color eyedropper activation
+  const handlePickColor = async () => {
+    if (window.EyeDropper) {
+      try {
+        const eyeDropper = new window.EyeDropper();
+        const result = await eyeDropper.open();
+        if (result && result.sRGBHex) {
+          saveColorToNotes(result.sRGBHex);
+        }
+      } catch (err) {
+        // User cancelled by pressing Escape or clicking outside
+        console.log('EyeDropper cancelled or dismissed', err);
+      }
+    } else if (colorInputRef.current) {
+      colorInputRef.current.click();
+    } else {
+      showToast('Color eyedropper is not supported in this browser');
+    }
   };
 
   const escapeXml = (unsafe) => {
@@ -325,6 +405,7 @@ const NotesPopup = ({ isOpen, onClose, selectedLayerId }) => {
     const lines = cleaned.split('\n').filter(Boolean);
     if (lines.length === 0) return '';
 
+    const isColor = isColorCode(cleaned);
     const fontSize = 18;
     const lineHeight = 24;
     const longestLine = Math.max(...lines.map(l => l.length));
@@ -332,7 +413,7 @@ const NotesPopup = ({ isOpen, onClose, selectedLayerId }) => {
     const estH = Math.max(60, lines.length * lineHeight + 20);
 
     const textNodes = lines.map((line, idx) => (
-      `<text x="${Math.round(estW / 2)}" y="${Math.round((idx + 1) * lineHeight)}" font-size="${fontSize}" font-family="Inter, sans-serif" font-weight="600" fill="#111827" text-anchor="middle">${escapeXml(line)}</text>`
+      `<text x="${Math.round(estW / 2)}" y="${Math.round((idx + 1) * lineHeight)}" font-size="${fontSize}" font-family="Inter, sans-serif" font-weight="600" fill="${isColor ? cleaned : '#111827'}" text-anchor="middle">${escapeXml(line)}</text>`
     )).join('\n');
 
     return `
@@ -433,7 +514,17 @@ const NotesPopup = ({ isOpen, onClose, selectedLayerId }) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-[0.3vw]">
+        <div className="flex items-center gap-[0.35vw]">
+          {/* Pipette / Color Picker Button */}
+          <button
+            type="button"
+            onClick={handlePickColor}
+            className="flex items-center justify-center p-[0.35vw] text-gray-600 hover:text-indigo-600 bg-white hover:bg-indigo-50 border border-gray-200 hover:border-indigo-200 rounded-[0.4vw] transition-all shadow-2xs active:scale-95 cursor-pointer"
+            title="Pick color from editor to notes"
+          >
+            <Pipette size="0.85vw" strokeWidth={2.2} />
+          </button>
+
           {!isAdding && !editingId && (
             <button
               onClick={() => {
@@ -559,26 +650,38 @@ const NotesPopup = ({ isOpen, onClose, selectedLayerId }) => {
                 : 'Click "New" to create a note or import selected text from your design.'}
             </p>
             {!searchQuery && !isAdding && !editingId && (
-              <button
-                onClick={() => setIsAdding(true)}
-                className="mt-[0.8vw] inline-flex items-center gap-[0.3vw] text-[0.7vw] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-[0.7vw] py-[0.35vw] rounded-[0.4vw] transition-colors cursor-pointer"
-              >
-                <Plus size="0.8vw" />
-                <span>Create first note</span>
-              </button>
+              <div className="flex items-center gap-[0.4vw] mt-[0.8vw]">
+                <button
+                  onClick={() => setIsAdding(true)}
+                  className="inline-flex items-center gap-[0.3vw] text-[0.7vw] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-[0.7vw] py-[0.35vw] rounded-[0.4vw] transition-colors cursor-pointer"
+                >
+                  <Plus size="0.8vw" />
+                  <span>Create first note</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePickColor}
+                  className="inline-flex items-center gap-[0.3vw] text-[0.7vw] font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 px-[0.6vw] py-[0.35vw] rounded-[0.4vw] transition-colors cursor-pointer"
+                  title="Pick color from editor"
+                >
+                  <Pipette size="0.75vw" />
+                  <span>Pick color</span>
+                </button>
+              </div>
             )}
           </div>
         ) : (
           filteredNotes.map((note) => {
             const isCopied = copiedId === note.id;
+            const isColor = isColorCode(note.text);
             return (
               <div
                 key={note.id}
                 onClick={() => handleAddNoteToPage(note.text)}
                 className="group relative bg-gray-50/70 hover:bg-indigo-50/30 border border-gray-100 hover:border-indigo-200 rounded-[0.5vw] px-[0.6vw] py-[0.4vw] transition-all flex items-center justify-between gap-[0.5vw] cursor-pointer"
-                title={`Click to add "${note.text}" to page`}
+                title={isColor ? `Click to add color "${note.text}" to page` : `Click to add "${note.text}" to page`}
               >
-                {/* Note Content (Pure Plain Text) - Single line with drag & drop */}
+                {/* Note Content (Pure Plain Text or Color Swatch) - Single line with drag & drop */}
                 <div
                   draggable="true"
                   onDragStart={(e) => {
@@ -590,19 +693,25 @@ const NotesPopup = ({ isOpen, onClose, selectedLayerId }) => {
                       }));
                     }
                   }}
-                  className="flex-1 min-w-0 text-[0.75vw] text-gray-800 group-hover:text-indigo-950 font-normal truncate select-none"
+                  className="flex-1 min-w-0 flex items-center gap-[0.4vw] select-none"
                 >
-                  {note.text}
+                  {isColor && (
+                    <span
+                      className="w-[0.9vw] h-[0.9vw] rounded-[0.2vw] border border-black/15 shadow-2xs shrink-0"
+                      style={{ backgroundColor: note.text }}
+                      title={note.text}
+                    />
+                  )}
+                  <span className={`truncate text-[0.75vw] text-gray-800 group-hover:text-indigo-950 ${isColor ? 'font-mono font-semibold tracking-wider text-[0.72vw]' : 'font-normal'}`}>
+                    {note.text}
+                  </span>
                 </div>
 
-                {/* Note Actions & Timestamp in single line */}
+                {/* Note Actions in single line */}
                 <div 
                   onClick={(e) => e.stopPropagation()}
                   className="flex items-center gap-[0.3vw] shrink-0 select-none cursor-default"
                 >
-                  <span className="text-[0.6vw] text-gray-400 mr-[0.1vw]">
-                    {formatTimeAgo(note.updatedAt || note.createdAt)}
-                  </span>
 
                   {/* Copy Plain Text Button */}
                   <button
@@ -612,7 +721,7 @@ const NotesPopup = ({ isOpen, onClose, selectedLayerId }) => {
                         ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
                         : 'hover:bg-white text-gray-500 hover:text-indigo-600 hover:border-gray-200'
                     }`}
-                    title={isCopied ? "Copied!" : "Copy note"}
+                    title={isCopied ? "Copied!" : (isColor ? "Copy color code" : "Copy note")}
                   >
                     {isCopied ? (
                       <Check size="0.65vw" strokeWidth={2.5} />
@@ -644,6 +753,18 @@ const NotesPopup = ({ isOpen, onClose, selectedLayerId }) => {
           })
         )}
       </div>
+
+      {/* Hidden Fallback Color Input */}
+      <input
+        ref={colorInputRef}
+        type="color"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.value) {
+            saveColorToNotes(e.target.value);
+          }
+        }}
+      />
 
     </div>
   );
