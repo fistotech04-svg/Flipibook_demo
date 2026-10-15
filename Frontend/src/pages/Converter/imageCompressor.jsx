@@ -31,7 +31,7 @@ const ImageCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
 
   const getRecommendedFormatLabel = (fmt) => `${fmt} (Recommended)`;
 
-  const [compressionLevel, setCompressionLevel] = useState(70);
+  const [compressionLevel, setCompressionLevel] = useState(50);
   const [resolution, setResolution] = useState('Original (Keep Same)');
   const [outputFormat, setOutputFormat] = useState(getRecommendedFormatLabel(originalFormat));
   const [openDropdown, setOpenDropdown] = useState(null); // 'resolution' | 'format' | null
@@ -582,16 +582,16 @@ const ImageCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
                 {/* Quick Preset Buttons (Low, Balanced, High) */}
                 <div className="flex items-center gap-2 mb-2.5">
                   {[
-                    { label: 'Low', pct: 40, tip: 'Max Quality (light compression)' },
-                    { label: 'Balanced', pct: 70, tip: 'Recommended: Best quality & size' },
-                    { label: 'High', pct: 85, tip: 'Smallest file size' },
+                    { label: 'Low', pct: 25, tip: 'Max Quality (light compression)' },
+                    { label: 'Balanced', pct: 50, tip: 'Recommended: Best quality & size' },
+                    { label: 'High', pct: 80, tip: 'Smallest file size' },
                   ].map((preset) => {
                     const isActive =
                       preset.label === 'Low'
-                        ? compressionLevel <= 50
+                        ? compressionLevel < 40
                         : preset.label === 'Balanced'
-                        ? compressionLevel > 50 && compressionLevel <= 75
-                        : compressionLevel > 75;
+                        ? compressionLevel >= 40 && compressionLevel <= 65
+                        : compressionLevel > 65;
 
                     return (
                       <button
@@ -637,7 +637,7 @@ const ImageCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
                   `}</style>
                   <input
                     type="range"
-                    min="1"
+                    min="0"
                     max="100"
                     value={compressionLevel}
                     onChange={(e) => setCompressionLevel(Number(e.target.value))}
@@ -649,7 +649,7 @@ const ImageCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
                   {/* Low / Balanced / High indicators */}
                   <div className="flex items-center justify-between text-[11px] font-medium text-[#94a3b8] mt-1.5 px-0.5">
                     <span>Low (Light)</span>
-                    <span className="text-[#EA7233] font-semibold">Balanced (70%)</span>
+                    <span className="text-[#EA7233] font-semibold">Balanced</span>
                     <span>High (Max Compression)</span>
                   </div>
                 </div>
