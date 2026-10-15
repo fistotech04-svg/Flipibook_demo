@@ -315,7 +315,6 @@ const NotesPopup = ({ isOpen, onClose, selectedLayerId }) => {
         updatedAt: Date.now()
       } : n);
       persistNotes(updated);
-      showToast('Note updated');
       setEditingId(null);
     } else {
       const newNote = {
@@ -325,7 +324,6 @@ const NotesPopup = ({ isOpen, onClose, selectedLayerId }) => {
         updatedAt: Date.now()
       };
       persistNotes([newNote, ...notes]);
-      showToast('Note saved');
       setIsAdding(false);
     }
     setNoteInput('');
@@ -469,7 +467,6 @@ const NotesPopup = ({ isOpen, onClose, selectedLayerId }) => {
       setEditingId(null);
       setNoteInput('');
     }
-    showToast('Note deleted');
   };
 
   // Start editing a note
