@@ -70,6 +70,8 @@ const get3DCoverflowSvg = (uniqueId, transformAttr = '') => {
           <image href="${img1}" xlink:href="${img1}" x="0" y="0" width="110" height="124" preserveAspectRatio="xMidYMid slice" />
         </pattern>
       </defs>
+      <!-- Container Background -->
+      <rect class="slideshow-container-bg" x="-5" y="-5" width="220" height="150" rx="12" fill="transparent" />
       <!-- Left frame -->
       <rect x="0" y="8" width="80" height="124" rx="10" stroke="#9ca3af" stroke-width="1" fill="url(#slideshow-pattern-left-${uniqueId})" style="transform: perspective(400px) rotateY(25deg); transform-origin: 100% 50%; transform-box: fill-box; transition: all 0.3s ease;"/>
       <!-- Right frame -->
@@ -77,7 +79,7 @@ const get3DCoverflowSvg = (uniqueId, transformAttr = '') => {
       <!-- Center frame -->
       <rect x="40" y="0" width="130" height="140" rx="12" stroke="#9ca3af" stroke-width="2" fill="url(#slideshow-pattern-center-${uniqueId})" style="transform: perspective(400px) rotateY(0deg); transform-origin: 50% 50%; transform-box: fill-box; transition: all 0.3s ease;"/>
       <!-- Invisible bounding box for selection/interaction -->
-      <rect class="bbox-anchor" x="0" y="0" width="210" height="140" fill="transparent" />
+      <rect class="bbox-anchor" x="-5" y="-5" width="220" height="150" fill="transparent" />
     </g>
   `;
 };
@@ -121,6 +123,8 @@ const getFlatGallerySvg = (uniqueId, transformAttr = '') => {
           <image href="${img2}" xlink:href="${img2}" x="0" y="0" width="34" height="24" preserveAspectRatio="xMidYMid slice" />
         </pattern>
       </defs>
+      <!-- Container Background -->
+      <rect class="slideshow-container-bg" x="-5" y="-5" width="220" height="200" rx="12" fill="transparent" />
       <!-- Left frame -->
       <rect class="main-frame" x="0" y="0" width="46" height="140" rx="6" stroke="#9ca3af" stroke-width="1" fill="url(#slideshow-pattern-left-${uniqueId})" style="opacity: 0.5; transition: all 0.3s ease;"/>
       <!-- Right frame -->
@@ -134,6 +138,8 @@ const getFlatGallerySvg = (uniqueId, transformAttr = '') => {
       <rect class="thumb-frame" x="88" y="150" width="34" height="24" rx="2" stroke="#0ea5e9" stroke-width="2" fill="url(#slideshow-pattern-thumb-2-${uniqueId})" />
       <rect class="thumb-frame" x="132" y="150" width="34" height="24" rx="2" stroke="#9ca3af" stroke-width="1" fill="url(#slideshow-pattern-thumb-3-${uniqueId})" />
       <rect class="thumb-frame" x="176" y="150" width="34" height="24" rx="2" stroke="#9ca3af" stroke-width="1" fill="url(#slideshow-pattern-thumb-4-${uniqueId})" />
+      <!-- Invisible bounding box for selection/interaction -->
+      <rect class="bbox-anchor" x="-5" y="-5" width="220" height="200" fill="transparent" />
       
     </g>
   `;
