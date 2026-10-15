@@ -24,8 +24,11 @@ import {
   Minus,
   GripVertical,
   Edit3,
-  Trash2
+  Trash2,
+  Crop
 } from 'lucide-react';
+import ImageAdjustModal from './ImageAdjustModal';
+import SlideTextPopup from './SlideTextPopup';
 import ReplaceMediaModal from '../ReplaceMediaModal';
 import { Icon } from '@iconify/react';
 import { getVisualBBox } from '../MainEditor';
@@ -305,7 +308,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
     infiniteLoop: true,
     showArrows: true,
     showDots: true,
-    imageFitType: 'Fill All',
+    imageFitType: 'Fit',
     transitionEffect: 'Linear',
     dragToSlide: false,
     dotColor: '#EC5137',
@@ -438,6 +441,124 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
   const [replaceTargetIndex, setReplaceTargetIndex] = useState(null);
   const [newReplaceImg, setNewReplaceImg] = useState(null);
   const replaceInputRef = useRef(null);
+
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjustTargetIndex, setAdjustTargetIndex] = useState(null);
+
+  const [showSlideTextPopup, setShowSlideTextPopup] = useState(false);
+  const [textTargetIndex, setTextTargetIndex] = useState(null);
+
+  const handleSaveAdjustedImage = useCallback(({
+    croppedUrl,
+    originalUrl,
+    cropData,
+    fixType,
+    opacity: adjustedOpacity,
+    filters
+  }) => {
+    if (adjustTargetIndex === null || !slideshowImages[adjustTargetIndex]) return;
+
+    setSlideshowImages(current => {
+      const updated = [...current];
+      if (updated[adjustTargetIndex]) {
+        updated[adjustTargetIndex] = {
+          ...updated[adjustTargetIndex],
+          url: croppedUrl,
+          originalUrl: originalUrl || updated[adjustTargetIndex].originalUrl || updated[adjustTargetIndex].url,
+          cropData: cropData,
+          fixType: fixType,
+          opacity: adjustedOpacity,
+          filters: filters || updated[adjustTargetIndex].filters
+        };
+      }
+      if (selectedElement?.id) {
+        saveToDB(`slideshow_${flipbookVId || 'local'}_${selectedElement.id}`, updated).catch(() => {});
+      }
+      return updated;
+    });
+
+    if (onUpdateRef.current) {
+      if (onUpdateTimerRef.current) clearTimeout(onUpdateTimerRef.current);
+      onUpdateTimerRef.current = setTimeout(() => {
+        if (onUpdateRef.current) onUpdateRef.current({ shouldRefresh: true });
+      }, 300);
+    }
+  }, [adjustTargetIndex, slideshowImages, flipbookVId, selectedElement?.id]);
+
+  const initialSlideBackupRef = useRef(null);
+
+  const handleLiveSlideTextChange = useCallback((updatedTypography) => {
+    if (textTargetIndex === null) return;
+    setSlideshowImages(current => {
+      const updated = [...current];
+      if (updated[textTargetIndex]) {
+        updated[textTargetIndex] = {
+          ...updated[textTargetIndex],
+          ...updatedTypography
+        };
+      }
+      return updated;
+    });
+  }, [textTargetIndex]);
+
+  const handleCancelSlideText = useCallback(() => {
+    if (textTargetIndex === null || !initialSlideBackupRef.current) return;
+    setSlideshowImages(current => {
+      const updated = [...current];
+      if (updated[textTargetIndex]) {
+        updated[textTargetIndex] = {
+          ...updated[textTargetIndex],
+          ...initialSlideBackupRef.current
+        };
+      }
+      return updated;
+    });
+  }, [textTargetIndex]);
+
+  const handleSaveSlideText = useCallback(({
+    heading,
+    subtext,
+    fontFamily,
+    fontSize,
+    textColor,
+    fontWeight,
+    fontStyle,
+    textDecoration,
+    textAlign,
+    textShadow
+  }) => {
+    if (textTargetIndex === null || !slideshowImages[textTargetIndex]) return;
+
+    setSlideshowImages(current => {
+      const updated = [...current];
+      if (updated[textTargetIndex]) {
+        updated[textTargetIndex] = {
+          ...updated[textTargetIndex],
+          heading: heading !== undefined ? heading : updated[textTargetIndex].heading,
+          subtext: subtext !== undefined ? subtext : updated[textTargetIndex].subtext,
+          fontFamily: fontFamily || updated[textTargetIndex].fontFamily,
+          fontSize: fontSize || updated[textTargetIndex].fontSize,
+          textColor: textColor || updated[textTargetIndex].textColor,
+          fontWeight: fontWeight || updated[textTargetIndex].fontWeight,
+          fontStyle: fontStyle || updated[textTargetIndex].fontStyle,
+          textDecoration: textDecoration || updated[textTargetIndex].textDecoration,
+          textAlign: textAlign || updated[textTargetIndex].textAlign,
+          textShadow: textShadow || updated[textTargetIndex].textShadow
+        };
+      }
+      if (selectedElement?.id) {
+        saveToDB(`slideshow_${flipbookVId || 'local'}_${selectedElement.id}`, updated).catch(() => {});
+      }
+      return updated;
+    });
+
+    if (onUpdateRef.current) {
+      if (onUpdateTimerRef.current) clearTimeout(onUpdateTimerRef.current);
+      onUpdateTimerRef.current = setTimeout(() => {
+        if (onUpdateRef.current) onUpdateRef.current({ shouldRefresh: true });
+      }, 300);
+    }
+  }, [textTargetIndex, slideshowImages, flipbookVId, selectedElement?.id]);
 
   const [isDisabling, setIsDisabling] = useState(false);
   const [internalIsOpen, setInternalIsOpen] = useState(true);
@@ -610,13 +731,17 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
           infiniteLoop: true,
           showArrows: true,
           showDots: true,
-          imageFitType: 'Fill All',
+          imageFitType: 'Fit',
           transitionEffect: 'Linear',
           dragToSlide: false,
           dotColor: '#000000',
           dotOpacity: 100,
+          dotStyle: 1,
+          dotButtonSize: 100,
           navIconColor: '#000000',
+          navIconOpacity: 100,
           navStyle: 1,
+          navButtonSize: 100,
           autoSlide: true
         });
         const imgEl = getSvgImageEl(targetElement);
@@ -630,7 +755,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
           }
           const is3Frame = targetElement.getAttribute('data-type') === 'slideshow' ||
                            targetElement.getAttribute('data-is-slideshow') === 'true' ||
-                           targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)').length >= 3;
+                           targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor):not(.slideshow-container-bg)').length >= 3;
           if (is3Frame) {
             return [
               { id: 1, url: 'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?w=600&auto=format&fit=crop&q=80', name: 'Slide 1', heading: '', subtext: '' },
@@ -705,7 +830,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
 
         targetElement.setAttribute('data-active-index', effectiveIndex.toString());
 
-        const is3Frame = targetElement.getAttribute('data-type') === 'slideshow' || targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)').length >= 3;
+        const is3Frame = targetElement.getAttribute('data-type') === 'slideshow' || targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor):not(.slideshow-container-bg)').length >= 3;
 
         // Dynamic 3-Frame Carousel Layout Logic
         if (is3Frame) {
@@ -730,7 +855,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
             if (len >= 3) leftIndex = (effectiveIndex - 1 + len) % len;
           }
 
-          const rects = targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)');
+          const rects = targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor):not(.slideshow-container-bg)');
           const leftRect = rects[0];
           const rightRect = rects[1];
           const centerRect = rects[2];
@@ -799,12 +924,62 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
             bboxAnchor.setAttribute('fill', 'transparent');
             targetElement.appendChild(bboxAnchor);
           }
-          bboxAnchor.setAttribute('x', '0');
-          bboxAnchor.setAttribute('y', '0');
-          bboxAnchor.setAttribute('width', slideStyle === 'flat' ? '210' : '215');
-          bboxAnchor.setAttribute('height', slideStyle === 'flat' ? '190' : '140');
+          const pad = 5; // ~0.2vw padding around frames
+          const baseW = slideStyle === 'flat' ? 210 : 210;
+          const baseH = slideStyle === 'flat' ? 190 : 140;
 
-          // Apply Stroke & Background properties to frames
+          bboxAnchor.setAttribute('x', (-pad).toString());
+          bboxAnchor.setAttribute('y', (-pad).toString());
+          bboxAnchor.setAttribute('width', (baseW + pad * 2).toString());
+          bboxAnchor.setAttribute('height', (baseH + pad * 2).toString());
+
+          // Apply Container Background behind all frames and controls
+          let containerBg = targetElement.querySelector('.slideshow-container-bg');
+          if (!containerBg) {
+            containerBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            containerBg.setAttribute('class', 'slideshow-container-bg');
+            if (defs && defs.nextSibling) {
+              targetElement.insertBefore(containerBg, defs.nextSibling);
+            } else {
+              targetElement.insertBefore(containerBg, targetElement.firstChild);
+            }
+          } else {
+            // Keep containerBg right after defs (behind all frames)
+            if (defs && defs.nextSibling && defs.nextSibling !== containerBg) {
+              targetElement.insertBefore(containerBg, defs.nextSibling);
+            }
+          }
+
+          const sAlign = slideshowSettings.strokeAlignment || 'Center';
+          let alignOffset = 0;
+          if (sAlign === 'Inside') alignOffset = sWidth / 2;
+          else if (sAlign === 'Outside') alignOffset = -sWidth / 2;
+
+          containerBg.setAttribute('x', (-pad + alignOffset).toString());
+          containerBg.setAttribute('y', (-pad + alignOffset).toString());
+          containerBg.setAttribute('width', (baseW + pad * 2 - alignOffset * 2).toString());
+          containerBg.setAttribute('height', (baseH + pad * 2 - alignOffset * 2).toString());
+
+          const bgCornerRadius = slideshowSettings.strokeLineCorner === 'Square' ? 0 : 12;
+          containerBg.setAttribute('rx', bgCornerRadius.toString());
+          containerBg.setAttribute('ry', bgCornerRadius.toString());
+
+          const bgColor = slideshowSettings.bgColor || '#000000';
+          const bgOpacity = (slideshowSettings.bgOpacity !== undefined ? slideshowSettings.bgOpacity : 100) / 100;
+
+          if (bgColor === 'transparent' || bgColor === 'none' || bgOpacity === 0) {
+            containerBg.setAttribute('fill', 'none');
+            containerBg.setAttribute('fill-opacity', '0');
+            containerBg.style.fill = 'none';
+            containerBg.style.fillOpacity = '0';
+          } else {
+            containerBg.setAttribute('fill', bgColor);
+            containerBg.setAttribute('fill-opacity', bgOpacity.toString());
+            containerBg.style.fill = bgColor;
+            containerBg.style.fillOpacity = bgOpacity.toString();
+          }
+
+          // Apply Stroke & Background properties to frames and container frame
           const sColor = slideshowSettings.strokeColor || '#9ca3af';
           const sWidth = slideshowSettings.strokeWidth !== undefined ? slideshowSettings.strokeWidth : 1;
           const sOpacity = (slideshowSettings.strokeOpacity !== undefined ? slideshowSettings.strokeOpacity : 100) / 100;
@@ -817,15 +992,30 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
           const sCap = slideshowSettings.strokeLineCorner === 'Rounded' ? 'round' : 'square';
           const sJoin = slideshowSettings.strokeLineCorner === 'Rounded' ? 'round' : 'miter';
 
-          [centerRect, leftRect, rightRect].forEach(r => {
+          [containerBg, centerRect, leftRect, rightRect].forEach(r => {
             if (r) {
-              r.setAttribute('stroke', sColor);
-              r.setAttribute('stroke-width', sWidth.toString());
-              r.setAttribute('stroke-opacity', sOpacity.toString());
-              if (sDash !== 'none') r.setAttribute('stroke-dasharray', sDash);
-              else r.removeAttribute('stroke-dasharray');
-              r.setAttribute('stroke-linecap', sCap);
-              r.setAttribute('stroke-linejoin', sJoin);
+              if (sColor === 'transparent' || sColor === 'none' || sWidth === 0 || sOpacity === 0) {
+                r.setAttribute('stroke', 'none');
+                r.setAttribute('stroke-width', '0');
+                r.style.stroke = 'none';
+                r.style.strokeWidth = '0';
+              } else {
+                r.setAttribute('stroke', sColor);
+                r.setAttribute('stroke-width', sWidth.toString());
+                r.setAttribute('stroke-opacity', sOpacity.toString());
+                r.style.stroke = sColor;
+                r.style.strokeWidth = `${sWidth}px`;
+                r.style.strokeOpacity = sOpacity.toString();
+                if (sDash !== 'none') {
+                  r.setAttribute('stroke-dasharray', sDash);
+                  r.style.strokeDasharray = sDash;
+                } else {
+                  r.removeAttribute('stroke-dasharray');
+                  r.style.removeProperty('stroke-dasharray');
+                }
+                r.setAttribute('stroke-linecap', sCap);
+                r.setAttribute('stroke-linejoin', sJoin);
+              }
             }
           });
           
@@ -855,7 +1045,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
               pattern.setAttribute('width', rect.getAttribute('width'));
               pattern.setAttribute('height', rect.getAttribute('height'));
               const imgNode = document.createElementNS('http://www.w3.org/2000/svg', 'image');
-              imgNode.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+              imgNode.setAttribute('preserveAspectRatio', 'xMidYMid meet');
               imgNode.setAttribute('x', '0');
               imgNode.setAttribute('y', '0');
               imgNode.setAttribute('width', rect.getAttribute('width'));
@@ -883,6 +1073,21 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
               try { imgNode.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', safeImgSrc); } catch (e) {}
               imgNode.setAttribute('width', pWidth);
               imgNode.setAttribute('height', pHeight);
+
+              const currentImgObj = slideshowImages[imageIndex];
+              const fitMode = currentImgObj?.fixType || slideshowSettings.imageFitType || 'Fit';
+              let par = 'xMidYMid meet';
+              if (fitMode === 'Fit' || fitMode === 'Fit All') par = 'xMidYMid meet';
+              else if (fitMode === 'Stretch') par = 'none';
+              else if (fitMode === 'Fill' || fitMode === 'Fill All') par = 'xMidYMid slice';
+              else if (fitMode === 'Crop') par = (currentImgObj?.cropData ? 'xMidYMid meet' : 'xMidYMid slice');
+              imgNode.setAttribute('preserveAspectRatio', par);
+
+              if (currentImgObj?.opacity !== undefined && currentImgObj?.opacity !== null) {
+                imgNode.setAttribute('opacity', (currentImgObj.opacity / 100).toString());
+              } else {
+                imgNode.removeAttribute('opacity');
+              }
             }
 
             const textGroup = pattern.querySelector('.overlay-text-group');
@@ -891,38 +1096,68 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
               const imgObj = slideshowImages[imageIndex];
               if (imgObj && patternPrefix === 'center') {
                 const fFam = imgObj.fontFamily || 'Arial';
-                const fSize = imgObj.fontSize || 16;
                 const pW = parseFloat(pWidth) || 130;
                 const pH = parseFloat(pHeight) || 140;
                 const centerX = pW / 2;
                 const centerY = pH / 2;
                 const hasHeading = Boolean(imgObj.heading);
                 const hasSubtext = Boolean(imgObj.subtext);
+                const tColor = imgObj.textColor || '#ffffff';
+                const fWeight = imgObj.fontWeight || 'bold';
+                const fStyle = imgObj.fontStyle || 'normal';
+                const tAlign = imgObj.textAlign || 'center';
+                const tAnchor = tAlign === 'left' ? 'start' : (tAlign === 'right' ? 'end' : 'middle');
+                const posX = tAlign === 'left' ? 10 : (tAlign === 'right' ? pW - 10 : centerX);
+
+                // Direct canvas typography rendering
+                const rawFSize = Number(imgObj.fontSize) || 16;
+                const headingFSize = rawFSize;
+                const subFSize = Math.max(8, Math.round(headingFSize * 0.65));
+
+                const headingY = hasSubtext ? centerY - (subFSize * 0.65) - 3 : centerY;
+                const subtextY = hasHeading ? centerY + (headingFSize * 0.65) + 3 : centerY;
+
+                const shadowCss = (() => {
+                  const s = imgObj.textShadow;
+                  if (s === 'none') return 'none';
+                  if (s === 'lite') return '1px 1px 2px rgba(0, 0, 0, 0.45)';
+                  if (s === 'dark') return '2px 3px 6px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0, 0, 0, 0.8)';
+                  return '1px 2px 4px rgba(0, 0, 0, 0.75)';
+                })();
 
                 if (hasHeading) {
                   const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                  t.setAttribute('x', centerX.toString());
-                  t.setAttribute('y', (hasSubtext ? centerY - 10 : centerY).toString());
-                  t.setAttribute('text-anchor', 'middle');
+                  t.setAttribute('x', posX.toString());
+                  t.setAttribute('y', headingY.toString());
+                  t.setAttribute('text-anchor', tAnchor);
                   t.setAttribute('dominant-baseline', 'central');
-                  t.setAttribute('fill', 'white');
-                  t.setAttribute('font-size', `${fSize}px`);
+                  t.setAttribute('fill', tColor);
+                  t.setAttribute('font-size', `${headingFSize}px`);
                   t.setAttribute('font-family', `'${fFam}', sans-serif`);
-                  t.setAttribute('font-weight', 'bold');
-                  t.setAttribute('style', 'text-shadow: 1px 1px 2px rgba(0,0,0,0.8); pointer-events: none;');
+                  t.setAttribute('font-weight', fWeight);
+                  t.setAttribute('font-style', fStyle);
+                  if (imgObj.textDecoration === 'underline') {
+                    t.setAttribute('text-decoration', 'underline');
+                  }
+                  t.setAttribute('style', `${shadowCss !== 'none' ? `text-shadow: ${shadowCss}; ` : ''}pointer-events: none;${imgObj.textDecoration === 'underline' ? ' text-decoration: underline;' : ''}`);
                   t.textContent = imgObj.heading;
                   textGroup.appendChild(t);
                 }
                 if (hasSubtext) {
                   const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                  t.setAttribute('x', centerX.toString());
-                  t.setAttribute('y', (hasHeading ? centerY + 14 : centerY).toString());
-                  t.setAttribute('text-anchor', 'middle');
+                  t.setAttribute('x', posX.toString());
+                  t.setAttribute('y', subtextY.toString());
+                  t.setAttribute('text-anchor', tAnchor);
                   t.setAttribute('dominant-baseline', 'central');
-                  t.setAttribute('fill', 'white');
-                  t.setAttribute('font-size', `${Math.max(8, fSize * 0.6)}px`);
+                  t.setAttribute('fill', tColor);
+                  t.setAttribute('font-size', `${subFSize}px`);
                   t.setAttribute('font-family', `'${fFam}', sans-serif`);
-                  t.setAttribute('style', 'text-shadow: 1px 1px 2px rgba(0,0,0,0.8); pointer-events: none;');
+                  t.setAttribute('font-weight', fWeight === 'bold' ? '600' : 'normal');
+                  t.setAttribute('font-style', fStyle);
+                  if (imgObj.textDecoration === 'underline') {
+                    t.setAttribute('text-decoration', 'underline');
+                  }
+                  t.setAttribute('style', `${shadowCss !== 'none' ? `text-shadow: ${shadowCss}; ` : ''}pointer-events: none;${imgObj.textDecoration === 'underline' ? ' text-decoration: underline;' : ''}`);
                   t.textContent = imgObj.subtext;
                   textGroup.appendChild(t);
                 }
@@ -932,14 +1167,31 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
 
             const imgObj = slideshowImages[imageIndex];
             if (imgObj) {
-              const blurVal = imgObj.blur || 0;
-              const brightnessVal = imgObj.brightness !== undefined ? imgObj.brightness : 100;
-              const contrastVal = imgObj.contrast !== undefined ? imgObj.contrast : 100;
-              
               let filterString = '';
-              if (blurVal > 0) filterString += `blur(${blurVal}px) `;
-              if (brightnessVal !== 100) filterString += `brightness(${brightnessVal}%) `;
-              if (contrastVal !== 100) filterString += `contrast(${contrastVal}%)`;
+              if (imgObj.filters) {
+                const f = imgObj.filters;
+                const exposure = f.exposure || 0;
+                const contrast = f.contrast || 0;
+                const saturation = f.saturation || 0;
+                const temperature = f.temperature || 0;
+                const tint = f.tint || 0;
+                const h = f.highlights || 0;
+                const s = f.shadows || 0;
+
+                filterString += `brightness(${100 + exposure + (h / 5)}%) `;
+                filterString += `contrast(${100 + contrast + (s / 5)}%) `;
+                filterString += `saturate(${100 + saturation}%) `;
+                if (tint !== 0) filterString += `hue-rotate(${tint}deg) `;
+                if (temperature > 0) filterString += `sepia(${temperature / 2}%) `;
+                else if (temperature < 0) filterString += `hue-rotate(180deg) sepia(${Math.abs(temperature) / 2}%) hue-rotate(-180deg) `;
+              } else {
+                const blurVal = imgObj.blur || 0;
+                const brightnessVal = imgObj.brightness !== undefined ? imgObj.brightness : 100;
+                const contrastVal = imgObj.contrast !== undefined ? imgObj.contrast : 100;
+                if (blurVal > 0) filterString += `blur(${blurVal}px) `;
+                if (brightnessVal !== 100) filterString += `brightness(${brightnessVal}%) `;
+                if (contrastVal !== 100) filterString += `contrast(${contrastVal}%) `;
+              }
               filterString = filterString.trim();
 
               if (filterString) {
@@ -1068,11 +1320,19 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
           }
 
           // Fit mode
+          const currentSingleImgObj = slideshowImages[activeSlideIndex];
+          const singleFitMode = currentSingleImgObj?.fixType || slideshowSettings.imageFitType || 'Fit';
           if (targetImg.tagName?.toLowerCase() === 'image') {
-            const val = slideshowSettings.imageFitType === 'Fill All' ? 'xMidYMid slice' : 'xMidYMid meet';
-            targetImg.setAttribute('preserveAspectRatio', val);
+            let par = 'xMidYMid meet';
+            if (singleFitMode === 'Fit' || singleFitMode === 'Fit All') par = 'xMidYMid meet';
+            else if (singleFitMode === 'Stretch') par = 'none';
+            else if (singleFitMode === 'Fill' || singleFitMode === 'Fill All') par = 'xMidYMid slice';
+            targetImg.setAttribute('preserveAspectRatio', par);
           } else if (targetImg.tagName?.toLowerCase() === 'img') {
-            const val = slideshowSettings.imageFitType === 'Fill All' ? 'cover' : 'contain';
+            let val = 'contain';
+            if (singleFitMode === 'Fit' || singleFitMode === 'Fit All') val = 'contain';
+            else if (singleFitMode === 'Stretch') val = 'fill';
+            else if (singleFitMode === 'Fill' || singleFitMode === 'Fill All') val = 'cover';
             targetImg.style.objectFit = val;
             targetImg.style.width = '100%';
             targetImg.style.height = '100%';
@@ -1089,17 +1349,36 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
           }
 
           // Apply Opacity
-          const opacityVal = (opacity / 100).toString();
+          const slideOpacity = currentSingleImgObj?.opacity !== undefined ? currentSingleImgObj.opacity : opacity;
+          const opacityVal = (slideOpacity / 100).toString();
           
           let filterString = '';
           if (slideshowImages[activeSlideIndex]) {
             const imgObj = slideshowImages[activeSlideIndex];
-            const blurVal = imgObj.blur || 0;
-            const brightnessVal = imgObj.brightness !== undefined ? imgObj.brightness : 100;
-            const contrastVal = imgObj.contrast !== undefined ? imgObj.contrast : 100;
-            if (blurVal > 0) filterString += `blur(${blurVal}px) `;
-            if (brightnessVal !== 100) filterString += `brightness(${brightnessVal}%) `;
-            if (contrastVal !== 100) filterString += `contrast(${contrastVal}%)`;
+            if (imgObj.filters) {
+              const f = imgObj.filters;
+              const exposure = f.exposure || 0;
+              const contrast = f.contrast || 0;
+              const saturation = f.saturation || 0;
+              const temperature = f.temperature || 0;
+              const tint = f.tint || 0;
+              const h = f.highlights || 0;
+              const s = f.shadows || 0;
+
+              filterString += `brightness(${100 + exposure + (h / 5)}%) `;
+              filterString += `contrast(${100 + contrast + (s / 5)}%) `;
+              filterString += `saturate(${100 + saturation}%) `;
+              if (tint !== 0) filterString += `hue-rotate(${tint}deg) `;
+              if (temperature > 0) filterString += `sepia(${temperature / 2}%) `;
+              else if (temperature < 0) filterString += `hue-rotate(180deg) sepia(${Math.abs(temperature) / 2}%) hue-rotate(-180deg) `;
+            } else {
+              const blurVal = imgObj.blur || 0;
+              const brightnessVal = imgObj.brightness !== undefined ? imgObj.brightness : 100;
+              const contrastVal = imgObj.contrast !== undefined ? imgObj.contrast : 100;
+              if (blurVal > 0) filterString += `blur(${blurVal}px) `;
+              if (brightnessVal !== 100) filterString += `brightness(${brightnessVal}%) `;
+              if (contrastVal !== 100) filterString += `contrast(${contrastVal}%)`;
+            }
             filterString = filterString.trim();
 
             if (targetElement.tagName?.toLowerCase() === 'svg' || targetElement.tagName?.toLowerCase() === 'g') {
@@ -1114,30 +1393,54 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
               const fSize = imgObj.fontSize || 16;
               const hasHeading = Boolean(imgObj.heading);
               const hasSubtext = Boolean(imgObj.subtext);
+              const tColor = imgObj.textColor || '#ffffff';
+              const fWeight = imgObj.fontWeight || 'bold';
+              const fStyle = imgObj.fontStyle || 'normal';
+              const tAlign = imgObj.textAlign || 'center';
+              const tAnchor = tAlign === 'left' ? 'start' : (tAlign === 'right' ? 'end' : 'middle');
+              const posX = tAlign === 'left' ? '8%' : (tAlign === 'right' ? '92%' : '50%');
+
+              const singleShadowCss = (() => {
+                const s = imgObj.textShadow;
+                if (s === 'none') return 'none';
+                if (s === 'lite') return '1px 1px 2px rgba(0, 0, 0, 0.45)';
+                if (s === 'dark') return '2px 3px 6px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0, 0, 0, 0.8)';
+                return '1px 2px 4px rgba(0, 0, 0, 0.75)';
+              })();
+
               if (imgObj.heading) {
                 const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                t.setAttribute('x', '50%');
+                t.setAttribute('x', posX);
                 t.setAttribute('y', hasSubtext ? '46%' : '50%');
-                t.setAttribute('text-anchor', 'middle');
+                t.setAttribute('text-anchor', tAnchor);
                 t.setAttribute('dominant-baseline', 'central');
-                t.setAttribute('fill', 'white');
+                t.setAttribute('fill', tColor);
                 t.setAttribute('font-size', `${fSize}px`);
                 t.setAttribute('font-family', `'${fFam}', sans-serif`);
-                t.setAttribute('font-weight', 'bold');
-                t.setAttribute('style', 'text-shadow: 1px 1px 3px rgba(0,0,0,0.8); pointer-events: none;');
+                t.setAttribute('font-weight', fWeight);
+                t.setAttribute('font-style', fStyle);
+                if (imgObj.textDecoration === 'underline') {
+                  t.setAttribute('text-decoration', 'underline');
+                }
+                t.setAttribute('style', `${singleShadowCss !== 'none' ? `text-shadow: ${singleShadowCss}; ` : ''}pointer-events: none;${imgObj.textDecoration === 'underline' ? ' text-decoration: underline;' : ''}`);
                 t.textContent = imgObj.heading;
                 textGroup.appendChild(t);
               }
               if (imgObj.subtext) {
                 const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                t.setAttribute('x', '50%');
+                t.setAttribute('x', posX);
                 t.setAttribute('y', hasHeading ? '56%' : '50%');
-                t.setAttribute('text-anchor', 'middle');
+                t.setAttribute('text-anchor', tAnchor);
                 t.setAttribute('dominant-baseline', 'central');
-                t.setAttribute('fill', 'white');
-                t.setAttribute('font-size', `${Math.max(8, fSize * 0.6)}px`);
+                t.setAttribute('fill', tColor);
+                t.setAttribute('font-size', `${Math.max(8, Math.round(fSize * 0.65))}px`);
                 t.setAttribute('font-family', `'${fFam}', sans-serif`);
-                t.setAttribute('style', 'text-shadow: 1px 1px 3px rgba(0,0,0,0.8); pointer-events: none;');
+                t.setAttribute('font-weight', fWeight === 'bold' ? '600' : 'normal');
+                t.setAttribute('font-style', fStyle);
+                if (imgObj.textDecoration === 'underline') {
+                  t.setAttribute('text-decoration', 'underline');
+                }
+                t.setAttribute('style', `${singleShadowCss !== 'none' ? `text-shadow: ${singleShadowCss}; ` : ''}pointer-events: none;${imgObj.textDecoration === 'underline' ? ' text-decoration: underline;' : ''}`);
                 t.textContent = imgObj.subtext;
                 textGroup.appendChild(t);
               }
@@ -1165,6 +1468,84 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
                 targetElement.style.removeProperty('filter');
             }
           }
+
+          // Apply Container Background for Single-Image mode
+          const bgParent = (targetElement.tagName?.toLowerCase() === 'g') ? targetElement : targetImg.parentNode;
+          if (bgParent && bgParent.tagName?.toLowerCase() === 'g') {
+            let containerBg = bgParent.querySelector('.slideshow-container-bg');
+            const bgColor = slideshowSettings.bgColor || '#000000';
+            const bgOpacity = (slideshowSettings.bgOpacity !== undefined ? slideshowSettings.bgOpacity : 100) / 100;
+            if (!containerBg && (bgColor !== 'transparent' && bgColor !== 'none' && bgOpacity > 0)) {
+              containerBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+              containerBg.setAttribute('class', 'slideshow-container-bg');
+              bgParent.insertBefore(containerBg, bgParent.firstChild);
+            }
+            if (containerBg) {
+              const pad = 5;
+              const sColor = slideshowSettings.strokeColor || '#9ca3af';
+              const sWidth = slideshowSettings.strokeWidth !== undefined ? slideshowSettings.strokeWidth : 1;
+              const sOpacity = (slideshowSettings.strokeOpacity !== undefined ? slideshowSettings.strokeOpacity : 100) / 100;
+              let sDash = 'none';
+              if (slideshowSettings.strokeLineStyle === 'Dotted') {
+                sDash = '2,3';
+              } else if (slideshowSettings.strokeLineStyle === 'Dashed') {
+                sDash = `${slideshowSettings.strokeDashLength || 8},${slideshowSettings.strokeDashGap || 4}`;
+              }
+              const sCap = slideshowSettings.strokeLineCorner === 'Rounded' ? 'round' : 'square';
+              const sJoin = slideshowSettings.strokeLineCorner === 'Rounded' ? 'round' : 'miter';
+              const sAlign = slideshowSettings.strokeAlignment || 'Center';
+              let alignOffset = 0;
+              if (sAlign === 'Inside') alignOffset = sWidth / 2;
+              else if (sAlign === 'Outside') alignOffset = -sWidth / 2;
+
+              const bAnchor = bgParent.querySelector('.bbox-anchor');
+              const bx = (parseFloat(bAnchor?.getAttribute('x') || targetImg.getAttribute('x') || '0')) - pad + alignOffset;
+              const by = (parseFloat(bAnchor?.getAttribute('y') || targetImg.getAttribute('y') || '0')) - pad + alignOffset;
+              const bw = (parseFloat(bAnchor?.getAttribute('width') || targetImg.getAttribute('width') || '100')) + pad * 2 - alignOffset * 2;
+              const bh = (parseFloat(bAnchor?.getAttribute('height') || targetImg.getAttribute('height') || '100')) + pad * 2 - alignOffset * 2;
+              containerBg.setAttribute('x', bx.toString());
+              containerBg.setAttribute('y', by.toString());
+              containerBg.setAttribute('width', bw.toString());
+              containerBg.setAttribute('height', bh.toString());
+              const bgCornerRadius = slideshowSettings.strokeLineCorner === 'Square' ? 0 : 10;
+              containerBg.setAttribute('rx', bgCornerRadius.toString());
+              containerBg.setAttribute('ry', bgCornerRadius.toString());
+              if (bgColor === 'transparent' || bgColor === 'none' || bgOpacity === 0) {
+                containerBg.setAttribute('fill', 'none');
+                containerBg.setAttribute('fill-opacity', '0');
+                containerBg.style.fill = 'none';
+                containerBg.style.fillOpacity = '0';
+              } else {
+                containerBg.setAttribute('fill', bgColor);
+                containerBg.setAttribute('fill-opacity', bgOpacity.toString());
+                containerBg.style.fill = bgColor;
+                containerBg.style.fillOpacity = bgOpacity.toString();
+              }
+
+              if (sColor === 'transparent' || sColor === 'none' || sWidth === 0 || sOpacity === 0) {
+                containerBg.setAttribute('stroke', 'none');
+                containerBg.setAttribute('stroke-width', '0');
+                containerBg.style.stroke = 'none';
+                containerBg.style.strokeWidth = '0';
+              } else {
+                containerBg.setAttribute('stroke', sColor);
+                containerBg.setAttribute('stroke-width', sWidth.toString());
+                containerBg.setAttribute('stroke-opacity', sOpacity.toString());
+                containerBg.style.stroke = sColor;
+                containerBg.style.strokeWidth = `${sWidth}px`;
+                containerBg.style.strokeOpacity = sOpacity.toString();
+                if (sDash !== 'none') {
+                  containerBg.setAttribute('stroke-dasharray', sDash);
+                  containerBg.style.strokeDasharray = sDash;
+                } else {
+                  containerBg.removeAttribute('stroke-dasharray');
+                  containerBg.style.removeProperty('stroke-dasharray');
+                }
+                containerBg.setAttribute('stroke-linecap', sCap);
+                containerBg.setAttribute('stroke-linejoin', sJoin);
+              }
+            }
+          }
         }
         } // End of Standard Single-Image Logic
 
@@ -1185,7 +1566,21 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
   }, [
     selectedElement?.id,
     JSON.stringify(slideshowSettings),
-    JSON.stringify(slideshowImages.map(img => ({ url: img.url, heading: img.heading, subtext: img.subtext }))),
+    JSON.stringify(slideshowImages.map(img => ({
+      url: img.url,
+      heading: img.heading,
+      subtext: img.subtext,
+      fontFamily: img.fontFamily,
+      fontSize: img.fontSize,
+      textColor: img.textColor,
+      fontWeight: img.fontWeight,
+      fontStyle: img.fontStyle,
+      textAlign: img.textAlign,
+      textDecoration: img.textDecoration,
+      textShadow: img.textShadow,
+      filters: img.filters,
+      opacity: img.opacity
+    }))),
     activeSlideIndex,
     opacity,
     activePageIndex
@@ -1218,7 +1613,29 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
     if (!isSyncingRef.current && !isSyncing && selectedElement?.id && !isDisabling) {
       applyDesign();
     }
-  }, [selectedElement?.id, JSON.stringify(slideshowSettings), JSON.stringify(slideshowImages.map(img => img.url)), activeSlideIndex, opacity, isSyncing, applyDesign]);
+  }, [
+    selectedElement?.id,
+    JSON.stringify(slideshowSettings),
+    JSON.stringify(slideshowImages.map(img => ({
+      url: img.url,
+      heading: img.heading,
+      subtext: img.subtext,
+      fontFamily: img.fontFamily,
+      fontSize: img.fontSize,
+      textColor: img.textColor,
+      fontWeight: img.fontWeight,
+      fontStyle: img.fontStyle,
+      textAlign: img.textAlign,
+      textDecoration: img.textDecoration,
+      textShadow: img.textShadow,
+      filters: img.filters,
+      opacity: img.opacity
+    }))),
+    activeSlideIndex,
+    opacity,
+    isSyncing,
+    applyDesign
+  ]);
 
   // ── Live Editor Runner ──
   // IMPORTANT: SVG elements can't host HTML children, so we inject
@@ -1228,6 +1645,9 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
   const liveRunnerImagesRef = useRef(slideshowImages);
   const liveRunnerAutoTimer = useRef(null);
   const liveRunnerOverlayRef = useRef(null);
+  const positionOverlayRef = useRef(null);
+  const slideshowSettingsRef = useRef(slideshowSettings);
+  slideshowSettingsRef.current = slideshowSettings;
 
   useEffect(() => { liveRunnerIndexRef.current = activeSlideIndex; }, [activeSlideIndex]);
   useEffect(() => { liveRunnerImagesRef.current = slideshowImages; }, [slideshowImages]);
@@ -1251,7 +1671,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
     if (!targetElement) return;
 
     // Dynamic 3-Frame Layout Bypasses CSS Transitions
-    const is3Frame = targetElement.getAttribute('data-type') === 'slideshow' || targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)').length >= 3;
+    const is3Frame = targetElement.getAttribute('data-type') === 'slideshow' || targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor):not(.slideshow-container-bg)').length >= 3;
     if (is3Frame) {
       liveRunnerIndexRef.current = newIdx;
       setActiveSlideIndex(newIdx);
@@ -1266,7 +1686,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
 
       // Apply transition animation to 3-frame carousel frames based on selected effect
       const effect = (transitionEffectRef.current || slideshowSettings.transitionEffect || 'Linear').toLowerCase();
-      const rects = targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor)');
+      const rects = targetElement.querySelectorAll('rect:not([fill="transparent"]):not(.bbox-anchor):not(.slideshow-container-bg)');
       const centerRect = rects[2];
       if (centerRect && effect !== 'linear') {
         const duration = 380;
@@ -1637,20 +2057,25 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
       // Dynamic Scaling for Controls
       const baseWidth = 300; // Reference width for 1:1 scale
       const scaleFactor = Math.max(0.4, Math.min(1.8, localWidth / baseWidth));
+      const currentSettings = slideshowSettingsRef.current || slideshowSettings;
+      const navScale = (currentSettings.navButtonSize || 100) / 100;
+      const dotScale = (currentSettings.dotButtonSize || 100) / 100;
 
       // Update Arrows
       overlay.querySelectorAll('.editor-ss-nav').forEach(btn => {
-        const size = 48 * scaleFactor; // Significantly increased size
+        const size = 48 * scaleFactor * navScale; // Dynamically scaled by user setting
         btn.style.width = size + 'px';
         btn.style.height = size + 'px';
-        const offset = 12 * scaleFactor; // Increased offset for breathing room
+        const offset = 12 * scaleFactor; // Offset for breathing room
         if (btn.style.left) btn.style.left = offset + 'px';
         if (btn.style.right) btn.style.right = offset + 'px';
 
         const svg = btn.querySelector('svg');
         if (svg) {
-          svg.style.width = (32 * scaleFactor) + 'px';
-          svg.style.height = (32 * scaleFactor) + 'px';
+          svg.style.width = (32 * scaleFactor * navScale) + 'px';
+          svg.style.height = (32 * scaleFactor * navScale) + 'px';
+          svg.setAttribute('width', (32 * scaleFactor * navScale) + 'px');
+          svg.setAttribute('height', (32 * scaleFactor * navScale) + 'px');
           svg.style.filter = 'drop-shadow(0 2px 6px rgba(0,0,0,0.2)) drop-shadow(0 2px 2px rgba(255,255,255,0.2))';
           svg.style.overflow = 'visible';
         }
@@ -1661,10 +2086,11 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
       if (dotsWrap) {
         dotsWrap.style.bottom = (8 * scaleFactor) + 'px';
         dotsWrap.style.gap = (5 * scaleFactor) + 'px';
-        dotsWrap.style.transform = `translateX(-50%) scale(${Math.max(0.6, scaleFactor)})`;
+        dotsWrap.style.transform = `translateX(-50%) scale(${Math.max(0.3, scaleFactor * dotScale)})`;
         dotsWrap.style.transformOrigin = 'bottom center';
       }
     };
+    positionOverlayRef.current = positionOverlay;
 
     cleanup(); // remove any previous overlay
 
@@ -1700,7 +2126,8 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
 
     const { navIconColor = '#000000', navStyle: styleId = 1, showDots = true,
       showArrows = true, showNav = true, dotColor = '#000000',
-      autoSlide = true, autoPlay = true, speed = 3, infiniteLoop = true } = slideshowSettings;
+      autoSlide = true, autoPlay = true, speed = 3, infiniteLoop = true,
+      navButtonSize = 100, dotButtonSize = 100 } = slideshowSettings;
     const showNavArrows = showArrows !== false && showNav !== false;
 
     // Helper: switch to a slide index
@@ -1741,8 +2168,8 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
           cursor: 'pointer',
           boxShadow: 'none',
           padding: '0',
-          pointerEvents: 'none',
-          opacity: '0',
+          pointerEvents: 'auto',
+          opacity: '0.85',
           transition: 'transform 0.15s, opacity 0.2s',
         });
         const iconKey = type === 'prev' ? 'left' : 'right';
@@ -1772,7 +2199,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
             <div
               className={`${isGrad && stops.length > 0 ? `grad-icon-${gradId}` : ''} transition-all`}
             >
-              {NavIconRenderer({ styleId, size: '36px', color: isGrad ? 'currentColor' : navIconColor })[iconKey]}
+              {NavIconRenderer({ styleId, size: `${Math.round(36 * (navButtonSize / 100))}px`, color: isGrad ? 'currentColor' : navIconColor })[iconKey]}
             </div>
           </>
         );
@@ -1823,8 +2250,8 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
         isHoveringRef.current = false;
         resetAutoTimer();
         navButtons.forEach(btn => {
-          btn.style.opacity = '0';
-          btn.style.pointerEvents = 'none';
+          btn.style.opacity = '0.85';
+          btn.style.pointerEvents = 'auto';
         });
       }, 50);
     };
@@ -1956,6 +2383,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
     }
 
     return () => {
+      positionOverlayRef.current = null;
       if (trackingRafId) cancelAnimationFrame(trackingRafId);
       cleanup();
       resizeObserver.disconnect();
@@ -1970,6 +2398,13 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
       pageContainer.style.overflow = prevOverflow;
     };
   }, [selectedElement?.id, slideshowImages.length, runnerSettingsStr, activePageIndex]);
+
+  // Smoothly update sizes without tearing down or blinking the overlay
+  useEffect(() => {
+    if (positionOverlayRef.current) {
+      positionOverlayRef.current();
+    }
+  }, [slideshowSettings.navButtonSize, slideshowSettings.dotButtonSize]);
 
 
   const uploadFile = useCallback(async (file) => {
@@ -2165,13 +2600,49 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
                     e.target.onerror = null;
                     e.target.src = "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%2280%22%20viewBox%3D%220%200%20100%2080%22%3E%3Crect%20fill%3D%22%23f3f4f6%22%20width%3D%22100%22%20height%3D%2280%22%2F%3E%3Ctext%20fill%3D%22%239ca3af%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%20dy%3D%223.5%22%3ENo%20Img%3C%2Ftext%3E%3C%2Fsvg%3E";
                   }}
-                  className="w-[3.2vw] h-[2.2vw] rounded-[0.35vw] object-cover mx-[0.4vw] border border-gray-100 shrink-0"
+                  style={{
+                    opacity: (img.opacity !== undefined ? img.opacity : 100) / 100,
+                    objectFit: img.fixType === 'Fit' ? 'contain' : img.fixType === 'Stretch' ? 'fill' : 'cover'
+                  }}
+                  className="w-[3.2vw] h-[2.2vw] rounded-[0.35vw] mx-[0.4vw] border border-gray-100 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAdjustTargetIndex(i);
+                    setShowAdjustModal(true);
+                  }}
+                  title="Click to adjust image"
                 />
 
                 <div className="flex-1" />
 
-                {/* Actions: Replace & Delete */}
+                {/* Actions: Adjust Image, Edit Text, Replace & Delete */}
                 <div className="flex items-center gap-[0.3vw] shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAdjustTargetIndex(i);
+                      setShowAdjustModal(true);
+                    }}
+                    className="text-gray-400 hover:text-[#EC5137] transition-colors p-[0.2vw]"
+                    title="Adjust / Crop Image"
+                  >
+                    <Crop size="0.9vw" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveSlideIndex(i);
+                      setTextTargetIndex(i);
+                      initialSlideBackupRef.current = { ...slideshowImages[i] };
+                      setShowSlideTextPopup(true);
+                    }}
+                    className="text-gray-400 hover:text-[#EC5137] transition-colors p-[0.2vw]"
+                    title="Edit Slide Text & Typography"
+                  >
+                    <Type size="0.9vw" />
+                  </button>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -2212,6 +2683,20 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
                     placeholder="Enter slide heading..."
                     className="flex-1 h-[1.6vw] rounded-[0.3vw] border border-gray-200 px-[0.4vw] text-[0.7vw] font-medium text-gray-800 outline-none focus:border-blue-500 bg-gray-50/50 focus:bg-white shadow-2xs transition-all"
                   />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveSlideIndex(i);
+                      setTextTargetIndex(i);
+                      initialSlideBackupRef.current = { ...slideshowImages[i] };
+                      setShowSlideTextPopup(true);
+                    }}
+                    className="text-gray-400 hover:text-[#EC5137] transition-colors p-[0.15vw]"
+                    title="Edit Text & Typography Styling"
+                  >
+                    <Type size="0.75vw" />
+                  </button>
                 </div>
                 <div className="flex items-center gap-[0.4vw]">
                   <span className="text-[0.65vw] font-semibold text-gray-500 w-[4.5vw] shrink-0">Subheading</span>
@@ -2355,12 +2840,18 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
             {/* Right Column: Preview Card */}
             <div
               onClick={() => setShowNavStylesPopup(true)}
-              className="w-[7.8vw] h-[4.8vw] bg-white border border-gray-200 rounded-[0.5vw] relative flex items-center justify-center cursor-pointer hover:border-gray-400 shadow-2xs shrink-0 group/nav"
+              className="w-[7.8vw] h-[4.8vw] bg-white border border-gray-200 rounded-[0.5vw] relative flex items-center justify-center cursor-pointer hover:border-gray-400 shadow-2xs shrink-0 group/nav overflow-hidden"
             >
               <div className="absolute top-[0.35vw] right-[0.4vw] text-gray-400 group-hover/nav:text-gray-600 transition-colors">
                 <Icon icon="lucide:arrow-right-left" className="w-[0.85vw] h-[0.85vw]" />
               </div>
-              <div className="flex items-center justify-center gap-[0.9vw]">
+              <div
+                className="flex items-center justify-center gap-[0.9vw] transition-transform duration-150"
+                style={{
+                  transform: `scale(${Math.max(0.5, Math.min(1.8, (slideshowSettings.navButtonSize || 100) / 100))})`,
+                  transformOrigin: 'center'
+                }}
+              >
                 <div className="flex items-center justify-center">
                   {NavIconRenderer({ styleId: slideshowSettings.navStyle || 1, size: '1.4vw', color: slideshowSettings.navIconColor || '#EC5137' }).left}
                 </div>
@@ -2434,12 +2925,18 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
             {/* Right Column: Preview Card */}
             <div
               onClick={() => setShowDotStylesPopup(true)}
-              className="w-[7.8vw] h-[4.8vw] bg-white border border-gray-200 rounded-[0.5vw] relative flex items-center justify-center cursor-pointer hover:border-gray-400 shadow-2xs shrink-0 group/dots"
+              className="w-[7.8vw] h-[4.8vw] bg-white border border-gray-200 rounded-[0.5vw] relative flex items-center justify-center cursor-pointer hover:border-gray-400 shadow-2xs shrink-0 group/dots overflow-hidden"
             >
               <div className="absolute top-[0.35vw] right-[0.4vw] text-gray-400 group-hover/dots:text-gray-600 transition-colors">
                 <Icon icon="lucide:arrow-right-left" className="w-[0.85vw] h-[0.85vw]" />
               </div>
-              <div className="flex items-center justify-center">
+              <div
+                className="flex items-center justify-center transition-transform duration-150"
+                style={{
+                  transform: `scale(${Math.max(0.5, Math.min(1.8, (slideshowSettings.dotButtonSize || 100) / 100))})`,
+                  transformOrigin: 'center'
+                }}
+              >
                 <DotRenderer
                   styleId={slideshowSettings.dotStyle || 1}
                   size="0.6vw"
@@ -2461,11 +2958,15 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
         </div>
         <div className="flex items-center justify-between gap-[0.5vw]">
           <div
-            className="w-[2vw] h-[2vw] rounded-[0.4vw] cursor-pointer shadow-2xs border border-gray-200 shrink-0"
+            className="w-[2vw] h-[2vw] rounded-[0.4vw] cursor-pointer shadow-2xs border border-gray-200 shrink-0 hover:scale-105 transition-transform"
             style={{ background: slideshowSettings.bgColor || '#000000' }}
             onClick={() => setShowBgColorPicker(true)}
+            title="Choose Background Color"
           />
-          <div className="flex-1 h-[2vw] border border-gray-200 rounded-[0.4vw] px-[0.75vw] flex items-center justify-between bg-white shadow-2xs">
+          <div
+            onClick={() => setShowBgColorPicker(true)}
+            className="flex-1 h-[2vw] border border-gray-200 rounded-[0.4vw] px-[0.75vw] flex items-center justify-between bg-white shadow-2xs cursor-pointer hover:border-gray-300 transition-colors"
+          >
             <span className="text-[0.75vw] text-gray-700 font-medium uppercase">
               {slideshowSettings.bgColor || '#000000'}
             </span>
@@ -2473,7 +2974,10 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
               {slideshowSettings.bgOpacity ?? 100}%
             </span>
           </div>
-          <div className="h-[2vw] px-[0.75vw] border border-gray-200 rounded-[0.4vw] flex items-center justify-between text-[0.75vw] font-medium text-gray-600 bg-white cursor-pointer hover:bg-gray-50 shadow-2xs">
+          <div
+            onClick={() => setShowBgColorPicker(true)}
+            className="h-[2vw] px-[0.75vw] border border-gray-200 rounded-[0.4vw] flex items-center justify-between text-[0.75vw] font-medium text-gray-600 bg-white cursor-pointer hover:bg-gray-50 shadow-2xs"
+          >
             <span>HEX</span>
             <ChevronDown size="0.75vw" className="text-gray-400 ml-[0.3vw]" />
           </div>
@@ -2809,6 +3313,49 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
           }
         }}
       />
+
+      {/* Image Adjust / Crop Modal (Strictly for Image Adjustment) */}
+      {showAdjustModal && adjustTargetIndex !== null && slideshowImages[adjustTargetIndex] && (
+        <ImageAdjustModal
+          isOpen={showAdjustModal}
+          onClose={() => {
+            setShowAdjustModal(false);
+            setAdjustTargetIndex(null);
+          }}
+          imageSrc={slideshowImages[adjustTargetIndex]?.originalUrl || slideshowImages[adjustTargetIndex]?.url}
+          initialFixType={slideshowImages[adjustTargetIndex]?.fixType || slideshowSettings.imageFitType || 'Fit'}
+          initialOpacity={slideshowImages[adjustTargetIndex]?.opacity !== undefined ? slideshowImages[adjustTargetIndex]?.opacity : 100}
+          initialFilters={slideshowImages[adjustTargetIndex]?.filters || null}
+          initialCrop={slideshowImages[adjustTargetIndex]?.cropData || null}
+          frameAspectRatio={130 / 140}
+          onSave={handleSaveAdjustedImage}
+        />
+      )}
+
+      {/* Slide Text & Typography Popup */}
+      {showSlideTextPopup && textTargetIndex !== null && slideshowImages[textTargetIndex] && (
+        <SlideTextPopup
+          isOpen={showSlideTextPopup}
+          onClose={() => {
+            setShowSlideTextPopup(false);
+            setTextTargetIndex(null);
+          }}
+          initialHeading={slideshowImages[textTargetIndex]?.heading || ''}
+          initialSubtext={slideshowImages[textTargetIndex]?.subtext || ''}
+          initialFontFamily={slideshowImages[textTargetIndex]?.fontFamily || 'Arial'}
+          initialFontSize={slideshowImages[textTargetIndex]?.fontSize || 14}
+          initialTextColor={slideshowImages[textTargetIndex]?.textColor || '#ffffff'}
+          initialFontWeight={slideshowImages[textTargetIndex]?.fontWeight || 'bold'}
+          initialFontStyle={slideshowImages[textTargetIndex]?.fontStyle || 'normal'}
+          initialTextAlign={slideshowImages[textTargetIndex]?.textAlign || 'center'}
+          initialTextDecoration={slideshowImages[textTargetIndex]?.textDecoration || 'none'}
+          initialTextShadow={slideshowImages[textTargetIndex]?.textShadow || 'medium'}
+          onChange={handleLiveSlideTextChange}
+          onCancel={handleCancelSlideText}
+          onSave={handleSaveSlideText}
+          positionStyle={{ top: '70%', right: '15vw', transform: 'translateY(-50%)' }}
+        />
+      )}
     </div>
   );
 };
