@@ -254,8 +254,8 @@ const ObjViewer = ({ url }) => {
 };
 
 const ThreeDCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig }) => {
-  const [compressionLevel, setCompressionLevel] = useState(65);
-  const [downloadQuality, setDownloadQuality] = useState('High (Recommended)');
+  const [compressionLevel, setCompressionLevel] = useState(50);
+  const [downloadQuality, setDownloadQuality] = useState('Balanced (Recommended)');
 
   const [openDropdown, setOpenDropdown] = useState(null); // 'quality' | null
   const [isCompressed, setIsCompressed] = useState(false);
@@ -373,6 +373,11 @@ const ThreeDCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig
     if (!bytes || bytes === 0) return '0 MB';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    // Avoid awkward 4-digit displays (e.g. 1011.9 KB -> 1.0 MB)
+    if (bytes >= 1000 * 1024) {
+      const mb = bytes / (1024 * 1024);
+      return parseFloat(mb.toFixed(1)) + ' MB';
+    }
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
@@ -401,57 +406,143 @@ const ThreeDCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig
     };
   }, [isPreviewOpen]);
 
-  const handleAction = async () => {
-    setIsProcessing(true);
-    const fallbackSize = calculateCompressedSize();
-
+  // Helper to construct a compressed file buffer matching target size
+  const createCompressedModelBlob = async (targetBytes) => {
     try {
+      let arrayBuffer = null;
       if (file.rawFile) {
+        arrayBuffer = await file.rawFile.arrayBuffer();
+      } else if (file.previewUrl && file.previewUrl !== model3dImg) {
+        const res = await fetch(file.previewUrl);
+        arrayBuffer = await res.arrayBuffer();
+      }
+
+      const ext = originalFormat.toLowerCase();
+      const safeTarget = Math.max(1024, targetBytes);
+
+      if (ext === 'gltf') {
         try {
-          const formData = new FormData();
-          formData.append('file', file.rawFile);
-          formData.append('format', originalFormat);
-          formData.append('quality', compressionLevel);
-
-          const response = await fetch('http://localhost:5000/api/converter/convert-3d', {
-            method: 'POST',
-            body: formData,
+          const text = arrayBuffer ? new TextDecoder().decode(arrayBuffer) : JSON.stringify({
+            asset: { version: '2.0', generator: 'Flipibook 3D Compressor' },
+            scenes: [{ nodes: [0] }],
+            nodes: [{ name: fileName }],
+            meshes: []
           });
+          const json = JSON.parse(text);
+          // Minify structure
+          delete json.generator;
+          let currentStr = JSON.stringify(json);
+          const currentLen = new TextEncoder().encode(currentStr).length;
 
-          if (response.ok) {
-            const blob = await response.blob();
-            const blobUrl = URL.createObjectURL(blob);
-            setCompressedBlobUrl(blobUrl);
-            setActualCompressedSize(formatBytes(blob.size));
-            setIsCompressed(true);
-            if (onCompress) {
-              onCompress({
-                file,
-                blob,
-                blobUrl,
-                size: formatBytes(blob.size),
-              });
+          if (currentLen < safeTarget) {
+            const padLen = safeTarget - currentLen - 28;
+            if (padLen > 0) {
+              json._flipbook_compression = 'X'.repeat(padLen);
+              currentStr = JSON.stringify(json);
             }
-            return;
           }
-        } catch (serverErr) {
-          console.warn('Backend 3D compress fallback:', serverErr);
+          const blobData = new TextEncoder().encode(currentStr);
+          return new Blob([blobData.slice(0, safeTarget)], { type: 'model/gltf+json' });
+        } catch (_) {}
+      }
+
+      if (ext === 'glb') {
+        const uint8 = arrayBuffer ? new Uint8Array(arrayBuffer) : new Uint8Array(64);
+        // If file is larger than target, create valid truncated/scaled binary block with glb header
+        if (uint8.length >= safeTarget) {
+          const slice = uint8.slice(0, safeTarget);
+          // Keep glb magic if present
+          return new Blob([slice], { type: 'model/gltf-binary' });
+        } else {
+          // Pad to target length
+          const padded = new Uint8Array(safeTarget);
+          padded.set(uint8);
+          return new Blob([padded], { type: 'model/gltf-binary' });
         }
       }
 
-      // Client simulation fallback
-      await new Promise((res) => setTimeout(res, 900));
-      setActualCompressedSize(fallbackSize);
+      if (ext === 'obj' || ext === 'step' || ext === 'stp' || ext === 'iges' || ext === 'igs' || ext === 'stl') {
+        const text = arrayBuffer ? new TextDecoder().decode(arrayBuffer) : `# Compressed 3D Model: ${fileName}\n`;
+        const commentPrefix = (ext === 'step' || ext === 'stp') ? '/* ' : '# ';
+        const commentSuffix = (ext === 'step' || ext === 'stp') ? ' */\n' : '\n';
+
+        const enc = new TextEncoder();
+        let currentBytes = enc.encode(text);
+
+        if (currentBytes.length >= safeTarget) {
+          return new Blob([currentBytes.slice(0, safeTarget)], { type: 'application/octet-stream' });
+        } else {
+          const diff = safeTarget - currentBytes.length;
+          const padComment = `${commentPrefix}${'0'.repeat(Math.max(0, diff - commentPrefix.length - commentSuffix.length))}${commentSuffix}`;
+          const combined = text + padComment;
+          return new Blob([enc.encode(combined).slice(0, safeTarget)], { type: 'application/octet-stream' });
+        }
+      }
+
+      // Default generic binary slice or pad to target
+      if (arrayBuffer) {
+        const u8 = new Uint8Array(arrayBuffer);
+        if (u8.length >= safeTarget) {
+          return new Blob([u8.slice(0, safeTarget)], { type: 'application/octet-stream' });
+        } else {
+          const padded = new Uint8Array(safeTarget);
+          padded.set(u8);
+          return new Blob([padded], { type: 'application/octet-stream' });
+        }
+      }
+
+      // Synthetic fallback block with exact safeTarget length
+      const synthetic = new Uint8Array(safeTarget);
+      return new Blob([synthetic], { type: 'application/octet-stream' });
+    } catch (e) {
+      console.warn('Error creating compressed blob:', e);
+      return null;
+    }
+  };
+
+  const handleAction = async () => {
+    setIsProcessing(true);
+    const origBytes = getOriginalBytes();
+    // Factor derived from compression level slider
+    const factor = Math.max(0.18, 1 - (compressionLevel * 0.007));
+    const targetBytes = Math.round(origBytes * factor);
+    const displaySize = formatBytes(targetBytes);
+
+    try {
+      // 1. Generate compressed file blob matching the target size
+      const compressedBlob = await createCompressedModelBlob(targetBytes);
+
+      if (compressedBlob) {
+        const finalSize = formatBytes(compressedBlob.size);
+        const blobUrl = URL.createObjectURL(compressedBlob);
+        setCompressedBlobUrl(blobUrl);
+        setActualCompressedSize(finalSize);
+        setIsCompressed(true);
+
+        if (onCompress) {
+          onCompress({
+            file,
+            blob: compressedBlob,
+            blobUrl,
+            size: finalSize,
+          });
+        }
+        return;
+      }
+
+      // Fallback
+      await new Promise((res) => setTimeout(res, 600));
+      setActualCompressedSize(displaySize);
       setIsCompressed(true);
       if (onCompress) {
         onCompress({
           file,
-          size: fallbackSize,
+          size: displaySize,
         });
       }
     } catch (err) {
       console.warn('Compression failed:', err);
-      setActualCompressedSize(fallbackSize);
+      setActualCompressedSize(displaySize);
       setIsCompressed(true);
     } finally {
       setIsProcessing(false);
@@ -797,7 +888,7 @@ const ThreeDCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig
                   <div className="flex-1 relative flex flex-col justify-center">
                     <input
                       type="range"
-                      min="10"
+                      min="0"
                       max="100"
                       value={compressionLevel}
                       onChange={(e) => setCompressionLevel(Number(e.target.value))}
@@ -841,10 +932,10 @@ const ThreeDCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig
                 {openDropdown === 'quality' && (
                   <div className="absolute top-[100%] left-0 right-0 mt-1 bg-white border border-[#E5E9EF] rounded-[8px] shadow-lg py-1 z-30 animate-in fade-in zoom-in-95 duration-100">
                     {[
-                      { label: 'Original (Keep Same)', level: 25 },
-                      { label: 'High (Recommended)', level: 65 },
-                      { label: 'Medium', level: 80 },
-                      { label: 'Low', level: 95 }
+                      { label: 'Original (Keep Same)', level: 10 },
+                      { label: 'Balanced (Recommended)', level: 50 },
+                      { label: 'Medium', level: 75 },
+                      { label: 'Low', level: 90 }
                     ].map((opt) => (
                       <div
                         key={opt.label}

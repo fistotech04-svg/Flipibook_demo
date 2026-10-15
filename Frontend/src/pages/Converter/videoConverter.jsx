@@ -4,7 +4,25 @@ import React, { useState, useRef, useEffect } from 'react';
 const DEFAULT_VIDEO_THUMB = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80';
 
 const VideoConverter = ({ onBack, onConvert, onReset, fileData, initialConfig }) => {
-  const [selectedFormat, setSelectedFormat] = useState('MP4');
+  // Extract original file format automatically (MP4, WEBM, MOV, GIF, AVI, etc.)
+  const detectOriginalFormat = (name, rawFile) => {
+    if (name) {
+      const ext = name.split('.').pop()?.toUpperCase();
+      if (ext && ['MP4', 'WEBM', 'MOV', 'GIF', 'AVI', 'MKV'].includes(ext)) return ext;
+    }
+    if (rawFile?.type) {
+      if (rawFile.type.includes('webm')) return 'WEBM';
+      if (rawFile.type.includes('quicktime')) return 'MOV';
+      if (rawFile.type.includes('gif')) return 'GIF';
+      if (rawFile.type.includes('x-msvideo')) return 'AVI';
+    }
+    return 'MP4';
+  };
+
+  const originalFormat = detectOriginalFormat(fileData?.name, fileData?.rawFile);
+
+  // Default: no format selected by default
+  const [selectedFormat, setSelectedFormat] = useState(null);
   const [resolution, setResolution] = useState('Original (Keep Same)');
   const [frameRate, setFrameRate] = useState('Original (Keep Same)');
   const [videoCodec, setVideoCodec] = useState('H.264 (Recommended)');
@@ -190,7 +208,9 @@ const VideoConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
           throw new Error(`Server returned ${response.status}: Failed to convert video`);
         }
 
-        const blob = await response.blob();
+        const rawBlob = await response.blob();
+        const mimeType = selectedFormat === 'GIF' ? 'image/gif' : (rawBlob.type || 'video/mp4');
+        const blob = new Blob([rawBlob], { type: mimeType });
         const blobUrl = URL.createObjectURL(blob);
         setConvertedBlobUrl(blobUrl);
         setActualConvertedSize(formatBytes(blob.size));
@@ -257,9 +277,19 @@ const VideoConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
             {/* Video Player Card */}
             <div className="w-full rounded-[14px] bg-white border border-gray-200 shadow-sm p-3.5 transition-all">
               <div className="relative w-full h-[280px] rounded-[10px] overflow-hidden bg-black flex items-center justify-center group">
-                {isVideoFile || convertedBlobUrl ? (
+                {/* Display converted GIF image if convertedFormat is GIF */}
+                {isConverted && selectedFormat === 'GIF' && convertedBlobUrl ? (
+                  <div className="w-full h-full flex items-center justify-center bg-[#18181b]">
+                    <img
+                      src={convertedBlobUrl}
+                      alt={fileName || 'Converted GIF'}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                ) : isVideoFile || convertedBlobUrl ? (
                   <video
                     ref={videoRef}
+                    key={convertedBlobUrl || 'original_video'}
                     src={convertedBlobUrl || file.previewUrl}
                     className="w-full h-full object-cover"
                     onTimeUpdate={() => {
@@ -282,100 +312,104 @@ const VideoConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
                   />
                 )}
 
-                {/* Big Center Play Button Overlay */}
-                <button
-                  type="button"
-                  onClick={togglePlay}
-                  className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-white/20 backdrop-blur-md border border-white/60 flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer shadow-lg group-hover:bg-white/30"
-                >
-                  {isPlaying ? (
-                    <svg className="w-7 h-7 text-white fill-current" viewBox="0 0 24 24">
-                      <rect x="6" y="4" width="4" height="16" rx="1" />
-                      <rect x="14" y="4" width="4" height="16" rx="1" />
-                    </svg>
-                  ) : (
-                    <svg className="w-8 h-8 text-white fill-current translate-x-0.5" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  )}
-                </button>
-
-                {/* Video Controls Bar at Bottom */}
-                <div className="absolute bottom-0 left-0 right-0 h-11 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-3.5 flex items-center gap-3 text-white text-[11px] font-medium z-10">
-                  {/* Play/Pause icon button */}
-                  <button type="button" onClick={togglePlay} className="hover:text-[#EA7233] transition-colors cursor-pointer">
+                {/* Big Center Play Button Overlay (Hide for GIF as it loops automatically) */}
+                {!(isConverted && selectedFormat === 'GIF') && (
+                  <button
+                    type="button"
+                    onClick={togglePlay}
+                    className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-white/20 backdrop-blur-md border border-white/60 flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer shadow-lg group-hover:bg-white/30"
+                  >
                     {isPlaying ? (
-                      <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                        <rect x="6" y="4" width="4" height="16" />
-                        <rect x="14" y="4" width="4" height="16" />
+                      <svg className="w-7 h-7 text-white fill-current" viewBox="0 0 24 24">
+                        <rect x="6" y="4" width="4" height="16" rx="1" />
+                        <rect x="14" y="4" width="4" height="16" rx="1" />
                       </svg>
                     ) : (
-                      <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                      <svg className="w-8 h-8 text-white fill-current translate-x-0.5" viewBox="0 0 24 24">
                         <path d="M8 5v14l11-7z" />
                       </svg>
                     )}
                   </button>
+                )}
 
-                  {/* Time Counter */}
-                  <span className="tabular-nums text-gray-200 text-[11px]">
-                    {formatTime(currentTime)}/{formatTime(duration)}
-                  </span>
+                {/* Video Controls Bar at Bottom (Hide for GIF) */}
+                {!(isConverted && selectedFormat === 'GIF') && (
+                  <div className="absolute bottom-0 left-0 right-0 h-11 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-3.5 flex items-center gap-3 text-white text-[11px] font-medium z-10">
+                    {/* Play/Pause icon button */}
+                    <button type="button" onClick={togglePlay} className="hover:text-[#EA7233] transition-colors cursor-pointer">
+                      {isPlaying ? (
+                        <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                          <rect x="6" y="4" width="4" height="16" />
+                          <rect x="14" y="4" width="4" height="16" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      )}
+                    </button>
 
-                  {/* Timeline Progress Bar */}
-                  <div 
-                    className="flex-1 h-1 bg-white/30 rounded-full overflow-hidden cursor-pointer relative"
-                    onClick={(e) => {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      const pos = (e.clientX - rect.left) / rect.width;
-                      const newTime = pos * duration;
-                      setCurrentTime(newTime);
-                      if (videoRef.current) {
-                        videoRef.current.currentTime = newTime;
-                      }
-                    }}
-                  >
+                    {/* Time Counter */}
+                    <span className="tabular-nums text-gray-200 text-[11px]">
+                      {formatTime(currentTime)}/{formatTime(duration)}
+                    </span>
+
+                    {/* Timeline Progress Bar */}
                     <div 
-                      className="h-full bg-white rounded-full transition-all"
-                      style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
-                    />
+                      className="flex-1 h-1 bg-white/30 rounded-full overflow-hidden cursor-pointer relative"
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const pos = (e.clientX - rect.left) / rect.width;
+                        const newTime = pos * duration;
+                        setCurrentTime(newTime);
+                        if (videoRef.current) {
+                          videoRef.current.currentTime = newTime;
+                        }
+                      }}
+                    >
+                      <div 
+                        className="h-full bg-white rounded-full transition-all"
+                        style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+                      />
+                    </div>
+
+                    {/* Volume Button */}
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setIsMuted(!isMuted);
+                        if (videoRef.current) videoRef.current.muted = !isMuted;
+                      }} 
+                      className="hover:text-gray-300 transition-colors cursor-pointer"
+                    >
+                      {isMuted ? (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                        </svg>
+                      )}
+                    </button>
+
+                    {/* Fullscreen icon */}
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        if (videoRef.current?.requestFullscreen) {
+                          videoRef.current.requestFullscreen();
+                        }
+                      }}
+                      className="hover:text-gray-300 transition-colors cursor-pointer"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+                      </svg>
+                    </button>
                   </div>
-
-                  {/* Volume Button */}
-                  <button 
-                    type="button" 
-                    onClick={() => {
-                      setIsMuted(!isMuted);
-                      if (videoRef.current) videoRef.current.muted = !isMuted;
-                    }} 
-                    className="hover:text-gray-300 transition-colors cursor-pointer"
-                  >
-                    {isMuted ? (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                      </svg>
-                    ) : (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                      </svg>
-                    )}
-                  </button>
-
-                  {/* Fullscreen icon */}
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      if (videoRef.current?.requestFullscreen) {
-                        videoRef.current.requestFullscreen();
-                      }
-                    }}
-                    className="hover:text-gray-300 transition-colors cursor-pointer"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
-                    </svg>
-                  </button>
-                </div>
+                )}
               </div>
             </div>
 
@@ -391,10 +425,12 @@ const VideoConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
               {/* File meta */}
               <div className="min-w-0 flex flex-col justify-center">
                 <span className="text-[14px] font-bold text-[#1e293b] truncate block leading-snug">
-                  {fileName}
+                  {isConverted
+                    ? `${fileName.substring(0, fileName.lastIndexOf('.')) || fileName}_converted.${selectedFormat.toLowerCase()}`
+                    : fileName}
                 </span>
                 <span className="text-[12px] text-[#64748b] font-medium leading-tight mt-0.5">
-                  {file.size || '6.5 MB'} • {file.resolution || '4000 x 3000'}
+                  {isConverted && actualConvertedSize ? actualConvertedSize : (file.size || '6.5 MB')} • {isConverted ? selectedFormat : (file.resolution || '4000 x 3000')}
                 </span>
               </div>
             </div>
@@ -594,26 +630,34 @@ const VideoConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
                 </div>
                 <div className={`grid grid-cols-5 gap-3 p-1 rounded-[10px] transition-all ${formatError ? 'ring-2 ring-red-400 bg-red-50/20' : ''}`}>
                   {formats.map((format) => {
+                    const isOriginal = format.toUpperCase() === originalFormat?.toUpperCase();
                     const isSelected = selectedFormat === format;
                     return (
                       <button
                         key={format}
                         type="button"
+                        disabled={isOriginal}
                         onClick={() => {
+                          if (isOriginal) return;
                           setSelectedFormat(format);
                           setFormatError(false);
                         }}
-                        className={`relative h-[86px] rounded-[8px] flex flex-col items-center justify-center p-2 transition-all cursor-pointer ${
-                          isSelected
-                            ? 'border border-[#EA7233] bg-[#fffaf6] shadow-sm'
-                            : 'border border-[#E5E9EF] bg-[#fafbfc] hover:bg-white'
+                        className={`relative h-[86px] rounded-[8px] flex flex-col items-center justify-center p-2 transition-all ${
+                          isOriginal
+                            ? 'opacity-40 cursor-not-allowed bg-gray-50 border border-gray-200'
+                            : isSelected
+                            ? 'border border-[#EA7233] bg-[#fffaf6] shadow-sm cursor-pointer'
+                            : 'border border-[#E5E9EF] bg-[#fafbfc] hover:bg-white cursor-pointer'
                         }`}
+                        title={isOriginal ? `Already ${format} (Same format)` : `Convert to ${format}`}
                       >
                         {/* Top-left Radio Dot Indicator */}
                         <div className="absolute top-2 left-2">
                           <div
                             className={`w-2.5 h-2.5 rounded-full border flex items-center justify-center ${
-                              isSelected
+                              isOriginal
+                                ? 'border-gray-200 bg-gray-100'
+                                : isSelected
                                 ? 'border-[#EA7233] bg-white'
                                 : 'border-gray-300 bg-white'
                             }`}
@@ -624,10 +668,21 @@ const VideoConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
                           </div>
                         </div>
 
+                        {/* Top-right "Current" badge if this is original format */}
+                        {isOriginal && (
+                          <div className="absolute top-1.5 right-1.5 bg-gray-200 text-gray-600 text-[9px] font-semibold px-1 rounded">
+                            Current
+                          </div>
+                        )}
+
                         {/* File Icon */}
                         <svg
                           className={`w-6 h-6 mb-1 ${
-                            isSelected ? 'text-[#EA7233]' : 'text-[#1e293b]'
+                            isOriginal
+                              ? 'text-gray-400'
+                              : isSelected
+                              ? 'text-[#EA7233]'
+                              : 'text-[#1e293b]'
                           }`}
                           viewBox="0 0 24 24"
                           fill="none"
@@ -643,7 +698,11 @@ const VideoConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
                         {/* Format Name */}
                         <span
                           className={`text-[12px] font-bold ${
-                            isSelected ? 'text-[#EA7233]' : 'text-[#1e293b]'
+                            isOriginal
+                              ? 'text-gray-400'
+                              : isSelected
+                              ? 'text-[#EA7233]'
+                              : 'text-[#1e293b]'
                           }`}
                         >
                           {format}
@@ -732,15 +791,16 @@ const VideoConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
               >
                 <img
                   src={convertedBlobUrl || file.previewUrl || DEFAULT_VIDEO_THUMB}
-                  alt={fileName || 'Preview'}
+                  alt={fileName || 'Converted GIF Preview'}
                   className="max-w-[700px] max-h-[75vh] w-auto h-auto object-contain rounded-[8px] select-none"
                 />
                 <span className="text-[11px] text-gray-400 mt-2 font-medium tracking-wide">
-                  GIF Preview • Loop Enabled
+                  Converted GIF Preview • Loop Enabled
                 </span>
               </div>
             ) : (
               <video
+                key={convertedBlobUrl || 'preview_video'}
                 src={convertedBlobUrl || file.previewUrl}
                 controls
                 autoPlay

@@ -377,6 +377,11 @@ const ThreeDConverter = ({ onBack, onConvert, onReset, fileData }) => {
     if (!bytes || bytes === 0) return '0 MB';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    // Avoid awkward 4-digit displays (e.g. 1011.9 KB -> 1.0 MB)
+    if (bytes >= 1000 * 1024) {
+      const mb = bytes / (1024 * 1024);
+      return parseFloat(mb.toFixed(1)) + ' MB';
+    }
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
