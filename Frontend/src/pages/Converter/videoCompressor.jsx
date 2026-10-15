@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 const DEFAULT_VIDEO_THUMB = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80';
 
 const VideoCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig }) => {
-  const [compressionLevel, setCompressionLevel] = useState(70);
+  const [compressionLevel, setCompressionLevel] = useState(50);
   const [resolution, setResolution] = useState('Original (Keep Same)');
   const [frameRate, setFrameRate] = useState('Original (Keep Same)');
 
@@ -356,22 +356,20 @@ const VideoCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
             </div>
           </div>
 
-          {/* Back button on Left Column if compressed */}
-          {isCompressed && (
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={() => setIsCompressed(false)}
-                className="inline-flex items-center gap-2 px-8 py-2.5 bg-white border border-[#d1d5db] hover:bg-[#f8fafc] active:scale-98 rounded-[6px] text-sm font-medium text-[#1e293b] shadow-sm transition-all cursor-pointer"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="19" y1="12" x2="5" y2="12" />
-                  <polyline points="12 19 5 12 12 5" />
-                </svg>
-                <span>Back</span>
-              </button>
-            </div>
-          )}
+          {/* Back button down below video name bar */}
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={isCompressed ? () => setIsCompressed(false) : onBack}
+              className="inline-flex items-center gap-2 px-8 py-2.5 bg-white border border-[#d1d5db] hover:bg-[#f8fafc] active:scale-98 rounded-[6px] text-sm font-medium text-[#1e293b] shadow-sm transition-all cursor-pointer"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12" />
+                <polyline points="12 19 5 12 12 5" />
+              </svg>
+              <span>Back</span>
+            </button>
+          </div>
         </div>
 
         {/* RIGHT COLUMN: Settings or Success Screen */}
@@ -579,7 +577,7 @@ const VideoCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
                   `}</style>
                   <input
                     type="range"
-                    min="1"
+                    min="0"
                     max="100"
                     value={compressionLevel}
                     onChange={(e) => setCompressionLevel(Number(e.target.value))}
@@ -599,7 +597,7 @@ const VideoCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
 
               {/* 2. Resolution */}
               <div className="mt-5">
-                <div className="relative">
+                <div className="relative max-w-[280px]">
                   <h2 className="text-[14px] font-bold text-[#1e293b] mb-1.5">
                     2. Resolution <span className="text-gray-400 font-normal text-[12px]">(Optional)</span>
                   </h2>
@@ -651,18 +649,18 @@ const VideoCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
                 </div>
               </div>
 
-              {/* Bottom Buttons: Back + Compress */}
+              {/* Bottom Buttons: Preview + Compress */}
               <div className="flex items-center gap-3 mt-8">
                 <button
                   type="button"
-                  onClick={onBack}
+                  onClick={() => setIsPreviewOpen(true)}
                   className="w-1/2 py-3 bg-white border border-[#d1d5db] hover:bg-gray-50 active:scale-98 rounded-[6px] text-sm font-semibold text-[#1e293b] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="19" y1="12" x2="5" y2="12" />
-                    <polyline points="12 19 5 12 12 5" />
+                  <svg className="w-4 h-4 text-[#1e293b]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
-                  <span>Back</span>
+                  <span>Preview</span>
                 </button>
 
                 <button

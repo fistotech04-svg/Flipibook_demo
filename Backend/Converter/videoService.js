@@ -75,46 +75,57 @@ export const processVideoConversion = ({
     // Apply Output Format
     command.toFormat(ext);
 
-    // Apply Codec
-    const codec = CODEC_MAP[videoCodec];
-    if (codec) {
-      try {
-        command.videoCodec(codec);
-      } catch (err) {
-        console.warn('Could not set custom codec, using default:', err);
+    if (ext === 'gif') {
+      // Special optimization for animated GIF (palette generation + loop)
+      const scale = RESOLUTION_MAP[resolution];
+      const scaleFilter = scale ? `scale=${scale}:force_original_aspect_ratio=decrease` : 'scale=480:-1:flags=lanczos';
+      const fpsVal = FPS_MAP[frameRate] || 15;
+      
+      command.outputOptions([
+        `-vf fps=${fpsVal},${scaleFilter},split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse`,
+        '-loop 0',
+      ]);
+    } else {
+      // Standard video conversions (MP4, WEBM, MOV, AVI)
+      const codec = CODEC_MAP[videoCodec];
+      if (codec) {
+        try {
+          command.videoCodec(codec);
+        } catch (err) {
+          console.warn('Could not set custom codec, using default:', err);
+        }
       }
-    }
 
-    // Use ultrafast/veryfast preset and multi-threading for maximum compression speed
-    const outputOptions = [
-      '-preset veryfast',
-      '-threads 0',
-      '-c:a copy', // Don't re-encode audio if possible, drastically speeds up conversion
-    ];
+      const outputOptions = [
+        '-preset veryfast',
+        '-threads 0',
+        '-c:a copy', // Don't re-encode audio if possible, drastically speeds up conversion
+      ];
 
-    // Apply Resolution
-    const scale = RESOLUTION_MAP[resolution];
-    if (scale) {
-      outputOptions.push(`-vf scale=${scale}:force_original_aspect_ratio=decrease,pad=${scale}:(ow-iw)/2:(oh-ih)/2`);
-    }
+      // Apply Resolution
+      const scale = RESOLUTION_MAP[resolution];
+      if (scale) {
+        outputOptions.push(`-vf scale=${scale}:force_original_aspect_ratio=decrease,pad=${scale}:(ow-iw)/2:(oh-ih)/2`);
+      }
 
-    // Apply Quality / CRF (for libx264/libx265)
-    const crf = CRF_MAP[quality];
-    if (crf !== undefined && (!codec || codec === 'libx264' || codec === 'libx265')) {
-      outputOptions.push(`-crf ${crf}`);
-    }
+      // Apply Quality / CRF (for libx264/libx265)
+      const crf = CRF_MAP[quality];
+      if (crf !== undefined && (!codec || codec === 'libx264' || codec === 'libx265')) {
+        outputOptions.push(`-crf ${crf}`);
+      }
 
-    // Faststart for streaming/mp4
-    if (ext === 'mp4') {
-      outputOptions.push('-movflags +faststart');
-    }
+      // Faststart for streaming/mp4
+      if (ext === 'mp4') {
+        outputOptions.push('-movflags +faststart');
+      }
 
-    command.outputOptions(outputOptions);
+      command.outputOptions(outputOptions);
 
-    // Apply FPS
-    const fps = FPS_MAP[frameRate];
-    if (fps) {
-      command.fps(fps);
+      // Apply FPS
+      const fps = FPS_MAP[frameRate];
+      if (fps) {
+        command.fps(fps);
+      }
     }
 
     command
