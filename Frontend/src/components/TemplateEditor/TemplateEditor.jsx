@@ -20,6 +20,7 @@ import { checkIsAnimatedWebp } from './editorUtils';
 import pageCacheManager from './PageCacheManager';
 import { formatTemplateSvgToPageSvg } from '../../utils/editorUtils';
 import { useToast } from '../CustomToast';
+import { addTextToNotes } from './NotesPopup';
 
 
 /**
@@ -4203,6 +4204,20 @@ const TemplateEditor = () => {
           const element = doc.querySelector(`[id="${layer.id}"]`);
           if (element) {
             let svgSnippet = new XMLSerializer().serializeToString(element);
+
+            // Automatically add copied text from template into Notes
+            try {
+              const textNodes = Array.from(element.querySelectorAll('text, tspan, div, p, span, h1, h2, h3, h4, h5, h6'));
+              let textToSave = '';
+              if (textNodes.length > 0) {
+                textToSave = textNodes.map(t => t.textContent || '').filter(Boolean).join('\n');
+              } else if (element.textContent) {
+                textToSave = element.textContent;
+              }
+              if (textToSave && textToSave.trim()) {
+                addTextToNotes(textToSave);
+              }
+            } catch (err) {}
 
             // Extract external definitions (clipPath, grads) used by this snippet
             const defSnippets = [];

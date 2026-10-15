@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Undo2, Redo2, RotateCcw, Plus, Minus } from 'lucide-react';
 import { Icon } from '@iconify/react';
+import NotesPopup from './NotesPopup';
 
 const TopToolbar = ({ 
   zoom, 
@@ -17,10 +18,14 @@ const TopToolbar = ({
   onFlipV,
   onAlign,
   hasSelection,
-  hideTools = false
+  hideTools = false,
+  selectedLayerId = null
 }) => {
   const [showRotationOptions, setShowRotationOptions] = useState(false);
   const rotationRef = useRef(null);
+  const [showNotesPopup, setShowNotesPopup] = useState(false);
+  const notesRef = useRef(null);
+  const [hasNotes, setHasNotes] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartPos = useRef({ x: 0, y: 0 });
   const dragStartValue = useRef(0);
@@ -95,9 +100,32 @@ const TopToolbar = ({
   }, [isDragging, onRotate]);
 
   useEffect(() => {
+    const checkNotesExist = () => {
+      try {
+        const saved = localStorage.getItem('fisto_template_editor_notes');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setHasNotes(Array.isArray(parsed) && parsed.length > 0);
+        } else {
+          setHasNotes(false);
+        }
+      } catch (e) {
+        setHasNotes(false);
+      }
+    };
+
+    checkNotesExist();
+    window.addEventListener('storage', checkNotesExist);
+    return () => window.removeEventListener('storage', checkNotesExist);
+  }, [showNotesPopup]);
+
+  useEffect(() => {
     const handleClickOutside = (event) => {
       if (rotationRef.current && !rotationRef.current.contains(event.target)) {
         setShowRotationOptions(false);
+      }
+      if (notesRef.current && !notesRef.current.contains(event.target)) {
+        setShowNotesPopup(false);
       }
     };
 
@@ -294,6 +322,45 @@ const TopToolbar = ({
 
       {/* Right Section: Zoom & Extra */}
       <div className="flex items-center gap-[1vw]">
+        {/* Notes Tool (Placed in space between Flip Vertical and Rotate) */}
+        <div className="relative" ref={notesRef}>
+          <div className="relative group/tt flex items-center justify-center">
+            <div
+              onClick={() => {
+                setShowNotesPopup(!showNotesPopup);
+                setShowRotationOptions(false);
+              }}
+              className={`flex items-center bg-[#F3F4F6] p-[0.3vw] rounded-[0.6vw] cursor-pointer transition-all ${
+                showNotesPopup ? 'ring-1 ring-gray-300 shadow-sm' : ''
+              }`}
+            >
+              <div className={`relative p-[0.4vw] rounded-[0.4vw] transition-all ${
+                showNotesPopup ? 'bg-white shadow-sm text-indigo-600' : 'hover:bg-white text-[#374151] hover:text-black'
+              }`}>
+                <Icon icon="solar:notes-bold" width="1.1vw" height="1.1vw" />
+                {hasNotes && (
+                  <span className="absolute top-[0.1vw] right-[0.1vw] w-[0.35vw] h-[0.35vw] bg-indigo-600 rounded-full ring-1 ring-white" />
+                )}
+              </div>
+            </div>
+            {!showNotesPopup && (
+              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-[0.35vw] hidden group-hover/tt:flex flex-col items-center pointer-events-none z-50 whitespace-nowrap">
+                <div className="w-0 h-0 border-x-[0.3vw] border-x-transparent border-b-[0.3vw] border-b-gray-900/90" />
+                <div className="bg-gray-900/90 text-white text-[0.65vw] font-medium px-[0.5vw] py-[0.2vw] rounded-[0.3vw] shadow-md backdrop-blur-xs">
+                  Notes
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Notes Popup */}
+          <NotesPopup
+            isOpen={showNotesPopup}
+            onClose={() => setShowNotesPopup(false)}
+            selectedLayerId={selectedLayerId}
+          />
+        </div>
+
         {!hideTools && (
           <div className="relative" ref={rotationRef}>
             <div className="relative group/tt flex items-center justify-center">
