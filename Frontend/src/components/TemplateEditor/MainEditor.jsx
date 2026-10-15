@@ -337,7 +337,7 @@ export const getCanvasBounds = (svgElement, baseWidth = 210, baseHeight = 297) =
 
 // Global style to ensure injected SVGs always fill their container perfectly
 const svgGlobalStyles = `
-  .page-svg-container svg:not(.svg-icon-override) {
+  .page-svg-container svg:not(.svg-icon-override):not([data-type="map"] foreignObject svg):not(foreignObject svg) {
     width: 100% !important;
     height: 100% !important;
     display: block !important;
@@ -591,6 +591,190 @@ const svgGlobalStyles = `
   }
   foreignObject[data-type="video"] * {
     pointer-events: auto !important;
+  }
+
+  /* Map Element Overrides & Container Responsiveness */
+  [data-type="map"] foreignObject {
+    overflow: hidden !important;
+    border-radius: 0px !important;
+  }
+  [data-type="map"] foreignObject > div.map-root-container,
+  [data-type="map"] foreignObject > div:first-child {
+    border-radius: 0px !important;
+    width: 100% !important;
+    height: 100% !important;
+    white-space: normal !important;
+    overflow: hidden !important;
+    line-height: normal !important;
+    position: relative !important;
+    container-type: size !important;
+  }
+  [data-type="map"] foreignObject div,
+  [data-type="map"] foreignObject span,
+  [data-type="map"] foreignObject a,
+  [data-type="map"] foreignObject p {
+    white-space: normal !important;
+    word-wrap: normal !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+  }
+  [data-type="map"] foreignObject .map-stage {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    transform-origin: 0 0 !important;
+    overflow: hidden !important;
+  }
+  [data-type="map"] foreignObject .map-overlay-wrapper {
+    position: absolute !important;
+    inset: 0 !important;
+    pointer-events: none !important;
+  }
+  [data-type="map"] foreignObject iframe {
+    pointer-events: none !important;
+    border: none !important;
+    display: block !important;
+  }
+  .page-svg-container [data-type="map"] foreignObject svg,
+  [data-type="map"] foreignObject svg,
+  [data-type="map"] foreignObject svg.svg-icon-override {
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    display: inline-block !important;
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  [data-type="map"] foreignObject .map-card-overlay {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    pointer-events: auto !important;
+    box-sizing: border-box !important;
+  }
+  [data-type="map"] foreignObject .map-card-overlay * {
+    line-height: normal;
+    box-sizing: border-box;
+  }
+  [data-type="map"] foreignObject .map-nowrap,
+  [data-type="map"] foreignObject [data-nowrap="true"] {
+    white-space: nowrap !important;
+  }
+
+  /* Fluid map responsive rules */
+  [data-type="map"] foreignObject .map-top-badge {
+    max-width: 88% !important;
+  }
+  [data-type="map"] foreignObject .map-top-badge .map-badge-title,
+  [data-type="map"] foreignObject .map-top-badge .map-badge-subtitle {
+    max-width: clamp(90px, 45cqw, 160px) !important;
+  }
+  [data-type="map"] foreignObject .map-card-actions {
+    max-height: 52% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-end !important;
+  }
+  [data-type="map"] foreignObject .map-actions-row {
+    display: flex !important;
+    gap: clamp(2px, 1.5cqw, 5px) !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  [data-type="map"] foreignObject .map-action-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: clamp(2px, 1cqw, 4px) !important;
+    padding: clamp(3px, 1.2cqh, 5px) clamp(2px, 1cqw, 5px) !important;
+    border-radius: clamp(4px, 1.5cqw, 6px) !important;
+    font-size: clamp(7.5px, 2.7cqw, 9.5px) !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    min-width: 0 !important;
+  }
+  [data-type="map"] foreignObject .map-btn-text {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: inherit !important;
+  }
+
+  /* Container Queries for compact map elements */
+  @container (max-height: 190px) {
+    [data-type="map"] foreignObject .map-drag-pill {
+      display: none !important;
+    }
+    [data-type="map"] foreignObject .map-biz-category {
+      display: none !important;
+    }
+    [data-type="map"] foreignObject .map-top-badge .map-badge-subtitle {
+      display: none !important;
+    }
+    [data-type="map"] foreignObject .map-top-badge {
+      padding: 2px 6px 2px 3px !important;
+      top: 4px !important;
+    }
+    [data-type="map"] foreignObject .map-biz-row {
+      margin-bottom: 2px !important;
+      gap: 4px !important;
+    }
+    [data-type="map"] foreignObject .map-biz-img {
+      width: 26px !important;
+      height: 26px !important;
+    }
+    [data-type="map"] foreignObject .map-card-actions {
+      padding: 4px 6px 5px !important;
+    }
+  }
+
+  @container (max-height: 140px) {
+    [data-type="map"] foreignObject .map-top-badge {
+      display: none !important;
+    }
+    [data-type="map"] foreignObject .map-biz-meta {
+      display: none !important;
+    }
+    [data-type="map"] foreignObject .map-biz-img {
+      width: 20px !important;
+      height: 20px !important;
+    }
+    [data-type="map"] foreignObject .map-card-actions {
+      padding: 3px 5px 3px !important;
+    }
+  }
+
+  @container (max-width: 230px) {
+    [data-type="map"] foreignObject .map-actions-row {
+      gap: 2px !important;
+    }
+    [data-type="map"] foreignObject .map-action-btn {
+      padding: 3px 2px !important;
+      font-size: 7.5px !important;
+    }
+    [data-type="map"] foreignObject .map-action-btn svg {
+      width: 8px !important;
+      height: 8px !important;
+      min-width: 8px !important;
+      max-width: 8px !important;
+      min-height: 8px !important;
+      max-height: 8px !important;
+    }
+  }
+
+  @container (max-width: 175px) {
+    [data-type="map"] foreignObject .map-action-btn-secondary:last-child {
+      display: none !important;
+    }
+    [data-type="map"] foreignObject .map-action-btn-primary {
+      flex: 1.2 !important;
+    }
+    [data-type="map"] foreignObject .map-action-btn-secondary {
+      flex: 1 !important;
+    }
   }
 
   .hide-controls::-webkit-media-controls {
@@ -2236,6 +2420,143 @@ const MainEditor = ({
       svg.querySelectorAll('foreignObject iframe').forEach(iframe => {
         const fo = iframe.closest('foreignObject');
         if (fo) {
+          const isMap = fo.closest('[data-type="map"]') || fo.getAttribute('data-type') === 'map' || (fo.id && fo.id.startsWith('map-'));
+          if (isMap) {
+            let foW = parseFloat(fo.getAttribute('width') || '0');
+            let foH = parseFloat(fo.getAttribute('height') || '0');
+            const mapGroup = fo.closest('[data-type="map"]') || fo;
+            const svgEl = fo.closest('svg');
+
+            // If an existing map element is currently the small default 180x120 on canvas, automatically upgrade it to prominent size
+            if ((!foW || (foW === 180 && foH === 120)) && svgEl) {
+              let pw = 297, ph = 210;
+              const vb = svgEl.getAttribute('viewBox')?.trim().split(/[\s,]+/).map(parseFloat);
+              if (vb && vb.length === 4 && vb[2] > 0 && vb[3] > 0) {
+                pw = vb[2];
+                ph = vb[3];
+              }
+
+              let targetW, targetH;
+              if (pw > ph) {
+                targetW = Math.round(pw * 0.82);
+                targetH = Math.round(targetW * (150 / 240));
+                if (targetH > ph * 0.78) {
+                  targetH = Math.round(ph * 0.75);
+                  targetW = Math.round(targetH * (240 / 150));
+                }
+              } else {
+                targetW = Math.round(pw * 0.86);
+                targetH = Math.round(targetW * (135 / 180));
+                if (targetH > ph * 0.55) {
+                  targetH = Math.round(ph * 0.50);
+                  targetW = Math.round(targetH * (180 / 135));
+                }
+              }
+              targetW = Math.min(targetW, pw - (pw > 400 ? 40 : 10));
+              targetH = Math.min(targetH, ph - (ph > 400 ? 40 : 10));
+
+              fo.setAttribute('width', targetW.toString());
+              fo.setAttribute('height', targetH.toString());
+              const rect = mapGroup.querySelector('rect');
+              if (rect) {
+                rect.setAttribute('width', targetW.toString());
+                rect.setAttribute('height', targetH.toString());
+              }
+
+              const currentTransform = mapGroup.getAttribute('transform') || '';
+              if (!currentTransform || currentTransform.includes('88.5')) {
+                const cx = Math.round((pw - targetW) / 2);
+                const cy = Math.round((ph - targetH) / 2);
+                mapGroup.setAttribute('transform', `translate(${cx}, ${cy})`);
+              }
+
+              foW = targetW;
+              foH = targetH;
+            } else if (!foW || !foH) {
+              foW = 240;
+              foH = 150;
+            }
+
+            let origW = parseFloat(iframe.getAttribute('data-original-width'));
+            let origH = parseFloat(iframe.getAttribute('data-original-height'));
+            if (!origW || !origH) {
+              origW = foW || 240;
+              origH = foH || 150;
+              iframe.setAttribute('data-original-width', origW.toString());
+              iframe.setAttribute('data-original-height', origH.toString());
+            }
+
+            const baseW = 320;
+            const scale = foW < baseW ? (foW / baseW) : 1;
+            const innerW = foW < baseW ? baseW : foW;
+            const innerH = Math.round(foH / scale);
+
+            let stage = fo.querySelector('.map-stage');
+            if (stage) {
+              stage.style.setProperty('width', innerW + 'px', 'important');
+              stage.style.setProperty('height', innerH + 'px', 'important');
+              stage.style.setProperty('transform', `scale(${scale})`, 'important');
+              stage.style.setProperty('transform-origin', '0 0', 'important');
+            } else {
+              const rootContainer = fo.querySelector('.map-root-container') || fo.querySelector('div');
+              if (rootContainer) {
+                stage = document.createElement('div');
+                stage.className = 'map-stage';
+                stage.style.cssText = `position: absolute; top: 0; left: 0; width: ${innerW}px; height: ${innerH}px; transform: scale(${scale}); transform-origin: 0 0; overflow: hidden;`;
+
+                const existingChildren = Array.from(rootContainer.children);
+                if (iframe.parentElement === rootContainer) {
+                  stage.appendChild(iframe);
+                }
+
+                const overlayWrapper = document.createElement('div');
+                overlayWrapper.className = 'map-overlay-wrapper';
+                overlayWrapper.style.cssText = 'position: absolute; inset: 0; pointer-events: none;';
+
+                existingChildren.forEach(child => {
+                  if (child !== iframe) {
+                    overlayWrapper.appendChild(child);
+                  }
+                });
+                stage.appendChild(overlayWrapper);
+                rootContainer.appendChild(stage);
+              }
+            }
+
+            iframe.setAttribute('width', innerW.toString());
+            iframe.setAttribute('height', innerH.toString());
+            iframe.style.setProperty('width', innerW + 'px', 'important');
+            iframe.style.setProperty('height', innerH + 'px', 'important');
+            iframe.style.setProperty('transform', 'none', 'important');
+            iframe.style.setProperty('pointer-events', 'none', 'important');
+            iframe.style.setProperty('border', 'none', 'important');
+            iframe.style.setProperty('display', 'block', 'important');
+
+            fo.style.setProperty('border-radius', '0px', 'important');
+            const rootContainer = fo.querySelector('.map-root-container') || fo.querySelector('div:first-child');
+            if (rootContainer) {
+              rootContainer.style.setProperty('border-radius', '0px', 'important');
+              rootContainer.style.setProperty('width', '100%', 'important');
+              rootContainer.style.setProperty('height', '100%', 'important');
+            }
+
+            fo.querySelectorAll('svg').forEach(s => {
+              if (!s.classList.contains('svg-icon-override')) {
+                s.classList.add('svg-icon-override');
+              }
+              const w = s.getAttribute('width') || '10';
+              const h = s.getAttribute('height') || '10';
+              s.style.setProperty('width', w + 'px', 'important');
+              s.style.setProperty('height', h + 'px', 'important');
+              s.style.setProperty('min-width', w + 'px', 'important');
+              s.style.setProperty('max-width', w + 'px', 'important');
+              s.style.setProperty('min-height', h + 'px', 'important');
+              s.style.setProperty('max-height', h + 'px', 'important');
+              s.style.setProperty('display', 'inline-block', 'important');
+              s.style.setProperty('flex-shrink', '0', 'important');
+            });
+            return;
+          }
           const foW = parseFloat(fo.getAttribute('width') || '0');
           const foH = parseFloat(fo.getAttribute('height') || '0');
           const origW = parseFloat(iframe.getAttribute('data-original-width')) || 640;
@@ -4083,6 +4404,17 @@ const MainEditor = ({
             localBBox = { x: 0, y: 0, width: 48, height: 48 };
           }
         } else if (el.getAttribute('data-type') === 'decorator' || (el.id && el.id.startsWith('decorator-'))) {
+          const fo = el.querySelector('foreignObject') || el.querySelector('rect');
+          if (fo) {
+            const w = parseFloat(fo.getAttribute('width')) || 0;
+            const h = parseFloat(fo.getAttribute('height')) || 0;
+            const x = parseFloat(fo.getAttribute('x') || '0');
+            const y = parseFloat(fo.getAttribute('y') || '0');
+            if (w > 0 && h > 0) {
+              localBBox = { x, y, width: w, height: h };
+            }
+          }
+        } else if (el.getAttribute('data-type') === 'map' || (el.id && el.id.startsWith('map-'))) {
           const fo = el.querySelector('foreignObject') || el.querySelector('rect');
           if (fo) {
             const w = parseFloat(fo.getAttribute('width')) || 0;
@@ -7764,6 +8096,17 @@ const MainEditor = ({
                     bbox = { x: rx, y: ry, width: rw, height: rh };
                   }
                 }
+              } else if (el.getAttribute('data-type') === 'map' || (el.id && el.id.startsWith('map-'))) {
+                const fo = el.querySelector('foreignObject') || el.querySelector('rect');
+                if (fo) {
+                  const rw = parseFloat(fo.getAttribute('width')) || 0;
+                  const rh = parseFloat(fo.getAttribute('height')) || 0;
+                  const rx = parseFloat(fo.getAttribute('x') || '0');
+                  const ry = parseFloat(fo.getAttribute('y') || '0');
+                  if (rw > 0 && rh > 0) {
+                    bbox = { x: rx, y: ry, width: rw, height: rh };
+                  }
+                }
               }
             }
 
@@ -8285,21 +8628,80 @@ const MainEditor = ({
                 if (el.tagName.toLowerCase() === 'foreignobject') {
                   const iframe = el.querySelector('iframe');
                   if (iframe) {
-                    const origW = parseFloat(iframe.getAttribute('data-original-width')) || 640;
-                    const origH = parseFloat(iframe.getAttribute('data-original-height')) || 360;
-                    iframe.setAttribute('data-original-width', origW.toString());
-                    iframe.setAttribute('data-original-height', origH.toString());
-                    iframe.setAttribute('width', origW.toString());
-                    iframe.setAttribute('height', origH.toString());
-                    iframe.style.setProperty('width', origW + 'px', 'important');
-                    iframe.style.setProperty('height', origH + 'px', 'important');
-                    iframe.style.setProperty('transform-origin', '0 0', 'important');
-                    iframe.style.setProperty('pointer-events', 'auto', 'important');
+                    const isMap = el.closest('[data-type="map"]') || el.getAttribute('data-type') === 'map' || (el.id && el.id.startsWith('map-'));
+                    if (isMap) {
+                      let stage = el.querySelector('.map-stage');
+                      const baseW = 320;
+                      const scale = adjustedWidth < baseW ? (adjustedWidth / baseW) : 1;
+                      const innerW = adjustedWidth < baseW ? baseW : adjustedWidth;
+                      const innerH = Math.round(adjustedHeight / scale);
 
-                    if (origW > 0 && origH > 0 && adjustedWidth > 0 && adjustedHeight > 0) {
-                      const scaleX = adjustedWidth / origW;
-                      const scaleY = adjustedHeight / origH;
-                      iframe.style.setProperty('transform', `scale(${scaleX}, ${scaleY})`, 'important');
+                      if (stage) {
+                        stage.style.setProperty('width', innerW + 'px', 'important');
+                        stage.style.setProperty('height', innerH + 'px', 'important');
+                        stage.style.setProperty('transform', `scale(${scale})`, 'important');
+                        stage.style.setProperty('transform-origin', '0 0', 'important');
+                      } else {
+                        const rootContainer = el.querySelector('.map-root-container') || el.querySelector('div');
+                        if (rootContainer) {
+                          stage = document.createElement('div');
+                          stage.className = 'map-stage';
+                          stage.style.cssText = `position: absolute; top: 0; left: 0; width: ${innerW}px; height: ${innerH}px; transform: scale(${scale}); transform-origin: 0 0; overflow: hidden;`;
+                          const existingChildren = Array.from(rootContainer.children);
+                          if (iframe.parentElement === rootContainer) {
+                            stage.appendChild(iframe);
+                          }
+                          const overlayWrapper = document.createElement('div');
+                          overlayWrapper.className = 'map-overlay-wrapper';
+                          overlayWrapper.style.cssText = 'position: absolute; inset: 0; pointer-events: none;';
+                          existingChildren.forEach(child => {
+                            if (child !== iframe) {
+                              overlayWrapper.appendChild(child);
+                            }
+                          });
+                          stage.appendChild(overlayWrapper);
+                          rootContainer.appendChild(stage);
+                        }
+                      }
+
+                      iframe.setAttribute('width', innerW.toString());
+                      iframe.setAttribute('height', innerH.toString());
+                      iframe.style.setProperty('width', innerW + 'px', 'important');
+                      iframe.style.setProperty('height', innerH + 'px', 'important');
+                      iframe.style.setProperty('transform', 'none', 'important');
+                      iframe.style.setProperty('pointer-events', 'none', 'important');
+                      iframe.style.setProperty('border', 'none', 'important');
+                      iframe.style.setProperty('display', 'block', 'important');
+
+                      const parentMap = el.closest('[data-type="map"]');
+                      if (parentMap) {
+                        const rect = parentMap.querySelector('rect');
+                        if (rect) {
+                          rect.setAttribute('x', adjustedX);
+                          rect.setAttribute('y', adjustedY);
+                          rect.setAttribute('width', adjustedWidth);
+                          rect.setAttribute('height', adjustedHeight);
+                        }
+                      }
+                    } else {
+                      const origW = parseFloat(iframe.getAttribute('data-original-width')) || 640;
+                      const origH = parseFloat(iframe.getAttribute('data-original-height')) || 360;
+                      iframe.setAttribute('data-original-width', origW.toString());
+                      iframe.setAttribute('data-original-height', origH.toString());
+                      iframe.setAttribute('width', origW.toString());
+                      iframe.setAttribute('height', origH.toString());
+                      iframe.style.setProperty('width', origW + 'px', 'important');
+                      iframe.style.setProperty('height', origH + 'px', 'important');
+                      iframe.style.setProperty('transform-origin', '0 0', 'important');
+                      iframe.style.setProperty('pointer-events', 'auto', 'important');
+                      iframe.style.setProperty('border', 'none', 'important');
+                      iframe.style.setProperty('display', 'block', 'important');
+
+                      if (origW > 0 && origH > 0 && adjustedWidth > 0 && adjustedHeight > 0) {
+                        const scaleX = adjustedWidth / origW;
+                        const scaleY = adjustedHeight / origH;
+                        iframe.style.setProperty('transform', `scale(${scaleX}, ${scaleY})`, 'important');
+                      }
                     }
                   }
                   const video = el.querySelector('video');
@@ -8421,7 +8823,7 @@ const MainEditor = ({
                     } else if (tag === 'rect' || (tag === 'path' && child.getAttribute('data-shape-type') === 'rectangle') || tag === 'foreignobject' || tag === 'image' || tag === 'video' || tag === 'svg') {
                       const isRectPath = tag === 'path' && child.getAttribute('data-shape-type') === 'rectangle';
                       const hasTransform = child.getAttribute('transform');
-                      const forceNative = (tag === 'rect' || isRectPath || tag === 'image' || tag === 'video' || tag === 'svg');
+                      const forceNative = (tag === 'rect' || isRectPath || tag === 'image' || tag === 'video' || tag === 'svg' || tag === 'foreignobject');
                       if (forceNative || !hasTransform || hasTransform === 'matrix(1 0 0 1 0 0)') {
                         if (forceNative && hasTransform && hasTransform !== 'matrix(1 0 0 1 0 0)') {
                           child.removeAttribute('transform');
@@ -8698,8 +9100,11 @@ const MainEditor = ({
                         if (tag === 'foreignobject') {
                           const iframe = child.querySelector('iframe');
                           if (iframe) {
-                            const origW = parseFloat(iframe.getAttribute('data-original-width')) || 640;
-                            const origH = parseFloat(iframe.getAttribute('data-original-height')) || 360;
+                            const isMap = child.closest('[data-type="map"]') || child.getAttribute('data-type') === 'map' || (child.id && child.id.startsWith('map-'));
+                            const defaultOrigW = isMap ? 240 : 640;
+                            const defaultOrigH = isMap ? 150 : 360;
+                            const origW = parseFloat(iframe.getAttribute('data-original-width')) || defaultOrigW;
+                            const origH = parseFloat(iframe.getAttribute('data-original-height')) || defaultOrigH;
                             iframe.setAttribute('data-original-width', origW.toString());
                             iframe.setAttribute('data-original-height', origH.toString());
                             iframe.setAttribute('width', origW.toString());
@@ -8707,7 +9112,9 @@ const MainEditor = ({
                             iframe.style.setProperty('width', origW + 'px', 'important');
                             iframe.style.setProperty('height', origH + 'px', 'important');
                             iframe.style.setProperty('transform-origin', '0 0', 'important');
-                            iframe.style.setProperty('pointer-events', 'auto', 'important');
+                            iframe.style.setProperty('pointer-events', isMap ? 'none' : 'auto', 'important');
+                            iframe.style.setProperty('border', 'none', 'important');
+                            iframe.style.setProperty('display', 'block', 'important');
 
                             if (origW > 0 && origH > 0 && imgW > 0 && imgH > 0) {
                               const scaleX = imgW / origW;
