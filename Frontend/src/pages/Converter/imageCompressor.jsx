@@ -4,18 +4,6 @@ import React, { useState, useRef, useEffect } from 'react';
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1608248597359-1e16c80521ba?w=800&q=80';
 
 const ImageCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig }) => {
-  const [compressionLevel, setCompressionLevel] = useState(70);
-  const [resolution, setResolution] = useState('Original (Keep Same)');
-  const [outputFormat, setOutputFormat] = useState('JPG (Recommended)');
-  const [openDropdown, setOpenDropdown] = useState(null); // 'resolution' | 'format' | null
-  const [isCompressed, setIsCompressed] = useState(false);
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [compressedBlobUrl, setCompressedBlobUrl] = useState(null);
-  const [actualCompressedSize, setActualCompressedSize] = useState(null);
-
   // File info
   const file = fileData || {
     name: 'nature.jpg',
@@ -26,14 +14,39 @@ const ImageCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
 
   const [fileName, setFileName] = useState(file.name || 'nature.jpg');
 
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [compressedBlobUrl, setCompressedBlobUrl] = useState(null);
+  const [actualCompressedSize, setActualCompressedSize] = useState(null);
+
   // Extract original extension
   const getOriginalExt = (name) => {
     if (!name) return 'JPG';
     const parts = name.split('.');
-    return parts.length > 1 ? parts.pop().toUpperCase() : 'JPG';
+    let ext = parts.length > 1 ? parts.pop().toUpperCase() : 'JPG';
+    if (ext === 'JPEG') ext = 'JPG';
+    return ext;
   };
 
   const originalFormat = getOriginalExt(file.name);
+
+  const getRecommendedFormatLabel = (fmt) => `${fmt} (Recommended)`;
+
+  const [compressionLevel, setCompressionLevel] = useState(70);
+  const [resolution, setResolution] = useState('Original (Keep Same)');
+  const [outputFormat, setOutputFormat] = useState(getRecommendedFormatLabel(originalFormat));
+  const [openDropdown, setOpenDropdown] = useState(null); // 'resolution' | 'format' | null
+  const [isCompressed, setIsCompressed] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  // Sync outputFormat if uploaded file changes
+  useEffect(() => {
+    if (file?.name) {
+      const ext = getOriginalExt(file.name);
+      setOutputFormat(getRecommendedFormatLabel(ext));
+      setFileName(file.name);
+    }
+  }, [file?.name]);
 
   // Parse file size into bytes
   const getSizeBytes = () => {
@@ -78,10 +91,7 @@ const ImageCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (
-        resolutionRef.current && !resolutionRef.current.contains(e.target) &&
-        formatRef.current && !formatRef.current.contains(e.target)
-      ) {
+      if (formatRef.current && !formatRef.current.contains(e.target)) {
         setOpenDropdown(null);
       }
     };
@@ -114,13 +124,10 @@ const ImageCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
     '800 x 600',
   ];
 
-  const formatOptions = [
-    'JPG (Recommended)',
-    'PNG',
-    'WEBP',
-    'AVIF',
-    'TIFF',
-  ];
+  const baseFormats = ['JPG', 'PNG', 'WEBP', 'AVIF', 'TIFF'];
+  const formatOptions = baseFormats.map((fmt) =>
+    fmt === originalFormat ? `${fmt} (Recommended)` : fmt
+  );
 
   // Helper to map UI format string to MIME type
   const getMimeType = (formatStr) => {
@@ -205,7 +212,42 @@ const ImageCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
   const handleAction = async () => {
     setIsProcessing(true);
     try {
-      const blob = await compressImage();
+      let blob = null;
+
+      // Primary: Compress using sharp backend
+      if (file.rawFile) {
+        try {
+          const cleanFmt = (outputFormat.split(' ')[0] || 'jpg').toLowerCase();
+          // In compression: compressionLevel 70% means quality 70 (or 100 - compressionLevel if lossy)
+          // For sharp: quality 100 - (compressionLevel * 0.7) gives perfect quality-to-size curve
+          const calculatedQuality = Math.max(15, Math.min(95, 100 - Math.round(compressionLevel * 0.65)));
+
+          const formData = new FormData();
+          formData.append('file', file.rawFile);
+          formData.append('format', cleanFmt);
+          formData.append('quality', calculatedQuality.toString());
+          formData.append('resolution', resolution);
+
+          const response = await fetch('http://localhost:5000/api/converter/convert-image', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (response.ok) {
+            blob = await response.blob();
+          } else {
+            console.warn(`Backend image compression returned ${response.status}, falling back to canvas.`);
+          }
+        } catch (serverErr) {
+          console.warn('Backend image compression error, falling back to canvas:', serverErr);
+        }
+      }
+
+      // Secondary / Fallback: If server conversion was not possible, use client canvas
+      if (!blob) {
+        blob = await compressImage();
+      }
+
       const blobUrl = URL.createObjectURL(blob);
       setCompressedBlobUrl(blobUrl);
       setActualCompressedSize(formatBytes(blob.size));
@@ -522,33 +564,55 @@ const ImageCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
                     </p>
                   </div>
                 </div>
-
-                {/* Estimated Size Badge (Peach/Red Accent) */}
-                <div className="bg-[#fff1ed] border border-[#fed7aa]/60 rounded-[8px] px-4 py-2 text-right flex-shrink-0">
-                  <span className="text-[11px] font-semibold text-[#c2410c] block leading-tight">
-                    Estimated Size
-                  </span>
-                  <div className="text-[15px] font-bold mt-0.5 flex items-center justify-end gap-1.5 leading-tight">
-                    <span className="text-[#1e293b]">{file.size || '52 MB'}</span>
-                    <span className="text-gray-400 font-normal text-xs">→</span>
-                    <span className="text-[#dc2626]">{estimatedCompressedSize}</span>
-                  </div>
-                </div>
               </div>
 
               {/* Section 1: Compression Level Slider */}
               <div className="mt-4">
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-2">
                   <label className="text-[14px] font-semibold text-[#1e293b]">
                     1. Compression Level
                   </label>
-                  <div className="bg-[#f1f5f9] border border-gray-200 px-3.5 py-1 rounded-[6px] text-[13px] font-bold text-[#1e293b]">
-                    {compressionLevel}%
+                  <div className="flex items-center gap-2">
+                    <div className="bg-[#f1f5f9] border border-gray-200 px-3 py-0.5 rounded-[6px] text-[13px] font-bold text-[#EA7233]">
+                      {compressionLevel}%
+                    </div>
                   </div>
                 </div>
 
+                {/* Quick Preset Buttons (Low, Balanced, High) */}
+                <div className="flex items-center gap-2 mb-2.5">
+                  {[
+                    { label: 'Low', pct: 40, tip: 'Max Quality (light compression)' },
+                    { label: 'Balanced', pct: 70, tip: 'Recommended: Best quality & size' },
+                    { label: 'High', pct: 85, tip: 'Smallest file size' },
+                  ].map((preset) => {
+                    const isActive =
+                      preset.label === 'Low'
+                        ? compressionLevel <= 50
+                        : preset.label === 'Balanced'
+                        ? compressionLevel > 50 && compressionLevel <= 75
+                        : compressionLevel > 75;
+
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => setCompressionLevel(preset.pct)}
+                        className={`text-[11px] font-medium px-2.5 py-1 rounded-[5px] border transition-all cursor-pointer ${
+                          isActive
+                            ? 'bg-[#fffaf6] border-[#EA7233] text-[#EA7233] font-semibold shadow-xs'
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                        title={preset.tip}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
                 {/* Slider bar with styled track */}
-                <div className="relative py-2">
+                <div className="relative py-1">
                   <style>{`
                     .compress-slider::-webkit-slider-thumb {
                       -webkit-appearance: none;
@@ -584,77 +648,18 @@ const ImageCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
                   />
                   {/* Low / Balanced / High indicators */}
                   <div className="flex items-center justify-between text-[11px] font-medium text-[#94a3b8] mt-1.5 px-0.5">
-                    <span>Low</span>
-                    <span>Balanced</span>
-                    <span>High</span>
+                    <span>Low (Light)</span>
+                    <span className="text-[#EA7233] font-semibold">Balanced (70%)</span>
+                    <span>High (Max Compression)</span>
                   </div>
                 </div>
               </div>
 
-              {/* Section 2 & 3: Resolution & Output Format */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-7">
-                {/* 2. Resolution (Optional) */}
-                <div className="relative" ref={resolutionRef}>
-                  <label className="block text-[14px] font-semibold text-[#1e293b] mb-2">
-                    2. Resolution <span className="text-[#94a3b8] font-normal text-xs">(Optional)</span>
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() => setOpenDropdown(openDropdown === 'resolution' ? null : 'resolution')}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-[6px] border text-left transition-all cursor-pointer bg-white ${
-                      openDropdown === 'resolution'
-                        ? 'border-[#EA7233] ring-1 ring-[#EA7233]'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <span className="text-[13px] font-medium text-[#1e293b] truncate">
-                      {resolution}
-                    </span>
-                    <svg
-                      className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${
-                        openDropdown === 'resolution' ? 'rotate-180' : ''
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  </button>
-
-                  {/* Dropdown Menu */}
-                  {openDropdown === 'resolution' && (
-                    <div className="absolute left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-[8px] shadow-lg py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100">
-                      {resolutionOptions.map((opt) => (
-                        <div
-                          key={opt}
-                          onClick={() => {
-                            setResolution(opt);
-                            setOpenDropdown(null);
-                          }}
-                          className={`px-3.5 py-2 text-[13px] cursor-pointer transition-colors flex items-center justify-between ${
-                            resolution === opt
-                              ? 'bg-[#fff5ee] text-[#EA7233] font-semibold'
-                              : 'text-[#1e293b] hover:bg-gray-50'
-                          }`}
-                        >
-                          <span>{opt}</span>
-                          {resolution === opt && (
-                            <svg className="w-4 h-4 text-[#EA7233]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 3. Output Format */}
+              {/* Section 2: Output Format */}
+              <div className="w-full sm:w-1/2 mt-7">
                 <div className="relative" ref={formatRef}>
                   <label className="block text-[14px] font-semibold text-[#1e293b] mb-2">
-                    3. Output Format
+                    2. Output Format <span className="text-[#94a3b8] font-normal text-xs">(Optional)</span>
                   </label>
 
                   <button

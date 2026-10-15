@@ -522,7 +522,7 @@ const VideoCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
           ) : (
             /* COMPRESS VIDEO SETTINGS VIEW (Matching Screenshot Exactly) */
             <div ref={dropdownRef}>
-              {/* Header: Compress Video + Estimated Size Badge */}
+              {/* Header: Compress Video */}
               <div className="flex items-start justify-between gap-4 pb-2">
                 <div className="flex items-center gap-3.5">
                   <div className="w-11 h-11 rounded-[8px] border border-gray-200 bg-white flex items-center justify-center text-[#1e293b] flex-shrink-0">
@@ -538,18 +538,6 @@ const VideoCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
                     <p className="text-[13px] text-[#64748b] mt-0.5">
                       Reduce the file size while maintaining good quality.
                     </p>
-                  </div>
-                </div>
-
-                {/* Estimated Size Badge (Peach/Red Accent matching screenshot) */}
-                <div className="bg-[#fff1ed] border border-[#fed7aa]/60 rounded-[8px] px-4 py-2 text-right flex-shrink-0">
-                  <span className="text-[11px] font-semibold text-[#c2410c] block leading-tight">
-                    Estimated Size
-                  </span>
-                  <div className="text-[15px] font-bold mt-0.5 flex items-center justify-end gap-1.5 leading-tight">
-                    <span className="text-[#1e293b]">{file.size || '52 MB'}</span>
-                    <span className="text-gray-400 font-normal text-xs">→</span>
-                    <span className="text-[#dc2626]">{estimatedCompressedSize}</span>
                   </div>
                 </div>
               </div>
@@ -609,9 +597,8 @@ const VideoCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
                 </div>
               </div>
 
-              {/* 2. Resolution & 3. Frame Rate (Two Columns matching screenshot) */}
-              <div className="grid grid-cols-2 gap-4 mt-4">
-                {/* 2. Resolution (Optional) */}
+              {/* 2. Resolution */}
+              <div className="mt-5">
                 <div className="relative">
                   <h2 className="text-[14px] font-bold text-[#1e293b] mb-1.5">
                     2. Resolution <span className="text-gray-400 font-normal text-[12px]">(Optional)</span>
@@ -644,58 +631,6 @@ const VideoCompressor = ({ onBack, onCompress, onReset, fileData, initialConfig 
                             key={opt}
                             onClick={() => {
                               setResolution(opt);
-                              setOpenDropdown(null);
-                            }}
-                            className={`px-3.5 py-2.5 text-[13px] cursor-pointer transition-colors text-left flex items-center justify-between ${
-                              isSelected ? 'font-semibold text-[#EA7233] bg-[#fffaf6]' : 'text-[#1e293b] hover:bg-gray-50'
-                            }`}
-                          >
-                            <span>{opt}</span>
-                            {isSelected && (
-                              <svg className="w-3.5 h-3.5 text-[#EA7233]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* 3. Frame Rate (Optional) */}
-                <div className="relative">
-                  <h2 className="text-[14px] font-bold text-[#1e293b] mb-1.5">
-                    3. Frame Rate <span className="text-gray-400 font-normal text-[12px]">(Optional)</span>
-                  </h2>
-                  <div
-                    onClick={() => setOpenDropdown(openDropdown === 'frameRate' ? null : 'frameRate')}
-                    className={`w-full flex items-center justify-between bg-white border ${
-                      openDropdown === 'frameRate' ? 'border-[#EA7233] ring-1 ring-[#EA7233]/20' : 'border-gray-200 hover:border-gray-300'
-                    } rounded-[6px] px-3.5 py-2.5 text-[13px] font-medium text-[#1e293b] cursor-pointer shadow-sm transition-all select-none`}
-                  >
-                    <span className="truncate">{frameRate}</span>
-                    <svg
-                      className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ${
-                        openDropdown === 'frameRate' ? 'rotate-180 text-[#EA7233]' : ''
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-
-                  {openDropdown === 'frameRate' && (
-                    <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-gray-100 rounded-[8px] shadow-[0_8px_24px_rgba(0,0,0,0.12)] py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-                      {frameRateOptions.map((opt) => {
-                        const isSelected = frameRate === opt;
-                        return (
-                          <div
-                            key={opt}
-                            onClick={() => {
-                              setFrameRate(opt);
                               setOpenDropdown(null);
                             }}
                             className={`px-3.5 py-2.5 text-[13px] cursor-pointer transition-colors text-left flex items-center justify-between ${

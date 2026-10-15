@@ -1,5 +1,17 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Icon } from '@iconify/react';
+import initOCCT from 'occt-import-js';
+
+// Pre-initialize OCCT WebAssembly instance while user is on upload screen
+let preloadedOcct = null;
+const warmUpOcct = () => {
+  if (!preloadedOcct) {
+    preloadedOcct = initOCCT({
+      locateFile: () => '/occt-import-js.wasm'
+    });
+  }
+  return preloadedOcct;
+};
 
 const UploadPage = ({ onBack, onContinue, initialConfig }) => {
   // Only display file preview when user uploads a file
@@ -7,6 +19,13 @@ const UploadPage = ({ onBack, onContinue, initialConfig }) => {
 
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Warm up 3D engine in background if in 3d-model mode
+  useEffect(() => {
+    if (initialConfig?.type === '3d-model') {
+      warmUpOcct();
+    }
+  }, [initialConfig?.type]);
 
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 Bytes';
@@ -18,6 +37,11 @@ const UploadPage = ({ onBack, onContinue, initialConfig }) => {
 
   const handleFileChange = (file) => {
     if (!file) return;
+
+    // Immediately trigger warm-up if CAD file
+    if (file.name && file.name.match(/\.(step|stp|iges|igs)$/i)) {
+      warmUpOcct();
+    }
 
     const previewUrl = URL.createObjectURL(file);
     const newFileState = {
@@ -111,7 +135,7 @@ const UploadPage = ({ onBack, onContinue, initialConfig }) => {
   // Accepted file types depending on converter mode
   const getAcceptTypes = () => {
     if (initialConfig?.type === 'video') return 'video/*';
-    if (initialConfig?.type === '3d-model') return '.obj,.gltf,.glb,.fbx,.stl';
+    if (initialConfig?.type === '3d-model') return '.step,.stp,.iges,.igs,.stl,.obj,.glb,.gltf';
     if (initialConfig?.type === 'image') return 'image/*';
     return '*/*';
   };
@@ -185,6 +209,37 @@ const UploadPage = ({ onBack, onContinue, initialConfig }) => {
             </svg>
             <span>Choose File</span>
           </button>
+
+          {/* Supported Formats Indicator */}
+          {initialConfig?.type === '3d-model' || initialConfig?.id === '3d-model' ? (
+            <div className="mt-4 flex flex-col items-center gap-1.5 text-center">
+              <span className="text-[12px] font-medium text-[#64748b]">
+                Supported Formats:
+              </span>
+              <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-[500px]">
+                {['STEP', 'STP', 'STL', 'OBJ', 'GLB', 'GLTF', 'IGES', 'IGS'].map((fmt) => (
+                  <span
+                    key={fmt}
+                    className="px-2 py-0.5 rounded-[4px] text-[11px] font-semibold bg-[#e2e8f0]/60 text-[#334155] border border-[#cbd5e1]/50"
+                  >
+                    .{fmt.toLowerCase()}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : initialConfig?.type === 'video' || initialConfig?.id === 'video' ? (
+            <div className="mt-4 flex flex-col items-center gap-1 text-center">
+              <span className="text-[12px] text-[#64748b]">
+                Supported Formats: <strong className="text-[#334155]">MP4, MOV, AVI, MKV, WEBM, WMV</strong>
+              </span>
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-col items-center gap-1 text-center">
+              <span className="text-[12px] text-[#64748b]">
+                Supported Formats: <strong className="text-[#334155]">JPG, PNG, WEBP, SVG, GIF, BMP</strong>
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Selected File Card - wide matching dropzone width with #F6F9FD */}
@@ -201,6 +256,14 @@ const UploadPage = ({ onBack, onContinue, initialConfig }) => {
                     playsInline
                     preload="metadata"
                   />
+                ) : selectedFile.name?.match(/\.(glb|gltf|obj|stl|ply)$/i) || initialConfig?.type === '3d-model' ? (
+                  <div className="w-full h-full bg-[#fff5ee] flex items-center justify-center text-[#EA7233]">
+                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                      <path d="m3.3 7 8.7 5 8.7-5" />
+                      <path d="M12 22V12" />
+                    </svg>
+                  </div>
                 ) : selectedFile.previewUrl ? (
                   <img
                     src={selectedFile.previewUrl}

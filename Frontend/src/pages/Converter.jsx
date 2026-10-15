@@ -7,6 +7,8 @@ import ImageConverter from './Converter/imageConverter';
 import ImageCompressor from './Converter/imageCompressor';
 import VideoConverter from './Converter/videoConverter';
 import VideoCompressor from './Converter/videoCompressor';
+import ThreeDConverter from './Converter/threeDConverter';
+import ThreeDCompressor from './Converter/threeDCompressor';
 
 const Converter = () => {
   const [step, setStep] = useState('select'); // 'select' | 'upload' | 'convert'
@@ -105,6 +107,36 @@ const Converter = () => {
     if (selectedConfig.type === 'video') {
       return (
         <VideoConverter
+          fileData={uploadedFile}
+          initialConfig={selectedConfig}
+          onBack={() => setStep('upload')}
+          onReset={() => {
+            setStep('select');
+            setSelectedConfig(null);
+            setUploadedFile(null);
+          }}
+        />
+      );
+    }
+
+    if (selectedConfig.action === 'compress' && selectedConfig.type === '3d-model') {
+      return (
+        <ThreeDCompressor
+          fileData={uploadedFile}
+          initialConfig={selectedConfig}
+          onBack={() => setStep('upload')}
+          onReset={() => {
+            setStep('select');
+            setSelectedConfig(null);
+            setUploadedFile(null);
+          }}
+        />
+      );
+    }
+
+    if (selectedConfig.type === '3d-model') {
+      return (
+        <ThreeDConverter
           fileData={uploadedFile}
           initialConfig={selectedConfig}
           onBack={() => setStep('upload')}
