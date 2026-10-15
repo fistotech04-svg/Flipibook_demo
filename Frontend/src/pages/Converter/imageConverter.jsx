@@ -6,8 +6,8 @@ const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1608248597359-1e16c8052
 const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig }) => {
   const [selectedFormat, setSelectedFormat] = useState(null);
   const [formatError, setFormatError] = useState(false);
-  const [quality, setQuality] = useState('Original (Keep Quality)');
-  const [resolution, setResolution] = useState('Original');
+  const [quality, setQuality] = useState('High (85% - Recommended)');
+  const [resolution, setResolution] = useState('Original (100% Size)');
   const [openDropdown, setOpenDropdown] = useState(null); // 'quality' | 'resolution' | null
   const [isConverted, setIsConverted] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -82,11 +82,13 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
           let targetHeight = img.naturalHeight;
 
           // Handle resolution setting
-          if (resolution === 'Low') {
-            const ratio = Math.min(800 / targetWidth, 600 / targetHeight, 1);
-            targetWidth = Math.max(1, Math.round(targetWidth * ratio));
-            targetHeight = Math.max(1, Math.round(targetHeight * ratio));
-          } else if (resolution.includes('Optimized')) {
+          if (resolution.includes('50%')) {
+            targetWidth = Math.max(1, Math.round(targetWidth * 0.5));
+            targetHeight = Math.max(1, Math.round(targetHeight * 0.5));
+          } else if (resolution.includes('75%')) {
+            targetWidth = Math.max(1, Math.round(targetWidth * 0.75));
+            targetHeight = Math.max(1, Math.round(targetHeight * 0.75));
+          } else if (resolution.includes('Web Fit') || resolution.includes('Optimized')) {
             if (targetWidth > 1920 || targetHeight > 1080) {
               const ratio = Math.min(1920 / targetWidth, 1080 / targetHeight);
               targetWidth = Math.max(1, Math.round(targetWidth * ratio));
@@ -101,20 +103,20 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
 
           const mimeType = getMimeType(selectedFormat);
 
-          // Fill white background for JPEG / TIFF so transparency is preserved cleanly
-          if (mimeType === 'image/jpeg') {
+          // Fill white background for JPEG / TIFF so transparency is preserved cleanly without black borders
+          if (mimeType === 'image/jpeg' || (selectedFormat || '').toUpperCase() === 'TIFF') {
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, targetWidth, targetHeight);
           }
 
           ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
-          // Quality calculation
-          let q = 0.92;
-          if (quality === 'High') q = 0.85;
-          if (quality === 'Medium') q = 0.65;
-          if (quality === 'Low') q = 0.45;
-          if (quality === 'Original (Keep Quality)') q = 0.95;
+          // Quality calculation - Capped appropriately to prevent browser canvas from blowing up file weight
+          let q = 0.82;
+          if (quality.includes('High') || quality.includes('85%')) q = 0.82;
+          else if (quality.includes('Medium') || quality.includes('70%')) q = 0.68;
+          else if (quality.includes('Low') || quality.includes('50%')) q = 0.45;
+          else if (quality.includes('Original') || quality.includes('100%')) q = 0.90;
 
           canvas.toBlob(
             (blob) => {
@@ -140,14 +142,10 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
   const convertedSize = actualConvertedSize || '...';
 
   const qualityRef = useRef(null);
-  const resolutionRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (
-        qualityRef.current && !qualityRef.current.contains(e.target) &&
-        resolutionRef.current && !resolutionRef.current.contains(e.target)
-      ) {
+      if (qualityRef.current && !qualityRef.current.contains(e.target)) {
         setOpenDropdown(null);
       }
     };
@@ -172,19 +170,26 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
     };
   }, [isPreviewOpen]);
 
-  const formats = ['JPG', 'PNG', 'WEBP', 'AVIF', 'TIFF'];
+  const allFormats = ['JPG', 'PNG', 'WEBP', 'AVIF', 'TIFF'];
+  const normOriginal = (originalFormat === 'JPEG' ? 'JPG' : originalFormat);
+  // Put current format at the 1st place, followed by the rest
+  const formats = [
+    ...(allFormats.includes(normOriginal) ? [normOriginal] : []),
+    ...allFormats.filter((f) => f !== normOriginal),
+  ];
 
   const qualityOptions = [
-    'Original (Keep Quality)',
-    'High',
-    'Medium',
-    'Low',
+    'Original (Lossless / 100%)',
+    'High (85% - Recommended)',
+    'Medium (70% - Balanced)',
+    'Low (50% - Smallest Size)',
   ];
 
   const resolutionOptions = [
-    'Original',
-    'Optimized (Recommended)',
-    'Low',
+    'Original (100% Size)',
+    '75% Scale',
+    '50% Scale',
+    'Web Fit (Max 1920px)',
   ];
 
   const handleAction = async () => {
@@ -192,11 +197,47 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
       setFormatError(true);
       return;
     }
+    const normOrig = (originalFormat === 'JPEG' ? 'JPG' : originalFormat);
+    const normSel = (selectedFormat === 'JPEG' ? 'JPG' : selectedFormat);
+    if (normOrig === normSel) {
+      setFormatError(true);
+      return;
+    }
     setFormatError(false);
     setIsProcessing(true);
 
     try {
-      const blob = await convertImageOnClient();
+      let blob = null;
+
+      // Primary: Convert using sharp backend (optimal compression, palette quantization, lossless handling)
+      if (file.rawFile) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file.rawFile);
+          formData.append('format', selectedFormat);
+          formData.append('quality', quality);
+          formData.append('resolution', resolution);
+
+          const response = await fetch('http://localhost:5000/api/converter/convert-image', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (response.ok) {
+            blob = await response.blob();
+          } else {
+            console.warn(`Backend image conversion returned status ${response.status}, falling back to client-side.`);
+          }
+        } catch (serverErr) {
+          console.warn('Backend image conversion error, falling back to client-side:', serverErr);
+        }
+      }
+
+      // Secondary / Fallback: If server conversion was not possible, use client canvas
+      if (!blob) {
+        blob = await convertImageOnClient();
+      }
+
       const blobUrl = URL.createObjectURL(blob);
       setConvertedBlobUrl(blobUrl);
       setActualConvertedSize(formatBytes(blob.size));
@@ -225,13 +266,14 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
       else if (fmt === 'JPG') formatFactor = 0.80;
 
       let qFactor = 0.95;
-      if (quality === 'High') qFactor = 0.80;
-      else if (quality === 'Medium') qFactor = 0.60;
-      else if (quality === 'Low') qFactor = 0.40;
+      if (quality.includes('High') || quality.includes('85%')) qFactor = 0.80;
+      else if (quality.includes('Medium') || quality.includes('70%')) qFactor = 0.60;
+      else if (quality.includes('Low') || quality.includes('50%')) qFactor = 0.40;
 
       let resFactor = 1.0;
-      if (resolution === 'Low') resFactor = 0.35;
-      else if (resolution.includes('Optimized')) resFactor = 0.75;
+      if (resolution.includes('50%')) resFactor = 0.35;
+      else if (resolution.includes('75%')) resFactor = 0.60;
+      else if (resolution.includes('Web Fit') || resolution.includes('Optimized')) resFactor = 0.75;
 
       const estimated = Math.max(1024, Math.round(baseBytes * formatFactor * qFactor * resFactor));
       setActualConvertedSize(formatBytes(estimated));
@@ -549,25 +591,35 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
                   </h2>
                   {formatError && (
                     <span className="text-[12px] font-medium text-red-500 animate-pulse">
-                      Please select an output format
+                      {selectedFormat
+                        ? `File is already ${originalFormat}. Choose another format.`
+                        : 'Please select an output format'}
                     </span>
                   )}
                 </div>
                 <div className={`grid grid-cols-5 gap-3 p-1 rounded-[10px] transition-all ${formatError ? 'ring-2 ring-red-400 bg-red-50/20' : ''}`}>
                   {formats.map((format) => {
+                    const normOrig = (originalFormat === 'JPEG' ? 'JPG' : originalFormat);
+                    const normFmt = (format === 'JPEG' ? 'JPG' : format);
+                    const isSameAsOriginal = normOrig === normFmt;
                     const isSelected = selectedFormat === format;
+
                     return (
                       <button
                         key={format}
                         type="button"
+                        disabled={isSameAsOriginal}
                         onClick={() => {
+                          if (isSameAsOriginal) return;
                           setSelectedFormat(format);
                           setFormatError(false);
                         }}
-                        className={`relative h-[86px] rounded-[8px] flex flex-col items-center justify-center p-2 transition-all cursor-pointer ${
-                          isSelected
-                            ? 'border border-[#EA7233] bg-[#fffaf6] shadow-sm'
-                            : 'border border-[#E5E9EF] bg-[#fafbfc] hover:bg-white'
+                        className={`relative h-[86px] rounded-[8px] flex flex-col items-center justify-center p-2 transition-all ${
+                          isSameAsOriginal
+                            ? 'border border-gray-200 bg-gray-50/60 opacity-40 cursor-not-allowed select-none'
+                            : isSelected
+                            ? 'border border-[#EA7233] bg-[#fffaf6] shadow-sm cursor-pointer'
+                            : 'border border-[#E5E9EF] bg-[#fafbfc] hover:bg-white cursor-pointer'
                         }`}
                       >
                         {/* Top-left Radio Dot Indicator */}
@@ -588,7 +640,11 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
                         {/* File Icon */}
                         <svg
                           className={`w-6 h-6 mb-1 ${
-                            isSelected ? 'text-[#EA7233]' : 'text-[#1e293b]'
+                            isSameAsOriginal
+                              ? 'text-gray-400'
+                              : isSelected
+                              ? 'text-[#EA7233]'
+                              : 'text-[#1e293b]'
                           }`}
                           viewBox="0 0 24 24"
                           fill="none"
@@ -604,7 +660,11 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
                         {/* Format Name */}
                         <span
                           className={`text-[12px] font-bold ${
-                            isSelected ? 'text-[#EA7233]' : 'text-[#1e293b]'
+                            isSameAsOriginal
+                              ? 'text-gray-400'
+                              : isSelected
+                              ? 'text-[#EA7233]'
+                              : 'text-[#1e293b]'
                           }`}
                         >
                           {format}
@@ -620,21 +680,25 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
                 <h2 className="text-[15px] font-bold text-[#1e293b] mb-3">
                   2. Settings <span className="text-gray-400 font-normal">(Optional)</span>
                 </h2>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="w-full sm:w-1/2">
                   {/* Quality Dropdown */}
                   <div className="relative" ref={qualityRef}>
-                    <label className="text-[12px] font-medium text-[#64748b] block mb-1.5">
-                      Quality
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-[12px] font-medium text-[#64748b]">
+                        Quality
+                      </label>
+                    </div>
                     <div
                       onClick={() => setOpenDropdown(openDropdown === 'quality' ? null : 'quality')}
-                      className={`w-full flex items-center justify-between bg-white border ${
-                        openDropdown === 'quality' ? 'border-[#EA7233] ring-1 ring-[#EA7233]/20' : 'border-gray-200 hover:border-gray-300'
-                      } rounded-[6px] px-3.5 py-2.5 text-[13px] font-medium text-[#1e293b] cursor-pointer shadow-sm transition-all select-none`}
+                      className={`w-full flex items-center justify-between border rounded-[6px] px-3.5 py-2.5 text-[13px] font-medium shadow-sm transition-all select-none cursor-pointer ${
+                        openDropdown === 'quality'
+                          ? 'bg-white border-[#EA7233] ring-1 ring-[#EA7233]/20 text-[#1e293b]'
+                          : 'bg-white border-gray-200 hover:border-gray-300 text-[#1e293b]'
+                      }`}
                     >
                       <span className="truncate">{quality}</span>
                       <svg
-                        className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ${
+                        className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 text-gray-400 ${
                           openDropdown === 'quality' ? 'rotate-180 text-[#EA7233]' : ''
                         }`}
                         fill="none"
@@ -655,61 +719,6 @@ const ImageConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
                               key={opt}
                               onClick={() => {
                                 setQuality(opt);
-                                setOpenDropdown(null);
-                              }}
-                              className={`px-3.5 py-2.5 text-[13px] cursor-pointer transition-colors text-left flex items-center justify-between ${
-                                isSelected
-                                  ? 'font-semibold text-[#EA7233] bg-[#fffaf6]'
-                                  : 'text-[#1e293b] hover:bg-gray-50'
-                              }`}
-                            >
-                              <span>{opt}</span>
-                              {isSelected && (
-                                <svg className="w-3.5 h-3.5 text-[#EA7233]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-                                </svg>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Resolution Dropdown */}
-                  <div className="relative" ref={resolutionRef}>
-                    <label className="text-[12px] font-medium text-[#64748b] block mb-1.5">
-                      Resolution
-                    </label>
-                    <div
-                      onClick={() => setOpenDropdown(openDropdown === 'resolution' ? null : 'resolution')}
-                      className={`w-full flex items-center justify-between bg-white border ${
-                        openDropdown === 'resolution' ? 'border-[#EA7233] ring-1 ring-[#EA7233]/20' : 'border-gray-200 hover:border-gray-300'
-                      } rounded-[6px] px-3.5 py-2.5 text-[13px] font-medium text-[#1e293b] cursor-pointer shadow-sm transition-all select-none`}
-                    >
-                      <span className="truncate">{resolution}</span>
-                      <svg
-                        className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ${
-                          openDropdown === 'resolution' ? 'rotate-180 text-[#EA7233]' : ''
-                        }`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-
-                    {/* Resolution Dropdown Menu */}
-                    {openDropdown === 'resolution' && (
-                      <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-gray-100 rounded-[8px] shadow-[0_8px_24px_rgba(0,0,0,0.12)] py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-                        {resolutionOptions.map((opt) => {
-                          const isSelected = resolution === opt;
-                          return (
-                            <div
-                              key={opt}
-                              onClick={() => {
-                                setResolution(opt);
                                 setOpenDropdown(null);
                               }}
                               className={`px-3.5 py-2.5 text-[13px] cursor-pointer transition-colors text-left flex items-center justify-between ${

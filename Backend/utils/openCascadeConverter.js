@@ -224,8 +224,12 @@ export const readCadShape = (occ, fileBuffer, ext) => {
   const tempVFilename = `cad_input_${Date.now()}_${Math.random().toString(36).substring(7)}.${normalizedExt}`;
   const vPath = `/${tempVFilename}`;
 
+  const uint8Data = Buffer.isBuffer(fileBuffer)
+    ? new Uint8Array(fileBuffer.buffer, fileBuffer.byteOffset, fileBuffer.byteLength)
+    : (fileBuffer instanceof Uint8Array ? fileBuffer : new Uint8Array(fileBuffer));
+
   // Write file buffer into Emscripten virtual filesystem
-  occ.FS.createDataFile("/", tempVFilename, fileBuffer, true, true, true);
+  occ.FS.createDataFile("/", tempVFilename, uint8Data, true, true, true);
 
   let shape = null;
 
@@ -233,9 +237,31 @@ export const readCadShape = (occ, fileBuffer, ext) => {
     if (normalizedExt === "step" || normalizedExt === "stp") {
       const ReaderClass = occ.STEPControl_Reader_1 || occ.STEPControl_Reader;
       const reader = new ReaderClass();
-      const status = (reader.ReadFile_1 || reader.ReadFile).call(reader, vPath);
-      reader.TransferRoots();
-      shape = reader.OneShape();
+      const readFn = reader.ReadFile_1 || reader.ReadFile;
+      const status = readFn.call(reader, vPath);
+      console.log(`[OpenCASCADE STEP ReadFile status]: ${status}`);
+      
+      const transferFn = reader.TransferRoots_1 || reader.TransferRoots || reader.TransferRoot;
+      if (typeof transferFn === "function") {
+        transferFn.call(reader);
+      }
+      
+      const shapeFn = reader.OneShape_1 || reader.OneShape || reader.Shape;
+      if (typeof shapeFn === "function") {
+        shape = shapeFn.call(reader);
+      }
+      
+      if (!shape || (typeof shape.IsNull === "function" && shape.IsNull())) {
+        // Fallback: try reader.Shape() or reading roots
+        const nbRoots = typeof reader.NbRootsForTransfer === "function" ? reader.NbRootsForTransfer() : 0;
+        console.log(`[OpenCASCADE STEP NbRootsForTransfer]: ${nbRoots}`);
+        for (let i = 1; i <= nbRoots; i++) {
+          reader.TransferRoot(i);
+        }
+        if (typeof reader.Shape === "function") {
+          shape = reader.Shape();
+        }
+      }
     } else if (normalizedExt === "iges" || normalizedExt === "igs") {
       const ReaderClass = occ.IGESControl_Reader_1 || occ.IGESControl_Reader;
       if (typeof ReaderClass === "function") {
@@ -696,6 +722,119 @@ export const convertCadFileToGlb = async (inputPath, outputPath, options = {}) =
   };
 };
 
+/**
+ * Builds an OBJ format text buffer from extracted mesh data
+ * @param {Object} meshData 
+ * @param {Object} [options] 
+ * @returns {Buffer} OBJ buffer
+ */
+export const buildObjBuffer = (meshData, options = {}) => {
+  const { positions, normals, indices } = meshData;
+  const modelName = options.name || "CAD_Model";
+
+  const lines = [
+    `# Wavefront OBJ converted with OpenCASCADE`,
+    `o ${modelName}`
+  ];
+
+  // 1. Geometric vertices (v x y z)
+  for (let i = 0; i < positions.length; i += 3) {
+    lines.push(`v ${positions[i].toFixed(6)} ${positions[i + 1].toFixed(6)} ${positions[i + 2].toFixed(6)}`);
+  }
+
+  // 2. Vertex normals (vn nx ny nz)
+  const hasNormals = normals && normals.length === positions.length;
+  if (hasNormals) {
+    for (let i = 0; i < normals.length; i += 3) {
+      lines.push(`vn ${normals[i].toFixed(6)} ${normals[i + 1].toFixed(6)} ${normals[i + 2].toFixed(6)}`);
+    }
+  }
+
+  // 3. Faces (f v1//vn1 v2//vn2 v3//vn3 - OBJ is 1-indexed)
+  for (let i = 0; i < indices.length; i += 3) {
+    const v1 = indices[i] + 1;
+    const v2 = indices[i + 1] + 1;
+    const v3 = indices[i + 2] + 1;
+
+    if (hasNormals) {
+      lines.push(`f ${v1}//${v1} ${v2}//${v2} ${v3}//${v3}`);
+    } else {
+      lines.push(`f ${v1} ${v2} ${v3}`);
+    }
+  }
+
+  lines.push(""); // Final newline
+  return Buffer.from(lines.join("\n"), "utf8");
+};
+
+/**
+ * Converts a CAD file buffer directly to an OBJ Buffer
+ * @param {Buffer|Uint8Array} fileBuffer 
+ * @param {string} ext - Extension like '.stl', '.step', '.stp', '.iges', '.igs'
+ * @param {Object} [options]
+ * @returns {Promise<Buffer>} OBJ Buffer
+ */
+export const convertCadBufferToObj = async (fileBuffer, ext, options = {}) => {
+  const normalizedExt = (ext || "").toLowerCase().replace(/^\./, "");
+
+  if (normalizedExt === "stl") {
+    try {
+      const occ = await getOpenCascade();
+      const shape = readCadShape(occ, fileBuffer, ext);
+      if (shape && (typeof shape.IsNull !== "function" || !shape.IsNull())) {
+        const meshData = extractMeshFromShape(occ, shape, options);
+        return buildObjBuffer(meshData, options);
+      }
+    } catch (occErr) {
+      console.warn("[OpenCASCADE] Native shape meshing notice for STL -> OBJ:", occErr.message);
+    }
+    const meshData = parseStlBuffer(fileBuffer);
+    return buildObjBuffer(meshData, options);
+  }
+
+  const occ = await getOpenCascade();
+  const shape = readCadShape(occ, fileBuffer, ext);
+  const meshData = extractMeshFromShape(occ, shape, options);
+  return buildObjBuffer(meshData, options);
+};
+
+/**
+ * Converts a CAD file (STL, STEP, STP, IGES, IGS) on disk to an .obj file using OpenCASCADE
+ * @param {string} inputPath - Path to input CAD file
+ * @param {string} outputPath - Path to output .obj file
+ * @param {Object} [options]
+ * @returns {Promise<{ success: boolean, outputPath: string, sizeInMB: string }>}
+ */
+export const convertCadFileToObj = async (inputPath, outputPath, options = {}) => {
+  if (!fs.existsSync(inputPath)) {
+    throw new Error(`Input CAD file does not exist: ${inputPath}`);
+  }
+
+  const outputDir = path.dirname(outputPath);
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  const ext = path.extname(inputPath).toLowerCase();
+  const fileBuffer = fs.readFileSync(inputPath);
+  const baseName = path.basename(inputPath, ext);
+
+  console.log(`[OpenCASCADE] Converting ${inputPath} (${(fileBuffer.length / (1024 * 1024)).toFixed(2)} MB) to OBJ...`);
+  const objBuffer = await convertCadBufferToObj(fileBuffer, ext, {
+    name: baseName,
+    ...options
+  });
+
+  fs.writeFileSync(outputPath, objBuffer);
+  console.log(`[OpenCASCADE] Successfully converted ${ext.toUpperCase()} to OBJ: ${outputPath} (${(objBuffer.length / (1024 * 1024)).toFixed(2)} MB)`);
+
+  return {
+    success: true,
+    outputPath,
+    sizeInMB: (objBuffer.length / (1024 * 1024)).toFixed(2)
+  };
+};
+
 export default {
   CAD_EXTENSIONS,
   isCadFormat,
@@ -704,7 +843,11 @@ export default {
   readCadShape,
   extractMeshFromShape,
   buildGlbBuffer,
+  buildObjBuffer,
   convertCadBufferToGlb,
-  convertCadFileToGlb
+  convertCadFileToGlb,
+  convertCadBufferToObj,
+  convertCadFileToObj
 };
+
 

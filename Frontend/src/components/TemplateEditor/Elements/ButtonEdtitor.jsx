@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { Icon } from '@iconify/react';
 import ColorPicker, { parseGradient, generateGradientString } from '../ColorPicker';
 import Effect from '../Effect';
 
@@ -135,6 +136,8 @@ const ButtonEditor = ({
   const [strokeColor, setStrokeColor] = useState('#1e2538');
   const [strokeWidth, setStrokeWidth] = useState(1.8);
   const [strokeOpacity, setStrokeOpacity] = useState(100);
+  const [strokeAlignment, setStrokeAlignment] = useState('Center');
+  const [isStrokeAlignOpen, setIsStrokeAlignOpen] = useState(false);
 
   // Hover Properties
   const [hoverTextFillColor, setHoverTextFillColor] = useState('#1e2538');
@@ -207,12 +210,18 @@ const ButtonEditor = ({
     }
 
     // 2. Find rect or ribbon element for Shape Properties
-    const isRibbon = selectedElement.getAttribute('data-button-shape') === 'ribbon' || Boolean(selectedElement.querySelector('.btn-main-poly'));
+    const isRibbon = selectedElement.getAttribute('data-button-shape') === 'ribbon';
+    const isParallelogram = selectedElement.getAttribute('data-button-shape') === 'parallelogram';
+    const isDiamond = selectedElement.getAttribute('data-button-shape') === 'diamond';
+    const isArrow = selectedElement.getAttribute('data-button-shape') === 'arrow';
+    const isSkew = selectedElement.getAttribute('data-button-shape') === 'skew';
+    const isOutsideCircle = selectedElement.getAttribute('data-button-shape') === 'outside-circle';
+    const isInsetCircle = selectedElement.getAttribute('data-button-shape') === 'inset-circle';
     const mainPoly = selectedElement.querySelector('.btn-main-poly');
     const rectEl = selectedElement.querySelector('rect') || (selectedElement.tagName?.toLowerCase() === 'rect' ? selectedElement : null);
     const shapeEl = mainPoly || rectEl;
     if (shapeEl) {
-      const sfc = extractColorOrGradient(shapeEl, 'fill', mainPoly ? '#7e22ce' : '#ffffff');
+      const sfc = extractColorOrGradient(shapeEl, 'fill', isInsetCircle ? '#1877f2' : (isOutsideCircle ? '#e31a61' : (isSkew ? 'linear-gradient(90deg, #ff9800 0%, #ff2b00 100%)' : (isArrow ? 'linear-gradient(90deg, #00f2fe 0%, #4facfe 100%)' : (isDiamond ? '#b7007e' : (isParallelogram ? '#00e676' : (mainPoly ? '#7e22ce' : '#ffffff')))))));
       setShapeFillColor(sfc);
 
       if (isRibbon) {
@@ -220,14 +229,18 @@ const ButtonEditor = ({
         setStrokeWidth(0);
         setStrokeOpacity(0);
       } else {
-        const sc = extractColorOrGradient(rectEl || shapeEl, 'stroke', '#1e2538');
-        setStrokeColor(sc);
+        const strokeTarget = (isParallelogram || isDiamond || isArrow || isSkew || isOutsideCircle || isInsetCircle) ? (mainPoly || shapeEl) : (rectEl || shapeEl);
+        const sc = extractColorOrGradient(strokeTarget, 'stroke', 'none');
+        setStrokeColor(sc || 'none');
 
-        const sw = (rectEl || shapeEl).getAttribute('stroke-width') || (rectEl || shapeEl).style.strokeWidth || '1.8';
-        setStrokeWidth(parseFloat(sw) || 1.8);
+        const sw = strokeTarget?.getAttribute('stroke-width') || strokeTarget?.style.strokeWidth || '0';
+        setStrokeWidth(parseFloat(sw) || 0);
 
-        const so = (rectEl || shapeEl).getAttribute('stroke-opacity') || (rectEl || shapeEl).style.strokeOpacity || '1';
+        const so = strokeTarget?.getAttribute('stroke-opacity') || strokeTarget?.style.strokeOpacity || '1';
         setStrokeOpacity(Math.round(parseFloat(so) * 100));
+
+        const sa = selectedElement.getAttribute('data-stroke-alignment') || 'Center';
+        setStrokeAlignment(sa);
       }
     }
 
@@ -235,7 +248,7 @@ const ButtonEditor = ({
     const hoverText = selectedElement.getAttribute('data-hover-text-fill') || (textEl ? extractColorOrGradient(textEl, 'fill', '#1e2538') : '#1e2538');
     setHoverTextFillColor(hoverText);
 
-    const fallbackShapeFill = (mainPoly ? extractColorOrGradient(mainPoly, 'fill', '#7e22ce') : (rectEl ? extractColorOrGradient(rectEl, 'fill', '#ffffff') : sfc));
+    const fallbackShapeFill = (mainPoly ? extractColorOrGradient(mainPoly, 'fill', '#7e22ce') : (rectEl ? extractColorOrGradient(rectEl, 'fill', '#ffffff') : '#ffffff'));
     const rawHoverShape = selectedElement.getAttribute('data-hover-shape-fill');
     const hoverShape = rawHoverShape && rawHoverShape !== 'none' ? rawHoverShape : fallbackShapeFill;
     setHoverShapeFillColor(hoverShape);
@@ -440,7 +453,16 @@ const ButtonEditor = ({
     const clipId = `clip-${btnId}`;
     let clipEl = defs.querySelector(`#${clipId}`);
 
-    const isRibbon = selectedElement.getAttribute('data-button-shape') === 'ribbon' || Boolean(selectedElement.querySelector('.btn-main-poly'));
+    const isRibbon = selectedElement.getAttribute('data-button-shape') === 'ribbon';
+    const isParallelogram = selectedElement.getAttribute('data-button-shape') === 'parallelogram';
+    const isDiamond = selectedElement.getAttribute('data-button-shape') === 'diamond';
+    const isArrow = selectedElement.getAttribute('data-button-shape') === 'arrow';
+    const isSkew = selectedElement.getAttribute('data-button-shape') === 'skew';
+    const isOutsideCircle = selectedElement.getAttribute('data-button-shape') === 'outside-circle';
+    const isInsetCircle = selectedElement.getAttribute('data-button-shape') === 'inset-circle';
+    const isPolygonShape = isRibbon || isParallelogram || isDiamond || isArrow;
+    const isPathShape = isSkew || isOutsideCircle || isInsetCircle;
+    const isCustomShape = isPolygonShape || isPathShape;
     const baseRect = selectedElement.querySelector('rect.btn-bg') || selectedElement.querySelector('rect:not(.button-hover-slide-rect):not(.btn-border)');
     if (baseRect && !baseRect.classList.contains('btn-bg')) {
       baseRect.classList.add('btn-bg');
@@ -450,13 +472,33 @@ const ButtonEditor = ({
     const currentY = baseRect ? (baseRect.getAttribute('y') || '0') : '0';
     const currentWidth = baseRect ? (baseRect.getAttribute('width') || '150') : '150';
     const currentHeight = baseRect ? (baseRect.getAttribute('height') || '42') : '42';
-    const currentRx = isRibbon ? '0' : (baseRect ? (baseRect.getAttribute('rx') || '10') : '10');
+    const currentRx = isCustomShape ? '0' : (baseRect ? (baseRect.getAttribute('rx') || '10') : '10');
     const numX = parseFloat(currentX) || 0;
     const numY = parseFloat(currentY) || 0;
     const numWidth = parseFloat(currentWidth) || 150;
     const numHeight = parseFloat(currentHeight) || 42;
     const slantDx = Math.round(numHeight * 0.22);
     const ribbonPoints = `${numX},${numY} ${numX + numWidth},${numY} ${numX + numWidth - slantDx / 2},${numY + numHeight / 2} ${numX + numWidth},${numY + numHeight} ${numX},${numHeight + numY} ${numX + slantDx / 2},${numY + numHeight / 2}`;
+    const pSlant = Math.round(numHeight * 0.35);
+    const parallelogramPoints = `${numX + pSlant},${numY} ${numX + numWidth},${numY} ${numX + numWidth - pSlant},${numY + numHeight} ${numX},${numY + numHeight}`;
+    const pointDx = Math.round(numHeight * 0.45);
+    const diamondPoints = `${numX + pointDx},${numY} ${numX + numWidth - pointDx},${numY} ${numX + numWidth},${numY + numHeight / 2} ${numX + numWidth - pointDx},${numY + numHeight} ${numX + pointDx},${numY + numHeight} ${numX},${numY + numHeight / 2}`;
+    const arrowDx = Math.round(numHeight * 0.45);
+    const arrowPoints = `${numX},${numY} ${numX + numWidth - arrowDx},${numY} ${numX + numWidth},${numY + numHeight / 2} ${numX + numWidth - arrowDx},${numY + numHeight} ${numX},${numY + numHeight} ${numX + arrowDx},${numY + numHeight / 2}`;
+    const polyShapePoints = isArrow ? arrowPoints : (isDiamond ? diamondPoints : (isParallelogram ? parallelogramPoints : ribbonPoints));
+
+    const skewR = 12;
+    const skewS = Math.round(numHeight * 0.25);
+    const skewD = `M ${numX + skewR},${numY} L ${numX + numWidth - skewS - skewR},${numY} Q ${numX + numWidth - skewS},${numY} ${numX + numWidth - skewS + 3},${numY + skewR * 0.6} L ${numX + numWidth - 3},${numY + numHeight - skewR * 0.6} Q ${numX + numWidth},${numY + numHeight} ${numX + numWidth - skewR},${numY + numHeight} L ${numX + skewR},${numY + numHeight} A ${skewR},${skewR} 0 0 1 ${numX},${numY + numHeight - skewR} L ${numX},${numY + skewR} A ${skewR},${skewR} 0 0 1 ${numX + skewR},${numY} Z`;
+
+    const ocRTop = 14;
+    const ocRBot = 16;
+    const outsideCircleD = `M ${numX},${numY + numHeight} Q ${numX + ocRBot * 0.7},${numY + numHeight} ${numX + ocRBot},${numY + numHeight - ocRBot} L ${numX + ocRBot},${numY + ocRTop} A ${ocRTop},${ocRTop} 0 0 1 ${numX + ocRBot + ocRTop},${numY} L ${numX + numWidth - ocRBot - ocRTop},${numY} A ${ocRTop},${ocRTop} 0 0 1 ${numX + numWidth - ocRBot},${numY + ocRTop} L ${numX + numWidth - ocRBot},${numY + numHeight - ocRBot} Q ${numX + numWidth - ocRBot * 0.7},${numY + numHeight} ${numX + numWidth},${numY + numHeight} Z`;
+
+    const icR = 12;
+    const insetCircleD = `M ${numX},${numY + icR} A ${icR},${icR} 0 0 0 ${numX + icR},${numY} L ${numX + numWidth - icR},${numY} A ${icR},${icR} 0 0 0 ${numX + numWidth},${numY + icR} L ${numX + numWidth},${numY + numHeight - icR} A ${icR},${icR} 0 0 0 ${numX + numWidth - icR},${numY + numHeight} L ${numX + icR},${numY + numHeight} A ${icR},${icR} 0 0 0 ${numX},${numY + numHeight - icR} Z`;
+
+    const customPathD = isInsetCircle ? insetCircleD : (isOutsideCircle ? outsideCircleD : skewD);
 
     if (isRibbon) {
       const mainPoly = selectedElement.querySelector('.btn-main-poly');
@@ -480,9 +522,13 @@ const ButtonEditor = ({
     if (!clipEl) {
       clipEl = ownerDoc.createElementNS("http://www.w3.org/2000/svg", "clipPath");
       clipEl.setAttribute('id', clipId);
-      if (isRibbon) {
+      if (isPathShape) {
+        const clipPathEl = ownerDoc.createElementNS("http://www.w3.org/2000/svg", "path");
+        clipPathEl.setAttribute('d', customPathD);
+        clipEl.appendChild(clipPathEl);
+      } else if (isPolygonShape) {
         const clipPoly = ownerDoc.createElementNS("http://www.w3.org/2000/svg", "polygon");
-        clipPoly.setAttribute('points', ribbonPoints);
+        clipPoly.setAttribute('points', polyShapePoints);
         clipEl.appendChild(clipPoly);
       } else {
         const clipRect = ownerDoc.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -495,14 +541,22 @@ const ButtonEditor = ({
       }
       defs.appendChild(clipEl);
     } else {
-      if (isRibbon) {
+      if (isPathShape) {
+        let clipPathEl = clipEl.querySelector('path');
+        if (!clipPathEl) {
+          clipEl.innerHTML = '';
+          clipPathEl = ownerDoc.createElementNS("http://www.w3.org/2000/svg", "path");
+          clipEl.appendChild(clipPathEl);
+        }
+        clipPathEl.setAttribute('d', customPathD);
+      } else if (isPolygonShape) {
         let clipPoly = clipEl.querySelector('polygon');
         if (!clipPoly) {
           clipEl.innerHTML = '';
           clipPoly = ownerDoc.createElementNS("http://www.w3.org/2000/svg", "polygon");
           clipEl.appendChild(clipPoly);
         }
-        clipPoly.setAttribute('points', ribbonPoints);
+        clipPoly.setAttribute('points', polyShapePoints);
       } else {
         let clipRect = clipEl.querySelector('rect');
         if (!clipRect) {
@@ -549,7 +603,7 @@ const ButtonEditor = ({
     // 3. Ensure border rect sits on top so stroke is never covered by slide fill
     const textEl = selectedElement.querySelector('text');
     let borderRect = selectedElement.querySelector('rect.btn-border');
-    if (isRibbon) {
+    if (isCustomShape) {
       if (borderRect) {
         borderRect.remove();
         borderRect = null;
@@ -678,6 +732,8 @@ const ButtonEditor = ({
     const hoverStrokeRule = hoverStroke ? `
       [id="${btnId}"]:hover .btn-border,
       [id="${btnId}"].is-hovered .btn-border,
+      [id="${btnId}"]:hover .btn-main-poly,
+      [id="${btnId}"].is-hovered .btn-main-poly,
       [id="${btnId}"]:hover rect[stroke]:not(.button-hover-slide-rect),
       [id="${btnId}"].is-hovered rect[stroke]:not(.button-hover-slide-rect) {
         stroke: ${hoverStroke} !important;
@@ -706,11 +762,11 @@ const ButtonEditor = ({
       }
       ${hoverShapeFill ? `
       [id="${btnId}"]:hover .btn-main-poly,
-      [id="${btnId}"].is-hovered .btn-main-poly,
+      [id="${btnId}"].is-hovered .btn-main-poly${isCustomShape ? '' : `,
       [id="${btnId}"]:hover rect.btn-bg,
       [id="${btnId}"].is-hovered rect.btn-bg,
       [id="${btnId}"]:hover rect:not(.button-hover-slide-rect):not(.btn-border),
-      [id="${btnId}"].is-hovered rect:not(.button-hover-slide-rect):not(.btn-border) {
+      [id="${btnId}"].is-hovered rect:not(.button-hover-slide-rect):not(.btn-border)`} {
         fill: ${hoverShapeFill} !important;
       }
       [id="${btnId}"]:hover .btn-accent-left,
@@ -810,14 +866,49 @@ const ButtonEditor = ({
       borderRect.setAttribute('height', currentH.toString());
     }
 
-    // Update ribbon polygons if present
+    // Update ribbon, parallelogram, diamond, arrow, skew, outside-circle, or inset-circle shapes if present
+    const isRibbon = selectedElement.getAttribute('data-button-shape') === 'ribbon';
+    const isParallelogram = selectedElement.getAttribute('data-button-shape') === 'parallelogram';
+    const isDiamond = selectedElement.getAttribute('data-button-shape') === 'diamond';
+    const isArrow = selectedElement.getAttribute('data-button-shape') === 'arrow';
+    const isSkew = selectedElement.getAttribute('data-button-shape') === 'skew';
+    const isOutsideCircle = selectedElement.getAttribute('data-button-shape') === 'outside-circle';
+    const isInsetCircle = selectedElement.getAttribute('data-button-shape') === 'inset-circle';
     const mainPoly = selectedElement.querySelector('.btn-main-poly');
     const accentLeft = selectedElement.querySelector('.btn-accent-left');
     const accentRight = selectedElement.querySelector('.btn-accent-right');
     const slantDx = Math.round(currentH * 0.22);
+    const pSlant = Math.round(currentH * 0.35);
+    const pointDx = Math.round(currentH * 0.45);
+    const arrowDx = Math.round(currentH * 0.45);
+    const skewR = 12;
+    const skewS = Math.round(currentH * 0.25);
+    const skewD = `M ${rectX + skewR},${rectY} L ${rectX + newButtonWidth - skewS - skewR},${rectY} Q ${rectX + newButtonWidth - skewS},${rectY} ${rectX + newButtonWidth - skewS + 3},${rectY + skewR * 0.6} L ${rectX + newButtonWidth - 3},${rectY + currentH - skewR * 0.6} Q ${rectX + newButtonWidth},${rectY + currentH} ${rectX + newButtonWidth - skewR},${rectY + currentH} L ${rectX + skewR},${rectY + currentH} A ${skewR},${skewR} 0 0 1 ${rectX},${rectY + currentH - skewR} L ${rectX},${rectY + skewR} A ${skewR},${skewR} 0 0 1 ${rectX + skewR},${rectY} Z`;
+
+    const ocRTop = 14;
+    const ocRBot = 16;
+    const outsideCircleD = `M ${rectX},${rectY + currentH} Q ${rectX + ocRBot * 0.7},${rectY + currentH} ${rectX + ocRBot},${rectY + currentH - ocRBot} L ${rectX + ocRBot},${rectY + ocRTop} A ${ocRTop},${ocRTop} 0 0 1 ${rectX + ocRBot + ocRTop},${rectY} L ${rectX + newButtonWidth - ocRBot - ocRTop},${rectY} A ${ocRTop},${ocRTop} 0 0 1 ${rectX + newButtonWidth - ocRBot},${rectY + ocRTop} L ${rectX + newButtonWidth - ocRBot},${rectY + currentH - ocRBot} Q ${rectX + newButtonWidth - ocRBot * 0.7},${rectY + currentH} ${rectX + newButtonWidth},${rectY + currentH} Z`;
+
+    const icR = 12;
+    const insetCircleD = `M ${rectX},${rectY + icR} A ${icR},${icR} 0 0 0 ${rectX + icR},${rectY} L ${rectX + newButtonWidth - icR},${rectY} A ${icR},${icR} 0 0 0 ${rectX + newButtonWidth},${rectY + icR} L ${rectX + newButtonWidth},${rectY + currentH - icR} A ${icR},${icR} 0 0 0 ${rectX + newButtonWidth - icR},${rectY + currentH} L ${rectX + icR},${rectY + currentH} A ${icR},${icR} 0 0 0 ${rectX},${rectY + currentH - icR} Z`;
+
     if (mainPoly) {
       mainPoly.removeAttribute('transform');
-      mainPoly.setAttribute('points', `${rectX},${rectY} ${rectX + newButtonWidth - slantDx},${rectY} ${rectX + newButtonWidth},${rectY + currentH} ${rectX + slantDx},${rectY + currentH}`);
+      if (isInsetCircle) {
+        mainPoly.setAttribute('d', insetCircleD);
+      } else if (isOutsideCircle) {
+        mainPoly.setAttribute('d', outsideCircleD);
+      } else if (isSkew) {
+        mainPoly.setAttribute('d', skewD);
+      } else if (isArrow) {
+        mainPoly.setAttribute('points', `${rectX},${rectY} ${rectX + newButtonWidth - arrowDx},${rectY} ${rectX + newButtonWidth},${rectY + currentH / 2} ${rectX + newButtonWidth - arrowDx},${rectY + currentH} ${rectX},${rectY + currentH} ${rectX + arrowDx},${rectY + currentH / 2}`);
+      } else if (isDiamond) {
+        mainPoly.setAttribute('points', `${rectX + pointDx},${rectY} ${rectX + newButtonWidth - pointDx},${rectY} ${rectX + newButtonWidth},${rectY + currentH / 2} ${rectX + newButtonWidth - pointDx},${rectY + currentH} ${rectX + pointDx},${rectY + currentH} ${rectX},${rectY + currentH / 2}`);
+      } else if (isParallelogram) {
+        mainPoly.setAttribute('points', `${rectX + pSlant},${rectY} ${rectX + newButtonWidth},${rectY} ${rectX + newButtonWidth - pSlant},${rectY + currentH} ${rectX},${rectY + currentH}`);
+      } else {
+        mainPoly.setAttribute('points', `${rectX},${rectY} ${rectX + newButtonWidth - slantDx},${rectY} ${rectX + newButtonWidth},${rectY + currentH} ${rectX + slantDx},${rectY + currentH}`);
+      }
     }
     if (accentLeft) {
       accentLeft.removeAttribute('transform');
@@ -828,9 +919,28 @@ const ButtonEditor = ({
       accentRight.setAttribute('points', `${rectX + newButtonWidth - slantDx},${rectY} ${rectX + newButtonWidth},${rectY} ${rectX + newButtonWidth - slantDx / 2},${rectY + currentH / 2}`);
     }
 
+    const clipPathEl = svgRoot?.querySelector(`#${clipId} path`);
+    if (clipPathEl) {
+      if (isInsetCircle) {
+        clipPathEl.setAttribute('d', insetCircleD);
+      } else if (isOutsideCircle) {
+        clipPathEl.setAttribute('d', outsideCircleD);
+      } else if (isSkew) {
+        clipPathEl.setAttribute('d', skewD);
+      }
+    }
+
     const clipPoly = svgRoot?.querySelector(`#${clipId} polygon`);
     if (clipPoly) {
-      clipPoly.setAttribute('points', `${rectX},${rectY} ${rectX + newButtonWidth},${rectY} ${rectX + newButtonWidth - slantDx / 2},${rectY + currentH / 2} ${rectX + newButtonWidth},${rectY + currentH} ${rectX},${rectY + currentH} ${rectX + slantDx / 2},${rectY + currentH / 2}`);
+      if (isArrow) {
+        clipPoly.setAttribute('points', `${rectX},${rectY} ${rectX + newButtonWidth - arrowDx},${rectY} ${rectX + newButtonWidth},${rectY + currentH / 2} ${rectX + newButtonWidth - arrowDx},${rectY + currentH} ${rectX},${rectY + currentH} ${rectX + arrowDx},${rectY + currentH / 2}`);
+      } else if (isDiamond) {
+        clipPoly.setAttribute('points', `${rectX + pointDx},${rectY} ${rectX + newButtonWidth - pointDx},${rectY} ${rectX + newButtonWidth},${rectY + currentH / 2} ${rectX + newButtonWidth - pointDx},${rectY + currentH} ${rectX + pointDx},${rectY + currentH} ${rectX},${rectY + currentH / 2}`);
+      } else if (isParallelogram) {
+        clipPoly.setAttribute('points', `${rectX + pSlant},${rectY} ${rectX + newButtonWidth},${rectY} ${rectX + newButtonWidth - pSlant},${rectY + currentH} ${rectX},${rectY + currentH}`);
+      } else {
+        clipPoly.setAttribute('points', `${rectX},${rectY} ${rectX + newButtonWidth},${rectY} ${rectX + newButtonWidth - slantDx / 2},${rectY + currentH / 2} ${rectX + newButtonWidth},${rectY + currentH} ${rectX},${rectY + currentH} ${rectX + slantDx / 2},${rectY + currentH / 2}`);
+      }
     }
 
     // Center text at exact center of button
@@ -998,7 +1108,7 @@ const ButtonEditor = ({
       }
     }
 
-    const rectEl = selectedElement.querySelector('rect') || (selectedElement.tagName?.toLowerCase() === 'rect' ? selectedElement : null);
+    const rectEl = !mainPoly ? (selectedElement.querySelector('rect') || (selectedElement.tagName?.toLowerCase() === 'rect' ? selectedElement : null)) : null;
     if (rectEl) {
       const fillVal = applySvgGradient(color, 'fill', 'rect');
       rectEl.setAttribute('fill', fillVal);
@@ -1015,8 +1125,27 @@ const ButtonEditor = ({
     setStrokeColor(color);
     if (!selectedElement) return;
 
+    const isParallelogram = selectedElement.getAttribute('data-button-shape') === 'parallelogram';
+    const isDiamond = selectedElement.getAttribute('data-button-shape') === 'diamond';
+    const isArrow = selectedElement.getAttribute('data-button-shape') === 'arrow';
+    const isSkew = selectedElement.getAttribute('data-button-shape') === 'skew';
+    const isOutsideCircle = selectedElement.getAttribute('data-button-shape') === 'outside-circle';
+    const isPolyButton = isParallelogram || isDiamond || isArrow || isSkew || isOutsideCircle;
+    const mainPoly = selectedElement.querySelector('.btn-main-poly');
     const rectEl = selectedElement.querySelector('rect') || (selectedElement.tagName?.toLowerCase() === 'rect' ? selectedElement : null);
-    if (rectEl) {
+
+    if (isPolyButton && mainPoly) {
+      const strokeVal = applySvgGradient(color, 'stroke', 'poly');
+      mainPoly.setAttribute('stroke', strokeVal);
+      mainPoly.style.stroke = strokeVal;
+      mainPoly.setAttribute('data-stroke-color', color);
+      if (strokeWidth === 0) {
+        setStrokeWidth(1.8);
+        mainPoly.setAttribute('stroke-width', '1.8');
+        mainPoly.style.strokeWidth = '1.8';
+      }
+      syncButtonToCanvas();
+    } else if (rectEl) {
       const strokeVal = applySvgGradient(color, 'stroke', 'rect');
       rectEl.setAttribute('stroke', strokeVal);
       rectEl.style.stroke = strokeVal;
@@ -1069,8 +1198,20 @@ const ButtonEditor = ({
     setStrokeWidth(num);
     if (!selectedElement) return;
 
+    const isParallelogram = selectedElement.getAttribute('data-button-shape') === 'parallelogram';
+    const isDiamond = selectedElement.getAttribute('data-button-shape') === 'diamond';
+    const isArrow = selectedElement.getAttribute('data-button-shape') === 'arrow';
+    const isSkew = selectedElement.getAttribute('data-button-shape') === 'skew';
+    const isOutsideCircle = selectedElement.getAttribute('data-button-shape') === 'outside-circle';
+    const isPolyButton = isParallelogram || isDiamond || isArrow || isSkew || isOutsideCircle;
+    const mainPoly = selectedElement.querySelector('.btn-main-poly');
     const rectEl = selectedElement.querySelector('rect') || (selectedElement.tagName?.toLowerCase() === 'rect' ? selectedElement : null);
-    if (rectEl) {
+
+    if (isPolyButton && mainPoly) {
+      mainPoly.setAttribute('stroke-width', num.toString());
+      mainPoly.style.strokeWidth = num.toString();
+      syncButtonToCanvas();
+    } else if (rectEl) {
       rectEl.setAttribute('stroke-width', num.toString());
       rectEl.style.strokeWidth = num.toString();
       syncButtonToCanvas();
@@ -1254,77 +1395,184 @@ const ButtonEditor = ({
           )}
         </div>
 
-        {/* 2. Stroke Color Accordion */}
+        {/* 2. Stroke Color Accordion (Exact Text Property implementation from Color.jsx) */}
         <div className="bg-white border border-gray-200 rounded-[0.75vw] shadow-sm overflow-hidden">
           <div
             onClick={() => toggleSection('strokeColor')}
-            className={`flex items-center justify-between px-[1vw] py-[0.85vw] border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors ${openSection === 'strokeColor' ? 'rounded-t-[0.75vw]' : 'rounded-[0.75vw]'}`}
+            className={`flex items-center justify-between px-[1vw] py-[1vw] border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors ${openSection === 'strokeColor' ? 'rounded-t-[0.75vw]' : 'rounded-[0.75vw]'}`}
           >
-            <span className={`font-semibold text-[0.85vw] ${openSection === 'strokeColor' ? 'text-gray-900' : 'text-gray-600'}`}>
-              Stroke Color
-            </span>
-            <ChevronDown size="1vw" className={`transition-transform duration-200 text-gray-500 ${openSection === 'strokeColor' ? 'rotate-180 text-gray-900' : ''}`} />
+            <div className="flex items-center gap-[0.5vw]">
+              <span className={`font-semibold text-[0.85vw] ${openSection === 'strokeColor' ? 'text-gray-900' : 'text-gray-500'}`}>Stroke Color</span>
+            </div>
+            <div className="flex items-center gap-[0.5vw]">
+              {openSection === 'strokeColor' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleStrokeColorChange('none');
+                    handleStrokeWidthChange(0);
+                    setStrokeOpacity(100);
+                    setStrokeAlignment('Center');
+                  }}
+                  className="text-gray-600 hover:text-gray-900 transition-colors p-[0.1vw] cursor-pointer flex items-center justify-center"
+                  title="Reset Stroke"
+                >
+                  <Icon icon="ix:reset" width="1.1vw" height="1.1vw" style={{ strokeWidth: 2.5 }} />
+                </button>
+              )}
+              <ChevronUp size="1vw" className={`transition-transform duration-200 ${openSection === 'strokeColor' ? 'text-gray-900' : 'rotate-180 text-gray-500'}`} />
+            </div>
           </div>
 
-          {openSection === 'strokeColor' && (
-            <div className="p-[1vw] flex flex-col gap-[0.75vw]">
-              <div className="flex items-center justify-between gap-[0.5vw]">
-                <div
-                  className="w-[2vw] h-[2vw] rounded-[0.4vw] border border-gray-200 relative overflow-hidden flex items-center justify-center cursor-pointer hover:border-indigo-500 transition-colors"
-                  style={{ background: strokeColor.includes('gradient') ? strokeColor : strokeColor }}
-                  onClick={() => setActiveColorPicker(activeColorPicker === 'strokeColor' ? null : 'strokeColor')}
-                />
-                <div className="flex-1 flex items-center border border-gray-300 rounded-[0.5vw] overflow-hidden h-[2vw] bg-white px-[0.5vw]">
-                  <input
-                    type="text"
-                    value={strokeColor.includes('gradient') ? 'GRADIENT' : strokeColor}
-                    onChange={(e) => handleStrokeColorChange(e.target.value)}
-                    maxLength={strokeColor.includes('gradient') ? 20 : 7}
-                    className="w-full text-[0.75vw] font-medium text-gray-700 outline-none bg-transparent uppercase"
-                  />
-                </div>
-                {activeColorPicker === 'strokeColor' && createPortal(
-                  <div
-                    className="fixed z-[5000]"
-                    style={{ top: '50%', right: '19.5vw', transform: 'translateY(-50%)' }}
-                  >
-                    <ColorPicker
-                      color={strokeColor}
-                      onChange={handleStrokeColorChange}
-                      onClose={() => setActiveColorPicker(null)}
-                      disableGradient={false}
-                    />
-                  </div>,
-                  document.body
-                )}
-              </div>
+          <div className={`grid transition-all duration-300 ease-in-out ${openSection === 'strokeColor' ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+            <div className="overflow-hidden">
+              <div className="p-[1vw] pt-[0.75vw] flex flex-col gap-[0.75vw]">
 
-              {/* Stroke Width control */}
-              <div className="flex items-center justify-between pt-[0.2vw]">
-                <span className="text-[0.75vw] font-semibold text-gray-600">Stroke Width :</span>
-                <div className="flex items-center gap-[0.3vw] h-[2vw]">
-                  <button
-                    className="w-[1.8vw] h-full flex items-center justify-center bg-gray-100 rounded-[0.3vw] text-gray-600 hover:bg-gray-200 transition-colors"
-                    onClick={() => handleStrokeWidthChange(strokeWidth - 0.5)}
+                {/* Row 1: Color Picker */}
+                <div className="flex items-center justify-between gap-[0.5vw]">
+                  {/* Swatch */}
+                  <div
+                    className="w-[2vw] h-[2vw] rounded-[0.4vw] border border-gray-200 flex-shrink-0 relative overflow-hidden flex items-center justify-center cursor-pointer"
+                    onClick={() => setActiveColorPicker(activeColorPicker === 'strokeColor' ? null : 'strokeColor')}
                   >
-                    -
-                  </button>
-                  <input
-                    type="number"
-                    value={strokeWidth}
-                    onChange={(e) => handleStrokeWidthChange(e.target.value)}
-                    className="w-[2.8vw] h-full border border-gray-200 rounded-[0.4vw] text-center text-[0.75vw] font-semibold text-gray-700 outline-none"
-                  />
-                  <button
-                    className="w-[1.8vw] h-full flex items-center justify-center bg-gray-100 rounded-[0.3vw] text-gray-600 hover:bg-gray-200 transition-colors"
-                    onClick={() => handleStrokeWidthChange(strokeWidth + 0.5)}
-                  >
-                    +
-                  </button>
+                    <div
+                      className="w-full h-full border border-gray-200"
+                      style={{
+                        background: (!strokeColor || strokeColor === 'none' || strokeColor === 'transparent' || strokeColor === '#')
+                          ? 'white'
+                          : strokeColor
+                      }}
+                    />
+                    {(!strokeColor || strokeColor === 'none' || strokeColor === 'transparent' || strokeColor === '#') && (
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[1.5px] bg-red-500 rotate-45" />
+                    )}
+                  </div>
+
+                  {/* Input box */}
+                  <div className="flex-grow flex items-center border-[0.1vw] border-gray-200 rounded-[0.5vw] overflow-hidden h-[2vw] bg-white hover:border-indigo-400 transition-colors px-[0.5vw]">
+                    <input
+                      type="text"
+                      value={(!strokeColor || strokeColor === 'none' || strokeColor === 'transparent') ? '#' : (strokeColor.includes('gradient') ? 'GRADIENT' : strokeColor.toUpperCase())}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || val === '#') {
+                          handleStrokeColorChange('none');
+                        } else {
+                          const finalVal = val.startsWith('#') ? val : '#' + val;
+                          handleStrokeColorChange(finalVal);
+                        }
+                      }}
+                      className="flex-grow text-[0.75vw] font-medium text-gray-700 outline-none bg-transparent min-w-[3vw] tracking-tight"
+                      maxLength={7}
+                    />
+                    <div
+                      className="flex items-center gap-[0.1vw] ml-[0.5vw] cursor-ew-resize select-none px-[0.2vw] hover:bg-gray-50 rounded"
+                    >
+                      <span className="text-[0.75vw] font-medium text-gray-600">
+                        {strokeOpacity}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* HEX Dropdown */}
+                  <div className="h-[2vw] flex items-center justify-between px-[0.5vw] border border-gray-200 rounded-[0.5vw] bg-white cursor-pointer hover:bg-gray-50 min-w-[3.5vw]">
+                    <span className="text-[0.7vw] text-gray-600 font-medium">HEX</span>
+                    <ChevronDown size="0.8vw" className="text-gray-400 ml-[0.2vw]" />
+                  </div>
+
+                  {activeColorPicker === 'strokeColor' && createPortal(
+                    <div
+                      className="fixed z-[5000]"
+                      style={{ top: '50%', right: '19.5vw', transform: 'translateY(-50%)' }}
+                    >
+                      <ColorPicker
+                        color={(!strokeColor || strokeColor === 'none') ? '#c71585' : strokeColor}
+                        onChange={handleStrokeColorChange}
+                        onClose={() => setActiveColorPicker(null)}
+                        disableGradient={false}
+                      />
+                    </div>,
+                    document.body
+                  )}
                 </div>
+
+                {/* Stroke Properties */}
+                <div className={`flex flex-col gap-[0.75vw] ${(!strokeColor || strokeColor === 'none' || strokeColor === '#' || strokeColor === 'transparent') ? 'opacity-50 pointer-events-none' : ''}`}>
+                  {/* Row 2: Alignment and Stroke Width */}
+                  <div className="flex items-center gap-[1vw]">
+                    {/* Alignment */}
+                    <div className="flex-1 flex flex-col gap-[0.3vw]">
+                      <span className="text-[0.7vw] text-gray-500 font-medium">Alignment</span>
+                      <div className="relative">
+                        <div
+                          className="h-[2vw] px-[0.5vw] border border-gray-200 rounded-[0.5vw] flex items-center justify-between bg-white cursor-pointer hover:bg-gray-50"
+                          onClick={() => setIsStrokeAlignOpen(!isStrokeAlignOpen)}
+                        >
+                          <span className="text-[0.75vw] font-medium text-gray-700 capitalize">{strokeAlignment || 'Center'}</span>
+                          <ChevronDown size="0.8vw" className="text-gray-400" />
+                        </div>
+                        {isStrokeAlignOpen && (
+                          <>
+                            <div className="fixed inset-0 z-[40]" onClick={(e) => { e.stopPropagation(); setIsStrokeAlignOpen(false); }} />
+                            <div className="absolute top-[110%] left-0 right-0 bg-white border border-gray-100 rounded-[0.5vw] shadow-xl z-50 py-1 overflow-hidden">
+                              {['Inside', 'Center', 'Outside'].map(pos => (
+                                <div
+                                  key={pos}
+                                  onClick={() => {
+                                    setStrokeAlignment(pos);
+                                    if (selectedElement) {
+                                      selectedElement.setAttribute('data-stroke-alignment', pos);
+                                      syncButtonToCanvas();
+                                    }
+                                    setIsStrokeAlignOpen(false);
+                                  }}
+                                  className="px-[1vw] py-[0.4vw] text-[0.7vw] font-semibold text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 cursor-pointer"
+                                >
+                                  {pos}
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Stroke Width */}
+                    <div className="flex-1 flex flex-col gap-[0.3vw]">
+                      <span className="text-[0.7vw] text-gray-500 font-medium">Stoke Width</span>
+                      <div className="flex items-center gap-[0.3vw] h-[2vw]">
+                        <button
+                          className="w-[2vw] h-full flex items-center justify-center bg-gray-100 rounded-[0.3vw] text-gray-600 hover:bg-gray-200 transition-colors"
+                          onClick={() => {
+                            handleStrokeWidthChange(Math.max(0, strokeWidth - 1));
+                          }}
+                        >
+                          <span className="text-[1vw] leading-none mb-[0.1vw]">-</span>
+                        </button>
+                        <div className="flex-grow h-full bg-white border border-gray-200 rounded-[0.5vw] flex items-center">
+                          <input
+                            type="number"
+                            value={strokeWidth}
+                            onChange={(e) => handleStrokeWidthChange(Math.max(0, parseFloat(e.target.value) || 0))}
+                            className="w-full h-full text-[0.75vw] font-medium outline-none text-center bg-transparent text-gray-700 no-spin"
+                          />
+                        </div>
+                        <button
+                          className="w-[2vw] h-full flex items-center justify-center bg-gray-100 rounded-[0.3vw] text-gray-600 hover:bg-gray-200 transition-colors"
+                          onClick={() => {
+                            handleStrokeWidthChange(strokeWidth + 1);
+                          }}
+                        >
+                          <span className="text-[1vw] leading-none mb-[0.1vw]">+</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* 3. Effect Accordion (reuses existing Effect component, Drop Shadow alone) */}

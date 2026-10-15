@@ -12,6 +12,11 @@ if (ffmpegStatic) {
  * Maps human-readable UI resolution strings to ffmpeg scale filters
  */
 const RESOLUTION_MAP = {
+  // Matching UI formats
+  '1080p (Full HD)': '1920:1080',
+  '720p (HD)': '1280:720',
+  '480p (SD)': '854:480',
+  // Standard dimension formats
   '4K (3840x2160)': '3840:2160',
   '1080p (1920x1080)': '1920:1080',
   '720p (1280x720)': '1280:720',

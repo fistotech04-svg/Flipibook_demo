@@ -159,19 +159,30 @@ export const convertWithAssimp = (inputPath, outputPath, options = {}) => {
       console.log(`[Assimp] Converting ${inputExt ? inputExt.toUpperCase() : "3D"} file with Assimp: ${path.basename(inputPath)}...`);
       const assimpBin = getAssimpPath();
       
-      // Prioritize embedding textures into GLB binary (glTF 2.0 with -embtex), followed by standard fallbacks
-      const flagStrategies = [
-        ["export", inputPath, outputPath, "glb2", "-embtex", "-tri"],
-        ["export", inputPath, outputPath, "glb2", "-embtex"],
-        ["export", inputPath, outputPath, "glb", "-embtex", "-tri"],
-        ["export", inputPath, outputPath, "glb", "-embtex"],
-        ["export", inputPath, outputPath, "-embtex", "-tri"],
-        ["export", inputPath, outputPath, "-embtex"],
-        ["export", inputPath, outputPath, "glb2", "-tri"],
-        ["export", inputPath, outputPath, "glb2"],
-        ["export", inputPath, outputPath, "-tri"],
-        ["export", inputPath, outputPath]
-      ];
+      // Prioritize formats: if outputPath ends in .obj, export obj directly; if .glb, export glb2/glb with embedded textures
+      const targetExt = path.extname(outputPath).toLowerCase();
+      let flagStrategies = [];
+
+      if (targetExt === ".obj") {
+        flagStrategies = [
+          ["export", inputPath, outputPath, "obj"],
+          ["export", inputPath, outputPath, "-tri"],
+          ["export", inputPath, outputPath]
+        ];
+      } else {
+        flagStrategies = [
+          ["export", inputPath, outputPath, "glb2", "-embtex", "-tri"],
+          ["export", inputPath, outputPath, "glb2", "-embtex"],
+          ["export", inputPath, outputPath, "glb", "-embtex", "-tri"],
+          ["export", inputPath, outputPath, "glb", "-embtex"],
+          ["export", inputPath, outputPath, "-embtex", "-tri"],
+          ["export", inputPath, outputPath, "-embtex"],
+          ["export", inputPath, outputPath, "glb2", "-tri"],
+          ["export", inputPath, outputPath, "glb2"],
+          ["export", inputPath, outputPath, "-tri"],
+          ["export", inputPath, outputPath]
+        ];
+      }
 
       const runAttempt = (args) => {
         return new Promise((resolveAttempt, rejectAttempt) => {
@@ -193,7 +204,7 @@ export const convertWithAssimp = (inputPath, outputPath, options = {}) => {
               }
 
               if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
-                console.log(`[Assimp] Successfully converted to GLB (glTF 2.0): ${outputPath} (${(fs.statSync(outputPath).size / (1024 * 1024)).toFixed(2)} MB)`);
+                console.log(`[Assimp] Successfully converted to ${targetExt.toUpperCase() || 'GLB'}: ${outputPath} (${(fs.statSync(outputPath).size / (1024 * 1024)).toFixed(2)} MB)`);
                 return resolveAttempt({ success: true, outputPath });
               }
 
@@ -201,13 +212,13 @@ export const convertWithAssimp = (inputPath, outputPath, options = {}) => {
                 return rejectAttempt(new Error(`Assimp conversion failed: ${error.message}${stderr ? `\nStderr: ${stderr}` : ""}`));
               }
 
-              rejectAttempt(new Error(`Assimp completed but output GLB was not created or empty.`));
+              rejectAttempt(new Error(`Assimp completed but output ${targetExt.toUpperCase()} was not created or empty.`));
             }
           );
         });
       };
 
-      // Try strategies sequentially until one creates a valid GLB
+      // Try strategies sequentially until one creates a valid file
       (async () => {
         let lastErr = null;
         for (const args of flagStrategies) {
