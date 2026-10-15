@@ -13158,6 +13158,7 @@ const MainEditor = ({
         onFlipV={() => handleFlip('v')}
         onAlign={handleAlign}
         hideTools={isPdfProject}
+        selectedLayerId={selectedLayerId}
 
         hasSelection={(() => {
           const ids = multiSelectedIds.size > 0 ? Array.from(multiSelectedIds) : (selectedLayerId ? [selectedLayerId] : []);

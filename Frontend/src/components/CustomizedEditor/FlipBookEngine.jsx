@@ -98,6 +98,13 @@ const sanitizePageHtmlForPreview = (html) => {
                     iframe.style.setProperty('pointer-events', 'auto', 'important');
                     iframe.style.setProperty('border', 'none', 'important');
                     iframe.style.setProperty('display', 'block', 'important');
+
+                    const mapGroup = fo.closest('[data-type="map"]') || fo.closest('[id^="map-"]') || fo.parentElement;
+                    const rect = mapGroup?.querySelector(':scope > rect') || mapGroup?.querySelector('rect');
+                    if (rect) {
+                        rect.style.setProperty('pointer-events', 'none', 'important');
+                        rect.style.setProperty('display', 'none', 'important');
+                    }
                 }
             }
         });
@@ -171,12 +178,23 @@ const buildPageDoc = (rawHtml) => `<!DOCTYPE html>
   }
 
   /* Map Element Overrides & Container Responsiveness */
-  [data-type="map"] foreignObject {
+  [data-type="map"] rect,
+  [data-type="map"] > rect,
+  [id^="map-"] rect,
+  [id^="map-"] > rect {
+    pointer-events: none !important;
+    display: none !important;
+  }
+  [data-type="map"] foreignObject,
+  [id^="map-"] foreignObject {
     overflow: hidden !important;
     border-radius: 0px !important;
+    pointer-events: auto !important;
   }
   [data-type="map"] foreignObject > div.map-root-container,
-  [data-type="map"] foreignObject > div:first-child {
+  [data-type="map"] foreignObject > div:first-child,
+  [id^="map-"] foreignObject > div.map-root-container,
+  [id^="map-"] foreignObject > div:first-child {
     border-radius: 0px !important;
     width: 100% !important;
     height: 100% !important;
@@ -390,7 +408,7 @@ const buildPageDoc = (rawHtml) => `<!DOCTYPE html>
     background: #1F2937 !important;
   }
 
-  foreignObject:not([data-scrollable="true"]):not([data-editing="true"])>div {
+  foreignObject:not([data-scrollable="true"]):not([data-editing="true"])>div:not(.map-root-container) {
     width: 100% !important;
     height: auto !important;
   }
