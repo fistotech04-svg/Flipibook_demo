@@ -80,9 +80,85 @@ export const handleAddElementToSvg = ({
 
   // If map element is added with small default size (<= 180), adapt to page canvas size
   const isMap = importedElement.getAttribute('data-type') === 'map' || importedElement.id?.startsWith('map-');
+  const isTable = importedElement.getAttribute('data-type') === 'table-frame' ||
+                  importedElement.getAttribute('data-type') === 'table' ||
+                  importedElement.id?.startsWith('table-');
   let foChild = importedElement.querySelector('foreignObject, rect');
   let elW = foChild ? parseFloat(foChild.getAttribute('width') || '100') : 100;
   let elH = foChild ? parseFloat(foChild.getAttribute('height') || '100') : 100;
+
+  if (isTable) {
+    const rows = importedElement.querySelectorAll('tr').length || parseInt(importedElement.getAttribute('data-rows') || '3', 10);
+    let targetW, targetH;
+
+    if (pw <= 400) {
+      // Millimeter canvas (e.g. A4 210x297, A5 148x210, DL 99x210, Square 210x210, Landscape 297x210)
+      const marginX = pw > 150 ? 20 : (pw > 100 ? 15 : 10);
+      targetW = Math.round(Math.min(pw - marginX * 2, pw * 0.82));
+      const maxH = Math.round(ph * 0.45);
+      targetH = Math.round(Math.min(maxH, Math.max(rows * 22, Math.round(targetW * 0.41))));
+    } else {
+      // Pixel canvas (e.g. 800x600, 1000x1400)
+      const marginX = Math.round(pw * 0.08);
+      targetW = Math.round(pw * 0.8);
+      const maxH = Math.round(ph * 0.5);
+      targetH = Math.round(Math.min(maxH, Math.max(rows * 55, Math.round(targetW * 0.35))));
+    }
+
+    elW = targetW;
+    elH = targetH;
+
+    const fo = importedElement.querySelector('foreignObject');
+    if (fo) {
+      fo.setAttribute('width', targetW.toString());
+      fo.setAttribute('height', targetH.toString());
+      // Strip whitespace text nodes inside foreignObject and wrapper
+      Array.from(fo.childNodes).forEach(n => {
+        if (n.nodeType === 3 && !n.textContent.trim()) n.remove();
+      });
+      const wrap = fo.querySelector('.table-card-wrapper, .table-container');
+      if (wrap) {
+        wrap.style.whiteSpace = 'normal';
+        wrap.style.lineHeight = 'normal';
+        wrap.style.display = 'block';
+        wrap.style.width = '100%';
+        wrap.style.height = '100%';
+        wrap.style.boxSizing = 'border-box';
+        wrap.style.overflow = 'hidden';
+        Array.from(wrap.childNodes).forEach(n => {
+          if (n.nodeType === 3 && !n.textContent.trim()) n.remove();
+        });
+      }
+      const tbl = fo.querySelector('table');
+      if (tbl) {
+        tbl.style.width = '100%';
+        tbl.style.height = '100%';
+        tbl.style.tableLayout = 'fixed';
+        tbl.style.borderCollapse = 'collapse';
+        tbl.style.boxSizing = 'border-box';
+        tbl.style.backgroundColor = '#ffffff';
+        const trList = tbl.querySelectorAll('tr');
+        const rLen = trList.length || 1;
+        trList.forEach(tr => {
+          tr.style.height = `${(100 / rLen).toFixed(3)}%`;
+          tr.style.boxSizing = 'border-box';
+          const tdList = tr.querySelectorAll('td, th');
+          const cLen = tdList.length || 1;
+          tdList.forEach(cell => {
+            cell.style.width = `${(100 / cLen).toFixed(3)}%`;
+            cell.style.height = '100%';
+            cell.style.boxSizing = 'border-box';
+            cell.style.backgroundColor = '#ffffff';
+          });
+        });
+      }
+    }
+    const rect = importedElement.querySelector('rect.svg-table-overlay, rect.svg-image-stroke-overlay, rect');
+    if (rect) {
+      rect.setAttribute('width', targetW.toString());
+      rect.setAttribute('height', targetH.toString());
+    }
+  }
 
   if (isMap && elW <= 180) {
     let targetW, targetH;
@@ -134,10 +210,23 @@ export const handleAddElementToSvg = ({
   }
 
   if (dropPoint) {
-    const currentTransform = importedElement.getAttribute('transform') || '';
-    // Strip old translate if replacing
-    importedElement.setAttribute('transform', `translate(${Math.round(dropPoint.x - (elW / 2))}, ${Math.round(dropPoint.y - (elH / 2))})`);
-  } else if (!importedElement.getAttribute('transform') || (isMap && importedElement.getAttribute('transform')?.includes('15'))) {
+    if (isTable) {
+      const marginX = pw <= 400 ? (pw > 150 ? 15 : 8) : 20;
+      const marginY = ph <= 400 ? (ph > 150 ? 15 : 8) : 20;
+      const minX = marginX;
+      const maxX = Math.max(minX, pw - elW - marginX);
+      const minY = marginY;
+      const maxY = Math.max(minY, ph - elH - marginY);
+
+      const posX = Math.round(Math.max(minX, Math.min(maxX, dropPoint.x - (elW / 2))));
+      const posY = Math.round(Math.max(minY, Math.min(maxY, dropPoint.y - (elH / 2))));
+      importedElement.setAttribute('transform', `translate(${posX}, ${posY})`);
+    } else {
+      const currentTransform = importedElement.getAttribute('transform') || '';
+      // Strip old translate if replacing
+      importedElement.setAttribute('transform', `translate(${Math.round(dropPoint.x - (elW / 2))}, ${Math.round(dropPoint.y - (elH / 2))})`);
+    }
+  } else if (isTable || !importedElement.getAttribute('transform') || (isMap && importedElement.getAttribute('transform')?.includes('15'))) {
     const cx = Math.round(Math.max(0, (pw - elW) / 2));
     const cy = Math.round(Math.max(0, (ph - elH) / 2));
     importedElement.setAttribute('transform', `translate(${cx}, ${cy})`);
@@ -376,7 +465,7 @@ export const fillElementShapeWithPattern = ({
  */
 export const handleElementsDropData = (data, displayIndex, dropPoint) => {
   if (!data) return false;
-  if (['button', 'text', 'slideshow', 'image-frame', 'map', 'qrcode', 'decorator'].includes(data.type)) {
+  if (['button', 'text', 'slideshow', 'image-frame', 'map', 'qrcode', 'decorator', 'table'].includes(data.type)) {
     console.log(`${data.type} Dropped:`, data);
     window.dispatchEvent(new CustomEvent('add-element-to-editor', {
       detail: {
@@ -462,7 +551,34 @@ export const isAudioGroup = (el) => {
  * so clicking inside them drags or selects the compound parent unit.
  */
 export const getElementCompoundTarget = (current) => {
-  if (!current || typeof current.closest !== 'function') return null;
+  if (!current) return null;
+
+  // Tables are single compound elements; clicking or typing inside them keeps the table element selected!
+  let tableGroup = null;
+  if (typeof current.closest === 'function') {
+    tableGroup = current.closest('[data-type="table-frame"], [data-type="table"], [id^="table-"], g[id*="table"]');
+  }
+  if (!tableGroup) {
+    let node = current;
+    while (node && node.nodeType === 1 && node !== document.body) {
+      const tag = node.tagName?.toLowerCase();
+      const dt = node.getAttribute ? node.getAttribute('data-type') : null;
+      const nid = node.id || '';
+      if (dt === 'table-frame' || dt === 'table' || nid.startsWith('table-') || (tag === 'g' && nid.includes('table'))) {
+        tableGroup = node;
+        break;
+      }
+      node = node.parentElement || node.parentNode;
+    }
+  }
+  if (tableGroup) {
+    if (!tableGroup.id) {
+      tableGroup.id = `table-${Date.now()}`;
+    }
+    return tableGroup;
+  }
+
+  if (typeof current.closest !== 'function') return null;
 
   // Slideshows are single compound elements; drag the whole slideshow!
   const slideshowGroup = current.closest('[data-type="slideshow"], [data-is-slideshow="true"], [id^="slideshow-"]');

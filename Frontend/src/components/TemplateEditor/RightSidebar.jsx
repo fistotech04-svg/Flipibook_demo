@@ -27,6 +27,7 @@ import TextElementEditor from './Elements/TextElementEditor';
 import ButtonEditor from './Elements/ButtonEdtitor';
 import AnimatedDecoratorsProperties from './Elements/Animated_Decorators_Properties';
 import ImageFramingProperties from './Elements/ImageFramingProperties';
+import TableProperties from './Elements/TableProperties';
 import ColorPicker, { parseGradient } from './ColorPicker';
 import MediaGalleryPopup from './MediaGalleryPopup';
 import { generateGradientString } from "../CustomizedEditor/AppearanceShared";
@@ -838,6 +839,17 @@ const RightSidebar = ({
         const isElementShape = el.getAttribute('data-is-element-shape') === 'true' || (el.querySelector && el.querySelector('[data-is-element-shape="true"]') !== null);
         const isShape = dataType === 'shape' || el.getAttribute('data-shape-type') === 'shape' || isElementShape;
 
+        const tableParent = el.closest ? el.closest('[data-type="table"], [data-type="table-frame"], [id^="table-"], [id*="table"], [class*="table"]') : null;
+        const tableChild = el.querySelector ? el.querySelector('[data-type="table"], [data-type="table-frame"], [id^="table-"], [id*="table"], .table-fill-layer, .table-card-wrapper, table') : null;
+        const hasTableRectOrLine = el.querySelector && (el.querySelector('.table-fill-layer') !== null || (el.classList && el.classList.contains('table-fill-layer')));
+        const isTable = dataType === 'table' || dataType === 'table-frame' || lowerDataName === 'table' || lowerDataName.includes('table') || lowerId.startsWith('table-') || lowerId.includes('table') || !!tableParent || !!tableChild || hasTableRectOrLine;
+        if (isTable) {
+          const foundTableNode = tableParent || (tableChild ? (tableChild.closest('[data-type="table"], [data-type="table-frame"], [id^="table-"]') || tableChild) : el);
+          props.isTable = true;
+          props.tableId = foundTableNode?.id || selectedLayerId;
+          return props;
+        }
+
         const isMap = dataType === 'map' || lowerId.includes('map');
         if (isMap) {
           props.isMap = true;
@@ -871,13 +883,13 @@ const RightSidebar = ({
           props.buttonId = buttonParent ? buttonParent.id : selectedLayerId;
         }
 
-        const isUserGroup = lowerTagName === 'g' && !isShape && !isAudio && !isTypography && (
+        const isUserGroup = lowerTagName === 'g' && !isShape && !isAudio && !isTypography && !isTable && (
           dataType === 'group' ||
           lowerDataName === 'group' ||
           lowerId.startsWith('group-') ||
           el.getAttribute('data-type') === 'group' ||
           (!el.getAttribute('data-is-image-group') && !el.getAttribute('data-is-video-group') && !el.getAttribute('data-is-gif-group') && dataType !== 'icon' && dataType !== 'button' && dataType !== 'slideshow' && lowerDataName !== 'icon' && !lowerId.includes('icon') && !lowerId.includes('button') && !lowerId.includes('slideshow'))
-        ) && el.getAttribute('data-is-image-group') !== 'true' && el.getAttribute('data-is-video-group') !== 'true' && el.getAttribute('data-is-gif-group') !== 'true' && dataType !== 'icon' && dataType !== 'button' && dataType !== 'slideshow' && lowerDataName !== 'icon' && !lowerId.includes('icon') && !lowerId.includes('button') && !lowerId.includes('slideshow') && !isMap;
+        ) && el.getAttribute('data-is-image-group') !== 'true' && el.getAttribute('data-is-video-group') !== 'true' && el.getAttribute('data-is-gif-group') !== 'true' && dataType !== 'icon' && dataType !== 'button' && dataType !== 'slideshow' && lowerDataName !== 'icon' && !lowerId.includes('icon') && !lowerId.includes('button') && !lowerId.includes('slideshow') && !isMap && !isTable;
 
         const isImage = !isUserGroup && (lowerTagName.includes('image') ||
           lowerTagName === 'img' ||
@@ -886,8 +898,8 @@ const RightSidebar = ({
           lowerId.includes('image') ||
           !!(el.getAttribute('href') || el.getAttribute('xlink:href')) ||
           (lowerTagName === 'g' && hasImageChild && el.getAttribute('data-is-image-group') === 'true') ||
-          isPatternImage) && !isGif && !isPdfBackground && !isMap && !isElementShape;
-        const isVideo = (lowerTagName === 'video' || lowerTagName === 'iframe' || dataType === 'video' || lowerDataName.includes('video') || lowerId.includes('video') || (lowerTagName === 'foreignobject' && el.querySelector('video, iframe'))) && !isMap;
+          isPatternImage) && !isGif && !isPdfBackground && !isMap && !isElementShape && !isTable;
+        const isVideo = (lowerTagName === 'video' || lowerTagName === 'iframe' || dataType === 'video' || lowerDataName.includes('video') || lowerId.includes('video') || (lowerTagName === 'foreignobject' && el.querySelector('video, iframe'))) && !isMap && !isTable;
         const isText = (lowerTagName === 'text' || lowerTagName === 'tspan' || (lowerTagName === 'foreignobject' && !isVideo && !isMap)) || dataType === 'text' || lowerDataName.includes('text') || lowerId.includes('text');
         const isIcon = (dataType === 'icon' || dataType === 'hotspot' || lowerDataName.includes('icon') || lowerDataName.includes('hotspot') || lowerId.includes('icon') || lowerId.includes('hotspot') || lowerTagName.includes('lucide') || el.classList.contains('lucide') || el.classList.contains('iconify')) && !isShape;
         const isActuallyImage = lowerTagName === 'image' || lowerTagName === 'img' || el.hasAttribute('href') || el.hasAttribute('xlink:href');
@@ -895,7 +907,8 @@ const RightSidebar = ({
         const isEmbed = dataType === 'embed-frame' || lowerDataName.includes('embed-frame') || lowerId.includes('embed-frame') || el.querySelector('[data-type="embed-frame"]') !== null;
         const isSlideshow = dataType === 'slideshow' || lowerId.includes('slideshow');
 
-        props.isUserGroup = isUserGroup && !isButton;
+        props.isUserGroup = isUserGroup && !isButton && !isTable;
+        props.isTable = isTable;
         props.isMap = isMap;
         props.isButton = isButton;
         props.isSlideshow = isSlideshow;
@@ -1348,6 +1361,53 @@ const RightSidebar = ({
                           updateElementAttribute={updateElementAttribute}
                           selectedElementProps={selectedElementProps}
                         />
+                      ) : selectedElementProps?.isTable ? (
+                        <TableProperties
+                          selectedElement={(() => {
+                            const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                            if (selectedLayerId) {
+                              const el = editorDoc.getElementById(selectedLayerId) || editorDoc.querySelector(`[id="${selectedLayerId}"]`);
+                              return el?.closest('[data-type="table"], [data-type="table-frame"], [id^="table-"], [id*="table"]') || el?.querySelector('[data-type="table"], [data-type="table-frame"], [id^="table-"], .table-fill-layer, .table-card-wrapper, table') || el;
+                            }
+                            return null;
+                          })()}
+                          selectedLayerId={selectedElementProps?.tableId || selectedLayerId}
+                          activePageIndex={activePageIndex}
+                          updateElementAttribute={updateElementAttribute}
+                          selectedElementProps={selectedElementProps}
+                          onUpdate={(newHtml) => {
+                            window.__skipCanvasUpdateForPage = activePageIndex;
+                            if (typeof newHtml === 'string') {
+                              updateElementAttribute(activePageIndex, selectedElementProps?.tableId || selectedLayerId, '__dom_sync__', newHtml);
+                            } else {
+                              const svgRoot = (() => {
+                                const targetId = selectedElementProps?.tableId || selectedLayerId;
+                                const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                                const el = (targetId ? editorDoc.getElementById(targetId) : null) || (targetId ? document.getElementById(targetId) : null);
+                                if (!el) return null;
+                                const container = el.closest('.page-svg-container');
+                                if (container) {
+                                  const canvasContent = container.querySelector('[id^="canvas-content-"]');
+                                  return canvasContent ? canvasContent.querySelector('svg') : container.querySelector('svg');
+                                }
+                                let node = el;
+                                let lastSvg = null;
+                                while (node) {
+                                  if (node.tagName?.toLowerCase() === 'svg') lastSvg = node;
+                                  node = node.parentElement;
+                                }
+                                return lastSvg;
+                              })();
+                              if (svgRoot) {
+                                const cloneSvg = svgRoot.cloneNode(true);
+                                cloneSvg.querySelectorAll('[data-highlight-id], .frame-boundary').forEach(el => el.remove());
+                                const serializer = new XMLSerializer();
+                                const html = serializer.serializeToString(cloneSvg);
+                                updateElementAttribute(activePageIndex, selectedElementProps?.tableId || selectedLayerId, '__dom_sync__', html);
+                              }
+                            }
+                          }}
+                        />
                       ) : selectedElementProps?.isImageFrame ? (
                         <ImageFramingProperties
                           selectedElement={(() => {
@@ -1728,6 +1788,27 @@ const RightSidebar = ({
                           flipbookName={effectiveBook}
                           flipbookVId={effectiveVId}
                           onDeleteLayer={() => deleteLayer?.(activePageIndex, selectedLayerId)}
+                        />
+                      ) : selectedElementProps?.isTable ? (
+                        <TableProperties
+                          selectedElement={(() => {
+                            const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                            if (selectedLayerId) {
+                              const el = editorDoc.getElementById(selectedLayerId) || editorDoc.querySelector(`[id="${selectedLayerId}"]`);
+                              return el?.closest('[data-type="table"], [data-type="table-frame"], [id^="table-"], [id*="table"]') || el?.querySelector('[data-type="table"], [data-type="table-frame"], [id^="table-"], .table-fill-layer, .table-card-wrapper, table') || el;
+                            }
+                            return null;
+                          })()}
+                          selectedLayerId={selectedElementProps?.tableId || selectedLayerId}
+                          activePageIndex={activePageIndex}
+                          updateElementAttribute={updateElementAttribute}
+                          selectedElementProps={selectedElementProps}
+                          onUpdate={(newHtml) => {
+                            window.__skipCanvasUpdateForPage = activePageIndex;
+                            if (typeof newHtml === 'string') {
+                              updateElementAttribute(activePageIndex, selectedElementProps?.tableId || selectedLayerId, '__dom_sync__', newHtml);
+                            }
+                          }}
                         />
                       ) : selectedElementProps?.isEmbed ? (
                         <ThirdPartyEmbedProperties
