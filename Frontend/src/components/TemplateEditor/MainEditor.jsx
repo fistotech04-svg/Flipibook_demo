@@ -775,6 +775,174 @@ const svgGlobalStyles = `
     [data-type="map"] foreignObject .map-action-btn-secondary {
       flex: 1 !important;
     }
+  /* Table Frame ForeignObject Overrides */
+  [data-type="table-frame"] foreignObject,
+  [data-type="table"] foreignObject,
+  [id^="table-"] foreignObject {
+    overflow: visible !important;
+  }
+
+  [data-type="table-frame"] foreignObject > div,
+  [data-type="table"] foreignObject > div,
+  [id^="table-"] foreignObject > div,
+  foreignObject > div.table-card-wrapper,
+  foreignObject > div.table-container {
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    white-space: normal !important;
+    line-height: normal !important;
+    overflow: hidden !important;
+    pointer-events: auto !important;
+  }
+
+  /* Scrollable Table support */
+  [data-type="table-frame"][data-scrollable="true"] foreignObject > div,
+  [data-type="table"][data-scrollable="true"] foreignObject > div,
+  [id^="table-"][data-scrollable="true"] foreignObject > div,
+  foreignObject[data-scrollable="true"] > div.table-card-wrapper,
+  foreignObject[data-scrollable="true"] > div.table-container,
+  div.table-card-wrapper.table-scrollable,
+  div.table-container.table-scrollable,
+  div.table-card-wrapper[data-scrollable="true"],
+  div.table-container[data-scrollable="true"] {
+    overflow: auto !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    pointer-events: auto !important;
+  }
+
+  [data-type="table-frame"] table,
+  [data-type="table"] table,
+  [id^="table-"] table,
+  .table-card-wrapper table {
+    width: max-content !important;
+    min-width: auto !important;
+    max-width: none !important;
+    height: max-content !important;
+    min-height: auto !important;
+    flex: none !important;
+    table-layout: auto !important;
+    border-collapse: collapse !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    white-space: normal !important;
+    transform: none !important;
+    will-change: auto !important;
+  }
+
+  [data-type="table-frame"][data-scrollable="true"] table,
+  [data-type="table"][data-scrollable="true"] table,
+  [id^="table-"][data-scrollable="true"] table,
+  .table-card-wrapper.table-scrollable table,
+  .table-container.table-scrollable table,
+  .table-card-wrapper[data-scrollable="true"] table,
+  .table-container[data-scrollable="true"] table {
+    width: max-content !important;
+    min-width: auto !important;
+    max-width: none !important;
+    height: max-content !important;
+    min-height: auto !important;
+    flex: none !important;
+    table-layout: auto !important;
+  }
+
+  div.table-card-wrapper::-webkit-scrollbar,
+  div.table-container::-webkit-scrollbar,
+  [data-type="table-frame"] foreignObject > div::-webkit-scrollbar,
+  [data-type="table"] foreignObject > div::-webkit-scrollbar,
+  [id^="table-"] foreignObject > div::-webkit-scrollbar,
+  [data-type="table-frame"] *::-webkit-scrollbar,
+  [data-type="table"] *::-webkit-scrollbar,
+  [id^="table-"] *::-webkit-scrollbar {
+    width: 4px !important;
+    height: 4px !important;
+    background: transparent !important;
+  }
+
+  div.table-card-wrapper::-webkit-scrollbar-track,
+  div.table-container::-webkit-scrollbar-track,
+  [data-type="table-frame"] foreignObject > div::-webkit-scrollbar-track,
+  [data-type="table"] foreignObject > div::-webkit-scrollbar-track,
+  [id^="table-"] foreignObject > div::-webkit-scrollbar-track,
+  [data-type="table-frame"] *::-webkit-scrollbar-track,
+  [data-type="table"] *::-webkit-scrollbar-track,
+  [id^="table-"] *::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05) !important;
+    border-radius: 4px !important;
+    border: none !important;
+  }
+
+  div.table-card-wrapper::-webkit-scrollbar-thumb,
+  div.table-container::-webkit-scrollbar-thumb,
+  [data-type="table-frame"] foreignObject > div::-webkit-scrollbar-thumb,
+  [data-type="table"] foreignObject > div::-webkit-scrollbar-thumb,
+  [id^="table-"] foreignObject > div::-webkit-scrollbar-thumb,
+  [data-type="table-frame"] *::-webkit-scrollbar-thumb,
+  [data-type="table"] *::-webkit-scrollbar-thumb,
+  [id^="table-"] *::-webkit-scrollbar-thumb {
+    background: #94a3b8 !important;
+    border-radius: 4px !important;
+    border: none !important;
+  }
+
+  div.table-card-wrapper::-webkit-scrollbar-thumb:hover,
+  div.table-container::-webkit-scrollbar-thumb:hover,
+  [data-type="table-frame"] foreignObject > div::-webkit-scrollbar-thumb:hover,
+  [data-type="table"] foreignObject > div::-webkit-scrollbar-thumb:hover,
+  [id^="table-"] foreignObject > div::-webkit-scrollbar-thumb:hover,
+  [data-type="table-frame"] *::-webkit-scrollbar-thumb:hover,
+  [data-type="table"] *::-webkit-scrollbar-thumb:hover,
+  [id^="table-"] *::-webkit-scrollbar-thumb:hover {
+    background: #64748b !important;
+  }
+
+  [data-type="table-frame"] tbody,
+  [data-type="table"] tbody,
+  [id^="table-"] tbody,
+  .table-card-wrapper tbody {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+    will-change: auto !important;
+  }
+
+  [data-type="table-frame"] tr,
+  [data-type="table"] tr,
+  [id^="table-"] tr,
+  .table-card-wrapper tr {
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+    will-change: auto !important;
+  }
+
+  [data-type="table-frame"] td,
+  [data-type="table"] td,
+  [id^="table-"] td,
+  .table-card-wrapper td {
+    transform: none !important;
+    will-change: auto !important;
+    box-sizing: border-box !important;
+  }
+
+  [data-type="table-frame"][data-scrollable="true"] td,
+  [data-type="table"][data-scrollable="true"] td,
+  [id^="table-"][data-scrollable="true"] td,
+  .table-card-wrapper.table-scrollable td,
+  .table-container.table-scrollable td,
+  .table-card-wrapper[data-scrollable="true"] td,
+  .table-container[data-scrollable="true"] td {
+    min-width: 65px !important;
+    box-sizing: border-box !important;
   }
 
   .hide-controls::-webkit-media-controls {
@@ -4425,6 +4593,17 @@ const MainEditor = ({
               localBBox = { x, y, width: w, height: h };
             }
           }
+        } else if (el.getAttribute('data-type') === 'table-frame' || el.getAttribute('data-type') === 'table' || (el.id && el.id.startsWith('table-'))) {
+          const fo = el.querySelector('foreignObject') || el.querySelector('rect');
+          if (fo) {
+            const w = parseFloat(fo.getAttribute('width')) || 0;
+            const h = parseFloat(fo.getAttribute('height')) || 0;
+            const x = parseFloat(fo.getAttribute('x') || '0');
+            const y = parseFloat(fo.getAttribute('y') || '0');
+            if (w > 0 && h > 0) {
+              localBBox = { x, y, width: w, height: h };
+            }
+          }
         }
         const elScreenCtm = el.getScreenCTM();
 
@@ -7209,6 +7388,17 @@ const MainEditor = ({
       return hotspotGroup;
     }
 
+    // Tables are single compound elements; clicking or dragging inside them targets the parent table!
+    const tableGroup = current && typeof current.closest === 'function'
+      ? current.closest('[data-type="table-frame"], [data-type="table"], [id^="table-"]')
+      : null;
+    if (tableGroup) {
+      if (!tableGroup.id) {
+        tableGroup.id = `table-${Date.now()}`;
+      }
+      return tableGroup;
+    }
+
     // Compound Elements from Elements system (buttons, embed frames, image frames, audio frames)
     const elementCompoundTarget = getElementCompoundTarget(current);
     if (elementCompoundTarget) {
@@ -7235,7 +7425,7 @@ const MainEditor = ({
         current.getAttribute('data-type') !== 'shield' &&
         current.parentNode?.getAttribute('data-type') !== 'button' &&
         current.parentNode?.parentNode?.getAttribute('data-type') !== 'button' &&
-        !['svg', 'defs', 'clippath', 'lineargradient', 'radialgradient', 'pattern', 'filter', 'style', 'metadata'].includes(tagName)
+        !['svg', 'defs', 'clippath', 'lineargradient', 'radialgradient', 'pattern', 'filter', 'style', 'metadata', 'table', 'tbody', 'thead', 'tr', 'td', 'th'].includes(tagName)
       ) {
         current.id = `${tagName}-${Math.random().toString(36).substr(2, 9)}`;
         if (!deepestElementWithId) deepestElementWithId = current;
@@ -7253,7 +7443,10 @@ const MainEditor = ({
           current.getAttribute('data-type') === 'hotspot' ||
           current.getAttribute('data-name') === 'Free Frame' ||
           current.getAttribute('data-type') === 'shape' ||
-          current.getAttribute('data-type') === 'icon'
+          current.getAttribute('data-type') === 'icon' ||
+          current.getAttribute('data-type') === 'table-frame' ||
+          current.getAttribute('data-type') === 'table' ||
+          (current.id && current.id.startsWith('table-'))
         ))
       ) {
         // Prevent targeting inner image of an image group directly, or inner elements of video/gif groups
@@ -8107,6 +8300,17 @@ const MainEditor = ({
                     bbox = { x: rx, y: ry, width: rw, height: rh };
                   }
                 }
+              } else if (el.getAttribute('data-type') === 'table-frame' || el.getAttribute('data-type') === 'table' || (el.id && el.id.startsWith('table-'))) {
+                const fo = el.querySelector('foreignObject') || el.querySelector('rect');
+                if (fo) {
+                  const rw = parseFloat(fo.getAttribute('width')) || 0;
+                  const rh = parseFloat(fo.getAttribute('height')) || 0;
+                  const rx = parseFloat(fo.getAttribute('x') || '0');
+                  const ry = parseFloat(fo.getAttribute('y') || '0');
+                  if (rw > 0 && rh > 0) {
+                    bbox = { x: rx, y: ry, width: rw, height: rh };
+                  }
+                }
               }
             }
 
@@ -8414,8 +8618,9 @@ const MainEditor = ({
             const isForeignObject = el.tagName?.toLowerCase() === 'foreignobject';
             const isHotspotIconGroup = el.getAttribute('data-is-hotspot') === 'true' && (el.tagName?.toLowerCase() === 'g' || el.tagName?.toLowerCase() === 'svg');
             const isGroup = (el.tagName?.toLowerCase() === 'g' || el.tagName === 'multi') && el.getAttribute('data-is-hotspot') !== 'true';
+            const isTable = el.getAttribute('data-type') === 'table-frame' || el.getAttribute('data-type') === 'table' || (el.id && el.id.startsWith('table-'));
             const isFreeFrame = (el.getAttribute('data-name') === 'Free Frame' && el.tagName?.toLowerCase() === 'rect') || isForeignObject;
-            const isShape = (['path', 'polygon', 'circle', 'ellipse', 'rect', 'polyline', 'line'].includes(el.tagName?.toLowerCase()) || isGroup) && !isFreeFrame && !isForeignObject;
+            const isShape = (['path', 'polygon', 'circle', 'ellipse', 'rect', 'polyline', 'line'].includes(el.tagName?.toLowerCase()) || isGroup) && !isFreeFrame && !isForeignObject && !isTable;
             const isCorner = ['nw', 'ne', 'se', 'sw'].includes(dir);
             const isCtrlPressedMove = event.ctrlKey || (event.sourceEvent && event.sourceEvent.ctrlKey) || isCtrlPressedRef.current;
 
@@ -8502,6 +8707,48 @@ const MainEditor = ({
               }
             }
 
+
+            // ── TABLE RESIZING: Directly resize foreignObject & overlay rect bounds ──
+            if (isTable) {
+              const newLocalX = state.localAnchor.x + (bbox.x - state.localAnchor.x) * scaleX;
+              const newLocalY = state.localAnchor.y + (bbox.y - state.localAnchor.y) * scaleY;
+              const newLocalRight = state.localAnchor.x + ((bbox.x + bbox.width) - state.localAnchor.x) * scaleX;
+              const newLocalBottom = state.localAnchor.y + ((bbox.y + bbox.height) - state.localAnchor.y) * scaleY;
+
+              const finalX = Math.min(newLocalX, newLocalRight);
+              const finalY = Math.min(newLocalY, newLocalBottom);
+              const finalWidth = Math.max(20, Math.abs(newLocalRight - newLocalX));
+              const finalHeight = Math.max(15, Math.abs(newLocalBottom - newLocalY));
+
+              const fo = el.querySelector('foreignObject');
+              const overlay = el.querySelector('rect.svg-table-overlay') || el.querySelector('rect');
+
+              const safeW = Math.round(finalWidth * 100) / 100;
+              const safeH = Math.round(finalHeight * 100) / 100;
+              const safeX = Math.round(finalX * 100) / 100;
+              const safeY = Math.round(finalY * 100) / 100;
+
+              if (fo) {
+                fo.setAttribute('x', safeX);
+                fo.setAttribute('y', safeY);
+                fo.setAttribute('width', safeW);
+                fo.setAttribute('height', safeH);
+              }
+              if (overlay) {
+                overlay.setAttribute('x', safeX);
+                overlay.setAttribute('y', safeY);
+                overlay.setAttribute('width', safeW);
+                overlay.setAttribute('height', safeH);
+              }
+
+              el.setAttribute('data-width', safeW);
+              el.setAttribute('data-height', safeH);
+
+              if (typeof drawOverlayHighlight === 'function') {
+                drawOverlayHighlight(el, 'selected');
+              }
+              return;
+            }
 
             if (isFreeFrame || isGroup || isHotspotIconGroup || isShape) {
               const newLocalX = state.localAnchor.x + (bbox.x - state.localAnchor.x) * scaleX;
@@ -8901,8 +9148,9 @@ const MainEditor = ({
                   const isSlideshow = isSlideshowGroup(el);
 
                   const isDecorator = el.getAttribute('data-type') === 'decorator' || (el.id && el.id.startsWith('decorator-'));
+                  const isTable = el.getAttribute('data-type') === 'table-frame' || el.getAttribute('data-type') === 'table' || (el.id && el.id.startsWith('table-'));
 
-                  // ── HOTSPOT ICON GROUP, AUDIO GROUP, SLIDESHOW & DECORATOR: update outer transform, NOT children ───────
+                  // ── DECORATOR: update outer transform, NOT children ───────
                   if (isDecorator) {
                     const scaleMatrix = new DOMMatrix()
                       .translate(worldAnchor.x, worldAnchor.y)
@@ -8915,6 +9163,8 @@ const MainEditor = ({
                     }
                     return;
                   }
+
+
 
                   if (isSlideshow) {
                     resizeSlideshowGroup({
@@ -9568,6 +9818,23 @@ const MainEditor = ({
 
   const handleSvgMouseDown = (pageIndex, e) => {
     if (e.button !== 0 || e.target.closest('.resize-handle')) return;
+
+    // Check if clicking inside a table (cell, row, or container) and keep it selected
+    const tableEl = e.target.closest('[data-type="table-frame"], [data-type="table"], [id^="table-"]') ||
+                    e.target.closest('.table-card-wrapper, table')?.closest('g');
+    if (tableEl && tableEl.id) {
+      if (selectedLayerIdRef.current !== tableEl.id) {
+        selectedLayerIdRef.current = tableEl.id;
+        if (typeof setSelectedLayerId === 'function') setSelectedLayerId(tableEl.id);
+        if (typeof setMultiSelectedIds === 'function') {
+          multiSelectedIdsRef.current = new Set([tableEl.id]);
+          setMultiSelectedIds(new Set([tableEl.id]));
+        }
+        if (typeof drawOverlayHighlight === 'function') {
+          drawOverlayHighlight(tableEl, 'selected');
+        }
+      }
+    }
 
     // Allow native text selection/interaction inside actively edited text boxes
     if (e.target.closest('[contenteditable="true"]')) {
@@ -12166,7 +12433,8 @@ const MainEditor = ({
           const isFreeFrame = underEl.getAttribute('data-name') === 'Free Frame';
           const isShape = underEl.getAttribute('data-type') === 'shape';
           const isIcon = underEl.getAttribute('data-type') === 'icon';
-          if (isHotspot || isFreeFrame || isShape || isIcon) {
+          const isTable = underEl.getAttribute('data-type') === 'table-frame' || underEl.getAttribute('data-type') === 'table' || (underEl.id && underEl.id.startsWith('table-'));
+          if (isHotspot || isFreeFrame || isShape || isIcon || isTable) {
             interactiveTarget = underEl;
           }
         }
@@ -12180,13 +12448,14 @@ const MainEditor = ({
             const isFreeFrame = curr.getAttribute('data-name') === 'Free Frame';
             const isShape = curr.getAttribute('data-type') === 'shape';
             const isIcon = curr.getAttribute('data-type') === 'icon';
+            const isTable = curr.getAttribute('data-type') === 'table-frame' || curr.getAttribute('data-type') === 'table' || (curr.id && curr.id.startsWith('table-')) || curr.classList?.contains('table-card-wrapper') || curr.tagName?.toLowerCase() === 'table';
             const isShield = curr.getAttribute('data-name') === 'Document Shield' || curr.getAttribute('data-type') === 'shield';
             if (isShield) {
               interactiveTarget = null;
               break;
             }
-            if (isHotspot || isFreeFrame || isShape || isIcon) {
-              interactiveTarget = curr;
+            if (isHotspot || isFreeFrame || isShape || isIcon || isTable) {
+              interactiveTarget = curr.closest ? (curr.closest('[data-type="table-frame"], [data-type="table"], [id^="table-"]') || curr) : curr;
               break;
             }
           }
