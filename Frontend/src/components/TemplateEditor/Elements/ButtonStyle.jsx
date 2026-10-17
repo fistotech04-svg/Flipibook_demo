@@ -310,9 +310,11 @@ const ButtonStyle = ({ isFullView }) => {
     }));
   };
 
+  const displayButtons = isFullView ? buttonTemplates : buttonTemplates.slice(0, 4);
+
   return (
     <div className={`w-full grid grid-cols-2 gap-[0.6vw] ${isFullView ? 'p-[0.5vw]' : ''}`}>
-      {buttonTemplates.map((btn) => (
+      {displayButtons.map((btn) => (
         <button
           key={btn.id}
           type="button"

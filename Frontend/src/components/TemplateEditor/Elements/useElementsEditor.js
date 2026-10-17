@@ -209,6 +209,21 @@ export const handleAddElementToSvg = ({
     }
   }
 
+  // If kinetic typography element, adapt to page canvas size
+  const isKinetic = importedElement.getAttribute('data-typography-type') === 'kinetic' ||
+                    (importedElement.getAttribute('data-type') === 'text' && (importedElement.id?.startsWith('typography-') || !!importedElement.querySelector('.kinetic-container')));
+
+  if (isKinetic) {
+    const fo = importedElement.querySelector('foreignObject');
+    if (fo) {
+      const maxAllowedW = Math.round(pw * 0.9);
+      if (elW > maxAllowedW) {
+        elW = maxAllowedW;
+        fo.setAttribute('width', elW.toString());
+      }
+    }
+  }
+
   if (dropPoint) {
     if (isTable) {
       const marginX = pw <= 400 ? (pw > 150 ? 15 : 8) : 20;
@@ -222,13 +237,19 @@ export const handleAddElementToSvg = ({
       const posY = Math.round(Math.max(minY, Math.min(maxY, dropPoint.y - (elH / 2))));
       importedElement.setAttribute('transform', `translate(${posX}, ${posY})`);
     } else {
-      const currentTransform = importedElement.getAttribute('transform') || '';
-      // Strip old translate if replacing
-      importedElement.setAttribute('transform', `translate(${Math.round(dropPoint.x - (elW / 2))}, ${Math.round(dropPoint.y - (elH / 2))})`);
+      const minX = 5;
+      const maxX = Math.max(minX, pw - elW - 5);
+      const minY = 5;
+      const maxY = Math.max(minY, ph - elH - 5);
+      const posX = Math.round(Math.max(minX, Math.min(maxX, dropPoint.x - (elW / 2))));
+      const posY = Math.round(Math.max(minY, Math.min(maxY, dropPoint.y - (elH / 2))));
+      importedElement.setAttribute('transform', `translate(${posX}, ${posY})`);
     }
-  } else if (isTable || !importedElement.getAttribute('transform') || (isMap && importedElement.getAttribute('transform')?.includes('15'))) {
-    const cx = Math.round(Math.max(0, (pw - elW) / 2));
-    const cy = Math.round(Math.max(0, (ph - elH) / 2));
+  } else if (isTable || isKinetic || !importedElement.getAttribute('transform') || (isMap && importedElement.getAttribute('transform')?.includes('15'))) {
+    const minX = 10;
+    const minY = 10;
+    const cx = Math.round(Math.max(minX, Math.min(pw - elW - minX, (pw - elW) / 2)));
+    const cy = Math.round(Math.max(minY, Math.min(ph - elH - minY, (ph - elH) / 2)));
     importedElement.setAttribute('transform', `translate(${cx}, ${cy})`);
   }
 
