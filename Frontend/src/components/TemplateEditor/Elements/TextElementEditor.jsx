@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Sparkles, Sliders, Type, AlignLeft } from 'lucide-react';
+import { Sparkles, Sliders, Type, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import ColorPicker from '../ColorPicker';
 import { KINETIC_ANIMATION_KEYFRAMES, calculateKineticDimensions, cleanKeyframesFromCss } from './kineticTypographyUtils';
 
@@ -105,6 +105,7 @@ const fontSizes = [14, 16, 18, 20, 24, 28, 32, 34, 36, 40, 48, 50, 56, 64, 72, 8
 
 const ANIMATION_PRESETS = [
   { id: 'none', name: 'None (Static)' },
+  { id: 'motion-graphic', name: 'Lottie Motion Graphic (Active)' },
   { id: 'slide-up', name: 'Kinetic Slide Up (Staggered)' },
   { id: 'slide-down', name: 'Kinetic Slide Down (Staggered)' },
   { id: 'pop-bounce', name: 'Kinetic Pop & Bounce' },
@@ -168,7 +169,9 @@ const extractElementProperties = (selectedElement, selectedTextId) => {
       animationDuration: 3800,
       animationStagger: 50,
       isKinetic: false,
-      kineticText: ''
+      kineticText: '',
+      isMotionGraphic: false,
+      motionGraphicText: ''
     };
   }
 
@@ -186,13 +189,22 @@ const extractElementProperties = (selectedElement, selectedTextId) => {
   const skewAngle = skewMatch ? parseFloat(skewMatch[1]) : (parseFloat(selectedElement.getAttribute('data-skew-angle')) || 0);
 
   const animStyleAttr = selectedElement.getAttribute('data-animation-style');
-  const hasKineticClass = selectedElement.getAttribute('data-typography-type') === 'kinetic' ||
-    !!selectedElement.querySelector('.kinetic-container, .word, .slide');
+  const isMotionGraphic = selectedElement.getAttribute('data-typography-type') === 'motion-graphic' ||
+    !!selectedElement.querySelector('.motion-text-content, .motion-subtext-content, .motion-outer-glow, .flipi-line, .box-accent-frame, .yt-logo-badge');
+  const hasKineticClass = !isMotionGraphic && (selectedElement.getAttribute('data-typography-type') === 'kinetic' ||
+    !!selectedElement.querySelector('.kinetic-container, .word, .slide'));
   const isKinetic = hasKineticClass;
-  const animationStyle = animStyleAttr || (hasKineticClass ? 'slide-up' : 'none');
+  const animationStyle = animStyleAttr || (hasKineticClass ? 'slide-up' : (isMotionGraphic ? 'motion-graphic' : 'none'));
 
-  const durationAttr = selectedElement.getAttribute('data-animation-duration');
-  const animationDuration = durationAttr ? (parseInt(durationAttr, 10) || 3800) : 3800;
+  const durationAttr = selectedElement.getAttribute('data-animation-duration') || selectedElement.getAttribute('data-duration');
+  let animationDuration = durationAttr ? (parseInt(durationAttr, 10) || 3800) : 3800;
+  if (!durationAttr && isMotionGraphic) {
+    const styleTag = selectedElement.querySelector('style');
+    const durMatch = styleTag?.textContent?.match(/(\d+)ms\s+infinite/i);
+    if (durMatch) {
+      animationDuration = parseInt(durMatch[1], 10) || 3800;
+    }
+  }
 
   const staggerAttr = selectedElement.getAttribute('data-animation-stagger');
   const animationStagger = staggerAttr ? (parseInt(staggerAttr, 10) || 50) : 50;
@@ -201,8 +213,15 @@ const extractElementProperties = (selectedElement, selectedTextId) => {
   let bgRadius = parseInt(selectedElement.getAttribute('data-bg-radius'), 10) || 8;
   let bgPadding = parseInt(selectedElement.getAttribute('data-bg-padding'), 10) || 12;
 
+  const motionBoundary = selectedElement.querySelector('.motion-click-boundary');
   const kineticContainer = selectedElement.querySelector('.kinetic-container');
-  if (kineticContainer) {
+  if (motionBoundary) {
+    if (!rawBgColor && motionBoundary.getAttribute('fill')) {
+      rawBgColor = motionBoundary.getAttribute('fill');
+    }
+    const rx = motionBoundary.getAttribute('rx');
+    if (rx) bgRadius = parseInt(rx, 10) || bgRadius;
+  } else if (kineticContainer) {
     if (kineticContainer.style.backgroundColor && kineticContainer.style.backgroundColor !== 'transparent') {
       rawBgColor = kineticContainer.style.backgroundColor;
     }
@@ -222,6 +241,18 @@ const extractElementProperties = (selectedElement, selectedTextId) => {
   const bgColor = toHexColor(rawBgColor, 'transparent');
 
   let kineticText = selectedElement.getAttribute('data-kinetic-text') || '';
+  let motionGraphicText = selectedElement.getAttribute('data-text') || '';
+  let motionGraphicSubText = selectedElement.getAttribute('data-subtext') || '';
+  if (!motionGraphicText && isMotionGraphic) {
+    const motionSpan = selectedElement.querySelector('.motion-text-content, .cyber-text, .flipi-text-a, .box-title-a, .yt-title-text');
+    if (motionSpan) motionGraphicText = motionSpan.textContent || '';
+  }
+  if (!motionGraphicSubText && isMotionGraphic) {
+    const subSpan = selectedElement.querySelector('.motion-text-subcontent, .motion-subtext-content, .flipi-text-b, .box-title-b');
+    if (subSpan) motionGraphicSubText = subSpan.textContent || '';
+  }
+
+
   if (!kineticText && hasKineticClass) {
     const wordEls = Array.from(selectedElement.querySelectorAll('.word'));
     if (wordEls.length > 0) {
@@ -245,6 +276,12 @@ const extractElementProperties = (selectedElement, selectedTextId) => {
 
   // Font Family extraction
   let fontFamily = selectedElement.getAttribute('data-font-family') || '';
+  if (!fontFamily && isMotionGraphic) {
+    const motionSpan = selectedElement.querySelector('.motion-text-content, .motion-subtext-content');
+    if (motionSpan && motionSpan.style.fontFamily) {
+      fontFamily = motionSpan.style.fontFamily;
+    }
+  }
   if (!fontFamily && kineticContainer && kineticContainer.style.fontFamily) {
     fontFamily = kineticContainer.style.fontFamily;
   }
@@ -262,6 +299,12 @@ const extractElementProperties = (selectedElement, selectedTextId) => {
 
   // Font Weight extraction
   let fontWeight = selectedElement.getAttribute('data-font-weight') || '';
+  if (!fontWeight && isMotionGraphic) {
+    const motionSpan = selectedElement.querySelector('.motion-text-content');
+    if (motionSpan && motionSpan.style.fontWeight) {
+      fontWeight = motionSpan.style.fontWeight;
+    }
+  }
   if (!fontWeight && kineticContainer && kineticContainer.style.fontWeight) {
     fontWeight = kineticContainer.style.fontWeight;
   }
@@ -279,6 +322,12 @@ const extractElementProperties = (selectedElement, selectedTextId) => {
 
   // Font Size extraction
   let fontSize = parseInt(selectedElement.getAttribute('data-font-size'), 10) || 0;
+  if (!fontSize && isMotionGraphic) {
+    const motionSpan = selectedElement.querySelector('.motion-text-content');
+    if (motionSpan && motionSpan.style.fontSize) {
+      fontSize = parseInt(motionSpan.style.fontSize, 10) || 0;
+    }
+  }
   if (!fontSize && kineticContainer && kineticContainer.style.fontSize) {
     fontSize = parseInt(kineticContainer.style.fontSize, 10) || 0;
   }
@@ -294,8 +343,31 @@ const extractElementProperties = (selectedElement, selectedTextId) => {
   }
   if (!fontSize) fontSize = 36;
 
-  // Text Color extraction
+  // Primary Text Color extraction
   let rawTextColor = selectedElement.getAttribute('data-text-color') || '';
+  const motionSpanForColor = selectedElement.querySelector('.motion-text-content, .cyber-text, .flipi-text-a, .box-title-a, .yt-title-text');
+  if (!rawTextColor && motionSpanForColor) {
+    rawTextColor = motionSpanForColor.style.color || motionSpanForColor.getAttribute('fill') || '';
+  }
+  if (!rawTextColor) {
+    const styleTag = selectedElement.querySelector('style');
+    const spanColorMatch = styleTag?.textContent?.match(/(?:\.box-title-a|\.cyber-text|\.flipi-text-a|\.yt-title-text|\.motion-text-content)[^{]*\{[^}]*color:\s*([^;}\s]+)/i) ||
+      styleTag?.textContent?.match(/(?:\.box-title-a|\.cyber-text|\.flipi-text-a|\.yt-title-text|\.motion-text-content)[^{]*\{[^}]*fill:\s*([^;}\s]+)/i);
+    if (spanColorMatch) {
+      rawTextColor = spanColorMatch[1].trim();
+    }
+  }
+  if (!rawTextColor && motionSpanForColor && typeof window !== 'undefined' && window.getComputedStyle) {
+    try {
+      const compColor = window.getComputedStyle(motionSpanForColor).color;
+      if (compColor) rawTextColor = compColor;
+    } catch {
+      // Fallback
+    }
+  }
+  if (!rawTextColor) {
+    rawTextColor = selectedElement.getAttribute('data-primary-color') || '';
+  }
   const spanWithColor = selectedElement.querySelector('span.slide, span.char');
   if (!rawTextColor && spanWithColor) {
     rawTextColor = spanWithColor.style.color || spanWithColor.style.webkitTextFillColor || '';
@@ -303,43 +375,87 @@ const extractElementProperties = (selectedElement, selectedTextId) => {
   if (!rawTextColor && kineticContainer && kineticContainer.style.color) {
     rawTextColor = kineticContainer.style.color;
   }
-  if (!rawTextColor) {
-    const styleTag = selectedElement.querySelector('style');
-    const spanColorMatch = styleTag?.textContent?.match(/span\.(?:slide|char)[^{]*\{[^}]*color:\s*([^;}\s]+)/i) ||
-      styleTag?.textContent?.match(/span\.(?:slide|char)[^{]*\{[^}]*-webkit-text-fill-color:\s*([^;}\s]+)/i) ||
-      styleTag?.textContent?.match(/color:\s*([^;}\s]+)/i);
-    if (spanColorMatch) {
-      rawTextColor = spanColorMatch[1].trim();
-    }
-  }
   if (!rawTextColor && targetText) {
     const innerDiv = targetText.querySelector('div');
     const styleSource = innerDiv || targetText;
     rawTextColor = styleSource.style.color || targetText.getAttribute('fill') || targetText.style.fill || '';
   }
-  if (!rawTextColor && spanWithColor && typeof window !== 'undefined' && window.getComputedStyle) {
-    try {
-      const compColor = window.getComputedStyle(spanWithColor).color;
-      if (compColor) rawTextColor = compColor;
-    } catch {
-      // Fallback if computed style cannot be resolved
-    }
-  }
   const textColor = toHexColor(rawTextColor, '#FFFFFF');
 
-  // Stroke Color extraction
-  let rawStrokeColor = '';
-  const strokeColorMatch = style.match(/--stroke-color:\s*([^;]+)/);
-  if (strokeColorMatch) {
-    rawStrokeColor = strokeColorMatch[1].trim();
-  } else if (selectedElement.getAttribute('data-stroke-color')) {
-    rawStrokeColor = selectedElement.getAttribute('data-stroke-color');
-  } else if (spanWithColor && spanWithColor.style.webkitTextStrokeColor) {
+  // Secondary Text Color extraction (for motion graphic subtitle / split text)
+  let rawSubTextColor = selectedElement.getAttribute('data-subtext-color') || '';
+  const motionSubSpanForColor = selectedElement.querySelector('.motion-text-subcontent, .motion-subtext-content, .flipi-text-b, .box-title-b');
+  if (!rawSubTextColor && motionSubSpanForColor) {
+    rawSubTextColor = motionSubSpanForColor.style.color || motionSubSpanForColor.getAttribute('fill') || '';
+  }
+  if (!rawSubTextColor) {
+    const styleTag = selectedElement.querySelector('style');
+    const subColorMatch = styleTag?.textContent?.match(/(?:\.box-title-b|\.flipi-text-b|\.motion-text-subcontent|\.motion-subtext-content)[^{]*\{[^}]*color:\s*([^;}\s]+)/i) ||
+      styleTag?.textContent?.match(/(?:\.box-title-b|\.flipi-text-b|\.motion-text-subcontent|\.motion-subtext-content)[^{]*\{[^}]*fill:\s*([^;}\s]+)/i);
+    if (subColorMatch) {
+      rawSubTextColor = subColorMatch[1].trim();
+    }
+  }
+  if (!rawSubTextColor && motionSubSpanForColor && typeof window !== 'undefined' && window.getComputedStyle) {
+    try {
+      const compColor = window.getComputedStyle(motionSubSpanForColor).color;
+      if (compColor) rawSubTextColor = compColor;
+    } catch {
+      // Fallback
+    }
+  }
+  if (!rawSubTextColor && isMotionGraphic) {
+    const template = selectedElement.getAttribute('data-motion-template');
+    if (template === 'box-reveal') {
+      rawSubTextColor = selectedElement.getAttribute('data-primary-color') || '#FF1E27';
+    } else {
+      rawSubTextColor = selectedElement.getAttribute('data-primary-color') || '#FFFFFF';
+    }
+  }
+  const subTextColor = toHexColor(rawSubTextColor, '#FF1E27');
+
+  // Stroke / Accent Color extraction
+  let rawStrokeColor = selectedElement.getAttribute('data-stroke-color') || '';
+  const motionStrokeEl = selectedElement.querySelector('.box-trim-frame, .cyber-inner-stroke, .cyber-glow-stroke, .flipi-slash-accent');
+  if (!rawStrokeColor && motionStrokeEl) {
+    rawStrokeColor = motionStrokeEl.getAttribute('stroke') || motionStrokeEl.style.stroke || '';
+  }
+  if (!rawStrokeColor) {
+    const strokeColorMatch = style.match(/--stroke-color:\s*([^;]+)/);
+    if (strokeColorMatch) {
+      rawStrokeColor = strokeColorMatch[1].trim();
+    }
+  }
+  if (!rawStrokeColor) {
+    rawStrokeColor = selectedElement.getAttribute('data-secondary-color') || '';
+  }
+  if (!rawStrokeColor && spanWithColor && spanWithColor.style.webkitTextStrokeColor) {
     rawStrokeColor = spanWithColor.style.webkitTextStrokeColor;
-  } else if (targetText) {
+  } else if (!rawStrokeColor && targetText) {
     rawStrokeColor = targetText.getAttribute('stroke') || '';
   }
   const strokeColor = toHexColor(rawStrokeColor, '#000000');
+
+  // Text Align extraction
+  let textAlign = selectedElement.getAttribute('data-text-align') || '';
+  if (!textAlign && targetText) {
+    const innerDiv = targetText.querySelector('div');
+    textAlign = innerDiv?.style?.textAlign || targetText.getAttribute('text-anchor') || '';
+    if (textAlign === 'middle') textAlign = 'center';
+    else if (textAlign === 'end') textAlign = 'right';
+    else if (textAlign === 'start') textAlign = 'left';
+  }
+  if (!textAlign) {
+    const foDiv = selectedElement.querySelector('foreignObject > div');
+    if (foDiv?.style?.justifyContent === 'center' || foDiv?.style?.textAlign === 'center') {
+      textAlign = 'center';
+    } else if (foDiv?.style?.justifyContent === 'flex-end' || foDiv?.style?.textAlign === 'right') {
+      textAlign = 'right';
+    } else if (foDiv?.style?.justifyContent === 'flex-start' || foDiv?.style?.textAlign === 'left') {
+      textAlign = 'left';
+    }
+  }
+  if (!textAlign) textAlign = isMotionGraphic ? 'center' : 'left';
 
   return {
     strokeWidth,
@@ -354,11 +470,16 @@ const extractElementProperties = (selectedElement, selectedTextId) => {
     fontFamily,
     fontWeight,
     fontSize,
+    textAlign,
     animationStyle,
     animationDuration,
     animationStagger,
     isKinetic,
-    kineticText
+    kineticText,
+    isMotionGraphic,
+    motionGraphicText,
+    motionGraphicSubText,
+    subTextColor
   };
 };
 
@@ -369,6 +490,7 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
   const [strokeWidth, setStrokeWidth] = useState(0);
   const [strokeColor, setStrokeColor] = useState('#000000');
   const [textColor, setTextColor] = useState('#ffffff');
+  const [subTextColor, setSubTextColor] = useState('#FF0033');
   const [bgColor, setBgColor] = useState('transparent');
   const [bgRadius, setBgRadius] = useState(8);
   const [bgPadding, setBgPadding] = useState(12);
@@ -381,6 +503,7 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
   const [fontFamily, setFontFamily] = useState('Inter');
   const [fontWeight, setFontWeight] = useState('800');
   const [fontSize, setFontSize] = useState(36);
+  const [textAlign, setTextAlign] = useState('left');
 
   // Kinetic & Animation States
   const [animationStyle, setAnimationStyle] = useState('none');
@@ -388,6 +511,9 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
   const [animationStagger, setAnimationStagger] = useState(50);
   const [isKinetic, setIsKinetic] = useState(false);
   const [kineticText, setKineticText] = useState('');
+  const [isMotionGraphic, setIsMotionGraphic] = useState(false);
+  const [motionGraphicText, setMotionGraphicText] = useState('');
+  const [motionGraphicSubText, setMotionGraphicSubText] = useState('');
 
   // Synchronize state during render when selected element changes
   if (selectedElement && loadedSelectionKey !== currentKey) {
@@ -405,11 +531,16 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
     setFontFamily(props.fontFamily);
     setFontWeight(props.fontWeight);
     setFontSize(props.fontSize);
+    setTextAlign(props.textAlign || (props.isMotionGraphic ? 'center' : 'left'));
     setAnimationStyle(props.animationStyle);
     setAnimationDuration(props.animationDuration);
     setAnimationStagger(props.animationStagger);
     setIsKinetic(props.isKinetic);
     setKineticText(props.kineticText);
+    setIsMotionGraphic(props.isMotionGraphic);
+    setMotionGraphicText(props.motionGraphicText);
+    setMotionGraphicSubText(props.motionGraphicSubText || '');
+    setSubTextColor(props.subTextColor || '#FF0033');
 
     // Auto-fit oversized/legacy kinetic elements and keep snug inside page
     if (props.isKinetic) {
@@ -419,7 +550,7 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
         const lines = props.kineticText.split('\n').filter(Boolean);
         const snug = calculateKineticDimensions(lines, props.fontSize, props.bgPadding);
         let modified = false;
-        if (curW >= 300 && snug.width < curW - 20) {
+        if (Math.abs(curW - snug.width) > 15) {
           fo.setAttribute('width', snug.width.toString());
           fo.setAttribute('height', snug.height.toString());
           modified = true;
@@ -446,6 +577,33 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
           }
         }
         if (modified) {
+          setTimeout(() => {
+            if (updateElementAttribute && selectedLayerId) {
+              const attrs = {};
+              Array.from(selectedElement.attributes).forEach(attr => {
+                attrs[attr.name] = attr.value;
+              });
+              attrs['innerHTML'] = selectedElement.innerHTML;
+              updateElementAttribute(selectedLayerId, attrs);
+            }
+          }, 0);
+        }
+      }
+    }
+
+    if (props.isMotionGraphic) {
+      const foDiv = selectedElement.querySelector('foreignObject > div');
+      if (foDiv) {
+        let alignModified = false;
+        if (foDiv.style.alignItems !== 'center') {
+          foDiv.style.alignItems = 'center';
+          alignModified = true;
+        }
+        if (!foDiv.style.justifyContent || foDiv.style.justifyContent === 'normal') {
+          foDiv.style.justifyContent = 'center';
+          alignModified = true;
+        }
+        if (alignModified) {
           setTimeout(() => {
             if (updateElementAttribute && selectedLayerId) {
               const attrs = {};
@@ -564,7 +722,7 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
       }
     });
 
-    const spans = Array.from(selectedElement.querySelectorAll('span.slide, span.char'));
+    const spans = Array.from(selectedElement.querySelectorAll('span.slide, span.char, .motion-text-content, .motion-text-subcontent, .cyber-text, .flipi-text-a, .flipi-text-b, .box-title-a, .box-title-b, .yt-title-text'));
     spans.forEach(span => {
       span.style.fontFamily = `'${val}', sans-serif`;
     });
@@ -576,10 +734,14 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
 
     const styleTag = selectedElement.querySelector('style');
     if (styleTag) {
-      const currentCss = styleTag.innerHTML;
+      let currentCss = styleTag.innerHTML;
       if (!currentCss.includes(`family=${val.replace(/ /g, '+')}`)) {
-        styleTag.innerHTML = `@import url('https://fonts.googleapis.com/css2?family=${val.replace(/ /g, '+')}:wght@400;700;800;900&display=swap');\n` + currentCss;
+        currentCss = `@import url('https://fonts.googleapis.com/css2?family=${val.replace(/ /g, '+')}:wght@400;700;800;900&display=swap');\n` + currentCss;
       }
+      if (isMotionGraphic) {
+        currentCss = currentCss.replace(/font-family:\s*[^;]+;/g, `font-family: '${val}', sans-serif !important;`);
+      }
+      styleTag.innerHTML = currentCss;
     }
 
     // Auto-resize foreignObject if needed
@@ -609,7 +771,7 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
       if (div) div.style.fontWeight = val;
     });
 
-    const spans = Array.from(selectedElement.querySelectorAll('span.slide, span.char'));
+    const spans = Array.from(selectedElement.querySelectorAll('span.slide, span.char, .motion-text-content, .motion-text-subcontent, .cyber-text, .flipi-text-a, .flipi-text-b, .box-title-a, .box-title-b, .yt-title-text'));
     spans.forEach(span => {
       span.style.fontWeight = val;
     });
@@ -617,6 +779,15 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
     const kineticContainer = selectedElement.querySelector('.kinetic-container');
     if (kineticContainer) {
       kineticContainer.style.fontWeight = val;
+    }
+
+    if (isMotionGraphic) {
+      const styleTag = selectedElement.querySelector('style');
+      if (styleTag) {
+        let currentCss = styleTag.innerHTML;
+        currentCss = currentCss.replace(/font-weight:\s*[^;]+;/g, `font-weight: ${val} !important;`);
+        styleTag.innerHTML = currentCss;
+      }
     }
 
     syncDOM();
@@ -637,7 +808,7 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
       if (div) div.style.fontSize = `${val}px`;
     });
 
-    const spans = Array.from(selectedElement.querySelectorAll('span.slide, span.char'));
+    const spans = Array.from(selectedElement.querySelectorAll('span.slide, span.char, .motion-text-content, .motion-text-subcontent, .cyber-text, .flipi-text-a, .flipi-text-b, .box-title-a, .box-title-b, .yt-title-text'));
     spans.forEach(span => {
       span.style.fontSize = `${val}px`;
     });
@@ -645,6 +816,15 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
     const kineticContainer = selectedElement.querySelector('.kinetic-container');
     if (kineticContainer) {
       kineticContainer.style.fontSize = `${val}px`;
+    }
+
+    if (isMotionGraphic) {
+      const styleTag = selectedElement.querySelector('style');
+      if (styleTag) {
+        let currentCss = styleTag.innerHTML;
+        currentCss = currentCss.replace(/font-size:\s*[^;]+;/g, `font-size: ${val}px !important;`);
+        styleTag.innerHTML = currentCss;
+      }
     }
 
     // Auto resize foreignObject wrapper to prevent overflow and keep snug
@@ -659,12 +839,72 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
     syncDOM();
   };
 
+  const handleTextAlignChange = (alignVal) => {
+    setTextAlign(alignVal);
+    if (!selectedElement) return;
+
+    selectedElement.setAttribute('data-text-align', alignVal);
+
+    // 1. Target standard SVG <text> and foreignObject <div>
+    const texts = getTargetTexts();
+    const anchorMap = { left: 'start', center: 'middle', right: 'end' };
+    const justifyMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
+
+    texts.forEach(t => {
+      t.setAttribute('text-anchor', anchorMap[alignVal] || 'middle');
+      t.style.textAnchor = anchorMap[alignVal] || 'middle';
+      const div = t.querySelector('div');
+      if (div) {
+        div.style.textAlign = alignVal;
+        div.style.justifyContent = justifyMap[alignVal] || 'center';
+      }
+    });
+
+    // 2. ForeignObject wrappers & motion containers
+    const foDivs = selectedElement.querySelectorAll('foreignObject > div');
+    foDivs.forEach(d => {
+      d.style.textAlign = alignVal;
+      d.style.justifyContent = justifyMap[alignVal] || 'center';
+      d.style.alignItems = 'center'; // Maintain vertical centering
+    });
+
+    // 3. Kinetic containers & motion spans
+    const kineticContainer = selectedElement.querySelector('.kinetic-container');
+    if (kineticContainer) {
+      kineticContainer.style.textAlign = alignVal;
+      kineticContainer.style.alignItems = alignVal === 'center' ? 'center' : (alignVal === 'right' ? 'flex-end' : 'flex-start');
+    }
+
+    const spans = selectedElement.querySelectorAll('.motion-text-content, .motion-text-subcontent, .cyber-text, .flipi-text-a, .flipi-text-b, .box-title-a, .box-title-b, .yt-title-text');
+    spans.forEach(s => {
+      s.style.textAlign = alignVal;
+    });
+
+    if (isMotionGraphic) {
+      const styleTag = selectedElement.querySelector('style');
+      if (styleTag) {
+        let currentCss = styleTag.innerHTML;
+        if (/text-align:\s*[^;]+;/i.test(currentCss)) {
+          currentCss = currentCss.replace(/text-align:\s*[^;]+;/g, `text-align: ${alignVal} !important;`);
+        } else {
+          currentCss = currentCss.replace(/(\.motion-text-content[^{]*\{)/i, `$1\n          text-align: ${alignVal} !important;`);
+        }
+        styleTag.innerHTML = currentCss;
+      }
+    }
+
+    syncDOM();
+  };
+
   const handleTextColorChange = (val) => {
     const hex = toHexColor(val, '#FFFFFF');
     setTextColor(hex);
     if (!selectedElement) return;
 
     selectedElement.setAttribute('data-text-color', hex);
+    if (isMotionGraphic) {
+      selectedElement.setAttribute('data-primary-color', hex);
+    }
 
     const texts = getTargetTexts();
     texts.forEach(text => {
@@ -677,9 +917,12 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
       }
     });
 
-    const spans = Array.from(selectedElement.querySelectorAll('span.slide, span.char'));
-    spans.forEach(span => {
+    // For motion graphics, primary text color targets the primary title (.motion-text-content, .cyber-text, .flipi-text-a, .box-title-a, .yt-title-text)
+    // and kinetic spans (span.slide, span.char)
+    const primarySpans = Array.from(selectedElement.querySelectorAll('span.slide, span.char, .motion-text-content, .cyber-text, .flipi-text-a, .box-title-a, .yt-title-text'));
+    primarySpans.forEach(span => {
       span.style.color = hex;
+      span.style.fill = hex;
       span.style.webkitTextFillColor = hex;
     });
 
@@ -691,8 +934,40 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
     const styleTag = selectedElement.querySelector('style');
     if (styleTag) {
       let css = styleTag.innerHTML;
-      css = css.replace(/color:\s*[^;]+;/g, `color: ${hex};`);
-      css = css.replace(/-webkit-text-fill-color:\s*[^;]+;/g, `-webkit-text-fill-color: ${hex};`);
+      if (isMotionGraphic) {
+        // Scoped replacement specifically for primary text classes
+        css = css.replace(/(\.(?:cyber-text|flipi-text-a|box-title-a|yt-title-text)[^{]*\{[^}]*?)color:\s*[^;]+;/gi, `$1color: ${hex} !important;`);
+        css = css.replace(/(\.(?:cyber-text|flipi-text-a|box-title-a|yt-title-text)[^{]*\{[^}]*?)fill:\s*[^;]+;/gi, `$1fill: ${hex} !important;`);
+      } else {
+        css = css.replace(/color:\s*[^;]+;/g, `color: ${hex};`);
+        css = css.replace(/-webkit-text-fill-color:\s*[^;]+;/g, `-webkit-text-fill-color: ${hex};`);
+      }
+      styleTag.innerHTML = css;
+    }
+
+    syncDOM();
+  };
+
+  const handleSubTextColorChange = (val) => {
+    const hex = toHexColor(val, '#FF0033');
+    setSubTextColor(hex);
+    if (!selectedElement) return;
+
+    selectedElement.setAttribute('data-subtext-color', hex);
+
+    // Target secondary text elements (.motion-text-subcontent, .motion-subtext-content, .flipi-text-b, .box-title-b)
+    const subSpans = Array.from(selectedElement.querySelectorAll('.motion-text-subcontent, .motion-subtext-content, .flipi-text-b, .box-title-b'));
+    subSpans.forEach(span => {
+      span.style.color = hex;
+      span.style.fill = hex;
+      span.style.webkitTextFillColor = hex;
+    });
+
+    const styleTag = selectedElement.querySelector('style');
+    if (styleTag) {
+      let css = styleTag.innerHTML;
+      css = css.replace(/(\.(?:flipi-text-b|box-title-b|motion-text-subcontent)[^{]*\{[^}]*?)color:\s*[^;]+;/gi, `$1color: ${hex} !important;`);
+      css = css.replace(/(\.(?:flipi-text-b|box-title-b|motion-text-subcontent)[^{]*\{[^}]*?)fill:\s*[^;]+;/gi, `$1fill: ${hex} !important;`);
       styleTag.innerHTML = css;
     }
 
@@ -705,6 +980,9 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
     if (!selectedElement) return;
 
     selectedElement.setAttribute('data-stroke-color', hex);
+    if (isMotionGraphic) {
+      selectedElement.setAttribute('data-secondary-color', hex);
+    }
     handleUpdate('stroke-color', hex);
 
     const texts = getTargetTexts();
@@ -721,6 +999,20 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
       span.style.webkitTextStrokeColor = hex;
     });
 
+    // Motion graphic frame/accent strokes:
+    // .cyber-inner-stroke, .cyber-glow-stroke, .flipi-slash-accent, .box-trim-frame
+    if (isMotionGraphic) {
+      const motionStrokes = selectedElement.querySelectorAll('.cyber-inner-stroke, .cyber-glow-stroke, .flipi-slash-accent, .box-trim-frame');
+      motionStrokes.forEach(el => {
+        el.setAttribute('stroke', hex);
+      });
+      const ytLogoBadge = selectedElement.querySelector('.yt-logo-box rect, .yt-logo-box polygon');
+      if (ytLogoBadge) {
+        const poly = selectedElement.querySelector('.yt-logo-box polygon');
+        if (poly) poly.setAttribute('fill', hex);
+      }
+    }
+
     syncDOM();
   };
 
@@ -731,8 +1023,14 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
 
     selectedElement.setAttribute('data-bg-color', hex);
 
+    const motionBoundary = selectedElement.querySelector('.motion-click-boundary');
     const kineticContainer = selectedElement.querySelector('.kinetic-container');
-    if (kineticContainer) {
+
+    if (motionBoundary) {
+      motionBoundary.setAttribute('fill', (hex && hex !== 'transparent' && hex !== 'none') ? hex : 'transparent');
+      motionBoundary.setAttribute('rx', bgRadius.toString());
+      motionBoundary.setAttribute('ry', bgRadius.toString());
+    } else if (kineticContainer) {
       kineticContainer.style.backgroundColor = hex;
       kineticContainer.style.borderRadius = `${bgRadius}px`;
       kineticContainer.style.padding = `${bgPadding}px`;
@@ -785,6 +1083,11 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
     if (!selectedElement) return;
     selectedElement.setAttribute('data-bg-radius', num.toString());
 
+    const motionBoundary = selectedElement.querySelector('.motion-click-boundary');
+    if (motionBoundary) {
+      motionBoundary.setAttribute('rx', num.toString());
+      motionBoundary.setAttribute('ry', num.toString());
+    }
     const kineticContainer = selectedElement.querySelector('.kinetic-container');
     if (kineticContainer) {
       kineticContainer.style.borderRadius = `${num}px`;
@@ -872,6 +1175,35 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
     if (!styleTag) {
       styleTag = document.createElementNS('http://www.w3.org/2000/svg', 'style');
       selectedElement.insertBefore(styleTag, selectedElement.firstChild);
+    }
+
+    if (isMotionGraphic) {
+      let currentCss = styleTag.innerHTML || '';
+      if (animType === 'none') {
+        currentCss = currentCss.replace(/animation-play-state:\s*[^;]+;/g, '');
+        currentCss += `\n#${selectedElement.id} * { animation-play-state: paused !important; }\n`;
+      } else {
+        currentCss = currentCss.replace(/#\S+\s+\*\s*\{\s*animation-play-state:\s*paused\s*!important;\s*\}/g, '');
+        currentCss = currentCss.replace(/(\d+)ms\s+infinite/g, `${durMs}ms infinite`);
+      }
+      styleTag.innerHTML = currentCss;
+
+      // Force instant animation timing reset on all animated children
+      const animatedEls = selectedElement.querySelectorAll('[class*="stroke"], [class*="text"], [class*="title"], [class*="slash"], [class*="badge"], [class*="box"]');
+      animatedEls.forEach(el => {
+        const prevAnim = el.style.animation;
+        el.style.animation = 'none';
+        void el.offsetHeight;
+        el.style.animation = prevAnim;
+        if (animType === 'none') {
+          el.style.animationPlayState = 'paused';
+        } else {
+          el.style.animationPlayState = 'running';
+        }
+      });
+
+      syncDOM();
+      return;
     }
 
     let css = cleanKeyframesFromCss(styleTag.innerHTML || '');
@@ -967,9 +1299,76 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
     syncDOM();
   };
 
+  const handleMotionGraphicTextChange = (e) => {
+    const val = e.target.value;
+    setMotionGraphicText(val);
+    if (!selectedElement) return;
+
+    selectedElement.setAttribute('data-text', val);
+    const motionSpans = selectedElement.querySelectorAll('.motion-text-content, .cyber-text, .flipi-text-a, .box-title-a, .yt-title-text');
+    motionSpans.forEach(span => {
+      span.textContent = val;
+    });
+    const typewriterContainer = selectedElement.querySelector('.yt-typewriter-container');
+    if (typewriterContainer) {
+      const steps = Math.max(val.length, 1);
+      const uniqueId = selectedElement.id.replace('typography-', '') || '';
+      const dur = selectedElement.getAttribute('data-duration') || 3600;
+      typewriterContainer.style.animation = `yt-typing-${uniqueId} ${dur}ms steps(${steps}, end) infinite`;
+    }
+    syncDOM();
+  };
+
+  const handleMotionGraphicSubTextChange = (e) => {
+    const val = e.target.value;
+    setMotionGraphicSubText(val);
+    if (!selectedElement) return;
+
+    selectedElement.setAttribute('data-subtext', val);
+    const subSpans = selectedElement.querySelectorAll('.motion-text-subcontent, .motion-subtext-content, .flipi-text-b, .box-title-b');
+    subSpans.forEach(subSpan => {
+      subSpan.textContent = val;
+    });
+    syncDOM();
+  };
+
   return (
     <div className="w-full flex flex-col gap-[0.5vw] font-sans text-gray-800">
       
+      {/* 0. Motion Graphic Title Customizer (From After Effects Lottie) */}
+      {isMotionGraphic && (
+        <div className="flex flex-col mt-[0.5vw] p-[1vw] bg-white border border-rose-200 rounded-[0.75vw] shadow-sm mb-[0.2vw]">
+          <SectionHeader title="Motion Title Content" icon={<AlignLeft size="0.9vw" className="text-rose-500" />} />
+          <div className="flex flex-col gap-[0.4vw]">
+            <span className="text-[0.75vw] font-medium text-gray-500">
+              Primary Title:
+            </span>
+            <input
+              type="text"
+              value={motionGraphicText}
+              onChange={handleMotionGraphicTextChange}
+              placeholder="PRIMARY TEXT"
+              className="w-full p-[0.6vw] text-[0.85vw] font-black text-rose-600 bg-rose-50/40 border border-rose-300 rounded-[0.5vw] outline-none focus:border-rose-500 uppercase tracking-widest"
+            />
+
+            {(motionGraphicSubText !== '' || selectedElement.getAttribute('data-subtext') !== null || selectedElement.querySelector('.motion-text-subcontent, .motion-subtext-content, .flipi-text-b, .box-title-b')) && (
+              <div className="flex flex-col gap-[0.4vw] mt-[0.4vw]">
+                <span className="text-[0.75vw] font-medium text-gray-500">
+                  Secondary Subtitle:
+                </span>
+                <input
+                  type="text"
+                  value={motionGraphicSubText}
+                  onChange={handleMotionGraphicSubTextChange}
+                  placeholder="SECONDARY TEXT"
+                  className="w-full p-[0.6vw] text-[0.85vw] font-black text-amber-600 bg-amber-50/40 border border-amber-300 rounded-[0.5vw] outline-none focus:border-amber-500 uppercase tracking-widest"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 1. Kinetic Text & Word Customizer (Only for Kinetic Typography) */}
       {isKinetic && (
         <div className="flex flex-col mt-[0.5vw] p-[1vw] bg-white border border-gray-200 rounded-[0.75vw] shadow-sm mb-[0.2vw]">
@@ -1085,6 +1484,43 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
               </select>
             </div>
           </div>
+
+          {/* Alignment Row */}
+          <div className="flex items-center justify-between pt-[0.2vw]">
+            <span className="text-[0.75vw] font-semibold text-gray-600">Alignment :</span>
+            <div className="flex items-center gap-[0.3vw] bg-gray-100 p-[0.2vw] rounded-[0.5vw] border border-gray-200">
+              <button
+                type="button"
+                onClick={() => handleTextAlignChange('left')}
+                className={`p-[0.35vw] rounded-[0.4vw] transition-all flex items-center justify-center ${
+                  textAlign === 'left' ? 'bg-white text-indigo-600 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-900'
+                }`}
+                title="Align Left"
+              >
+                <AlignLeft size="0.95vw" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTextAlignChange('center')}
+                className={`p-[0.35vw] rounded-[0.4vw] transition-all flex items-center justify-center ${
+                  textAlign === 'center' ? 'bg-white text-indigo-600 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-900'
+                }`}
+                title="Align Center"
+              >
+                <AlignCenter size="0.95vw" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTextAlignChange('right')}
+                className={`p-[0.35vw] rounded-[0.4vw] transition-all flex items-center justify-center ${
+                  textAlign === 'right' ? 'bg-white text-indigo-600 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-900'
+                }`}
+                title="Align Right"
+              >
+                <AlignRight size="0.95vw" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1092,17 +1528,17 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
       <div className="w-full flex flex-col gap-[0.5vw] p-[1vw] bg-white border border-gray-200 rounded-[0.75vw] shadow-sm mb-[0.5vw]">
         <SectionHeader title="Colors & Effects" icon={<Sliders size="0.9vw" />} />
         
-        {/* Text Color */}
+        {/* Primary Text Color */}
         <div className="flex items-center gap-[1vw] py-[0.4vw]">
           <span className="text-[0.8vw] font-semibold text-gray-600 w-[7vw] flex-shrink-0 select-none">
-            Text Color :
+            {isMotionGraphic ? 'Title Color :' : 'Text Color :'}
           </span>
           <div className="flex-grow flex items-center gap-[1vw]">
             <div
               className="w-[2vw] h-[2vw] rounded-[0.4vw] border border-gray-200 flex-shrink-0 relative overflow-hidden flex items-center justify-center cursor-pointer hover:border-indigo-500 transition-colors shadow-sm"
               style={{ background: textColor || '#ffffff' }}
               onClick={() => setActiveColorPicker('text')}
-              title="Pick text color"
+              title="Pick primary text color"
             />
             {activeColorPicker === 'text' && createPortal(
               <div
@@ -1135,6 +1571,52 @@ const TextElementEditor = ({ selectedElement, updateElementAttribute, selectedLa
             </div>
           </div>
         </div>
+
+        {/* Secondary Subtitle Color (Only when secondary text exists) */}
+        {isMotionGraphic && (motionGraphicSubText !== '' || selectedElement.getAttribute('data-subtext') !== null || selectedElement.querySelector('.motion-text-subcontent, .motion-subtext-content, .flipi-text-b, .box-title-b')) && (
+          <div className="flex items-center gap-[1vw] py-[0.4vw]">
+            <span className="text-[0.8vw] font-semibold text-gray-600 w-[7vw] flex-shrink-0 select-none">
+              Subtitle Color :
+            </span>
+            <div className="flex-grow flex items-center gap-[1vw]">
+              <div
+                className="w-[2vw] h-[2vw] rounded-[0.4vw] border border-gray-200 flex-shrink-0 relative overflow-hidden flex items-center justify-center cursor-pointer hover:border-indigo-500 transition-colors shadow-sm"
+                style={{ background: subTextColor || '#FF0033' }}
+                onClick={() => setActiveColorPicker('subtext')}
+                title="Pick subtitle text color"
+              />
+              {activeColorPicker === 'subtext' && createPortal(
+                <div
+                  className="fixed z-[5000]"
+                  style={{
+                    top: '50%',
+                    right: '19.5vw',
+                    transform: 'translateY(-50%)'
+                  }}
+                >
+                  <div className="animate-in fade-in zoom-in-95 duration-200">
+                    <ColorPicker
+                      color={subTextColor}
+                      onChange={handleSubTextColorChange}
+                      onClose={() => setActiveColorPicker(null)}
+                      disableGradient={true}
+                    />
+                  </div>
+                </div>,
+                document.body
+              )}
+              <div className="flex-1 min-w-0 flex items-center border border-gray-300 rounded-[0.5vw] overflow-hidden h-[2vw] bg-white hover:border-indigo-500 focus-within:border-indigo-500 transition-colors px-[0.5vw]">
+                <input
+                  type="text"
+                  value={subTextColor}
+                  onChange={(e) => handleSubTextColorChange(e.target.value)}
+                  className="w-full min-w-0 text-[0.75vw] font-medium text-gray-700 outline-none bg-transparent uppercase"
+                  maxLength={7}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Outline Color */}
         <div className="flex items-center gap-[1vw] py-[0.4vw]">

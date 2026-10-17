@@ -209,17 +209,23 @@ export const handleAddElementToSvg = ({
     }
   }
 
-  // If kinetic typography element, adapt to page canvas size
+  // If kinetic or motion-graphic typography element, adapt to page canvas size
   const isKinetic = importedElement.getAttribute('data-typography-type') === 'kinetic' ||
                     (importedElement.getAttribute('data-type') === 'text' && (importedElement.id?.startsWith('typography-') || !!importedElement.querySelector('.kinetic-container')));
+  const isMotionGraphic = importedElement.getAttribute('data-typography-type') === 'motion-graphic' ||
+                    !!importedElement.querySelector('.motion-text-content, .motion-subtext-content, .motion-outer-glow, .flipi-line, .box-accent-frame, .yt-logo-badge');
+  const isKineticOrMotionGraphic = isKinetic || isMotionGraphic;
 
-  if (isKinetic) {
+  if (isKineticOrMotionGraphic) {
     const fo = importedElement.querySelector('foreignObject');
     if (fo) {
-      const maxAllowedW = Math.round(pw * 0.9);
-      if (elW > maxAllowedW) {
+      const curFoW = parseFloat(fo.getAttribute('width') || '0');
+      const maxAllowedW = Math.round(pw * 0.95);
+      if (curFoW > maxAllowedW && maxAllowedW > 50) {
+        fo.setAttribute('width', maxAllowedW.toString());
         elW = maxAllowedW;
-        fo.setAttribute('width', elW.toString());
+      } else if (curFoW > 0) {
+        elW = curFoW;
       }
     }
   }
@@ -245,7 +251,7 @@ export const handleAddElementToSvg = ({
       const posY = Math.round(Math.max(minY, Math.min(maxY, dropPoint.y - (elH / 2))));
       importedElement.setAttribute('transform', `translate(${posX}, ${posY})`);
     }
-  } else if (isTable || isKinetic || !importedElement.getAttribute('transform') || (isMap && importedElement.getAttribute('transform')?.includes('15'))) {
+  } else if (isTable || isKineticOrMotionGraphic || !importedElement.getAttribute('transform') || (isMap && importedElement.getAttribute('transform')?.includes('15'))) {
     const minX = 10;
     const minY = 10;
     const cx = Math.round(Math.max(minX, Math.min(pw - elW - minX, (pw - elW) / 2)));
@@ -619,6 +625,12 @@ export const getElementCompoundTarget = (current) => {
     return buttonGroup;
   }
 
+  // Typography elements (Motion Graphics & Kinetic) are single compound units; clicking/dragging any child selects the whole group!
+  const typographyGroup = current.closest('g[data-type="text"][id*="typography-"], g[data-typography-type="motion-graphic"], g[data-typography-type="kinetic"]');
+  if (typographyGroup) {
+    return typographyGroup;
+  }
+
   // Animated Decorators (Starbursts) are compound elements; drag the whole decorator!
   const decoratorGroup = current.closest('[data-type="decorator"], [id^="decorator-"]');
   if (decoratorGroup) {
@@ -923,7 +935,9 @@ export const resizeAudioGroup = ({
     const newSx = newW / innerWidth;
     const newSy = newH / innerHeight;
     el.setAttribute('transform', `translate(${newTx}, ${newTy}) scale(${newSx}, ${newSy})`);
-  } catch (e) { }
+  } catch (error) {
+    console.debug('Failed to transform component SVG group:', error);
+  }
 
   if (typeof drawOverlayHighlight === 'function') {
     const highlightType = (currentFrameIdRef?.current && el.id !== currentFrameIdRef.current) ? 'child-selected' : 'selected';
@@ -1574,7 +1588,7 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
         const imgTag2 = imgEl.tagName?.toLowerCase();
         if (imgTag2 === 'image') {
           imgEl.setAttribute('href', url);
-          try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (err) { }
+          try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch { /* ignore */ }
         } else if (imgTag2 === 'img') {
           imgEl.src = url;
         } else {
@@ -1582,7 +1596,7 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
         }
         window.dispatchEvent(new CustomEvent('slideshow-index-changed', { detail: { id: el.id, index: nextIndex } }));
         renderOverlays();
-      } catch (err) { }
+      } catch { /* ignore */ }
     };
 
     window.addEventListener('force-slideshow-advance', handleForceAdvance);
@@ -1682,7 +1696,7 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
         const imgTag = imgEl.tagName?.toLowerCase();
         if (imgTag === 'image') {
           imgEl.setAttribute('href', url);
-          try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (err) { }
+          try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch { /* ignore */ }
         } else if (imgTag === 'img') {
           imgEl.src = url;
         } else {
@@ -1692,7 +1706,7 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
         slideshowEl.setAttribute('data-active-index', nextIndex.toString());
         slideshowEl._lastSlideTime = Date.now();
         window.dispatchEvent(new CustomEvent('slideshow-index-changed', { detail: { id: slideshowEl.id, index: nextIndex } }));
-      } catch (err) { }
+      } catch { /* ignore */ }
     };
 
     const handleMouseDown = (e) => {

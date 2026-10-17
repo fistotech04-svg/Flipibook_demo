@@ -72,6 +72,49 @@ export const getVisualBBox = (el) => {
   const ssBBox = getSlideshowBBox(el);
   if (ssBBox) return ssBBox;
 
+  // ── TYPOGRAPHY BOUNDING BOX (Kinetic & Motion Graphic) ──
+  const isTypoGroup = el.tagName?.toLowerCase() === 'g' && (
+    el.getAttribute('data-typography-type') ||
+    (el.id && el.id.startsWith('typography-')) ||
+    el.querySelector?.('.kinetic-container, .motion-click-boundary')
+  );
+  if (isTypoGroup) {
+    const motionBoundary = el.querySelector('.motion-click-boundary');
+    if (motionBoundary) {
+      const mw = parseFloat(motionBoundary.getAttribute('width')) || 0;
+      const mh = parseFloat(motionBoundary.getAttribute('height')) || 0;
+      const mx = parseFloat(motionBoundary.getAttribute('x') || '0');
+      const my = parseFloat(motionBoundary.getAttribute('y') || '0');
+      if (mw > 0 && mh > 0) {
+        return { x: mx, y: my, width: mw, height: mh };
+      }
+    }
+    const kineticContainer = el.querySelector('.kinetic-container');
+    const fo = el.querySelector('foreignObject');
+    if (kineticContainer && fo) {
+      const words = Array.from(kineticContainer.querySelectorAll('.word'));
+      const textLines = words.map(w => (w.textContent || '').trim()).filter(Boolean);
+      const fs = parseFloat(el.getAttribute('data-font-size')) || parseFloat(kineticContainer.style.fontSize) || 34;
+      const pad = parseFloat(el.getAttribute('data-bg-padding')) || parseFloat(kineticContainer.style.padding) || 12;
+      const maxLen = Math.max(...textLines.map(l => l.length), 1);
+      const snugW = Math.round(maxLen * (fs * 0.55) + (pad * 2));
+      const snugH = Math.round(textLines.length * (fs * 1.08) + (pad * 2));
+      const fox = parseFloat(fo.getAttribute('x') || '0');
+      const foy = parseFloat(fo.getAttribute('y') || '0');
+      return { x: fox, y: foy, width: Math.max(30, snugW), height: Math.max(20, snugH) };
+    }
+    const bgRect = el.querySelector('rect.typography-bg');
+    if (bgRect) {
+      const rw = parseFloat(bgRect.getAttribute('width')) || 0;
+      const rh = parseFloat(bgRect.getAttribute('height')) || 0;
+      const rx = parseFloat(bgRect.getAttribute('x') || '0');
+      const ry = parseFloat(bgRect.getAttribute('y') || '0');
+      if (rw > 0 && rh > 0) {
+        return { x: rx, y: ry, width: rw, height: rh };
+      }
+    }
+  }
+
   const isUserGroup = el.tagName?.toLowerCase() === 'g' && (
     el.getAttribute('data-type') === 'group' ||
     (el.getAttribute('data-name') || '').toLowerCase() === 'group' ||
@@ -4604,6 +4647,8 @@ const MainEditor = ({
               localBBox = { x, y, width: w, height: h };
             }
           }
+        } else if (el.getAttribute('data-typography-type') || (el.id && el.id.startsWith('typography-')) || el.querySelector?.('.kinetic-container, .motion-click-boundary')) {
+          localBBox = getVisualBBox(el);
         }
         const elScreenCtm = el.getScreenCTM();
 
@@ -8311,6 +8356,8 @@ const MainEditor = ({
                     bbox = { x: rx, y: ry, width: rw, height: rh };
                   }
                 }
+              } else if (el.getAttribute('data-typography-type') || (el.id && el.id.startsWith('typography-')) || el.querySelector?.('.kinetic-container, .motion-click-boundary')) {
+                bbox = getVisualBBox(el);
               }
             }
 
@@ -8616,10 +8663,11 @@ const MainEditor = ({
             const isScaledImage = isImage && !isElementInCropMode;
             const isText = el.getAttribute('data-type') === 'text' || el.tagName?.toLowerCase() === 'text';
             const isForeignObject = el.tagName?.toLowerCase() === 'foreignobject';
+            const isTypography = el.getAttribute('data-typography-type') || (el.id && el.id.startsWith('typography-')) || el.querySelector?.('.kinetic-container, .motion-click-boundary');
             const isHotspotIconGroup = el.getAttribute('data-is-hotspot') === 'true' && (el.tagName?.toLowerCase() === 'g' || el.tagName?.toLowerCase() === 'svg');
             const isGroup = (el.tagName?.toLowerCase() === 'g' || el.tagName === 'multi') && el.getAttribute('data-is-hotspot') !== 'true';
             const isTable = el.getAttribute('data-type') === 'table-frame' || el.getAttribute('data-type') === 'table' || (el.id && el.id.startsWith('table-'));
-            const isFreeFrame = (el.getAttribute('data-name') === 'Free Frame' && el.tagName?.toLowerCase() === 'rect') || isForeignObject;
+            const isFreeFrame = ((el.getAttribute('data-name') === 'Free Frame' && el.tagName?.toLowerCase() === 'rect') || isForeignObject) && !isTypography;
             const isShape = (['path', 'polygon', 'circle', 'ellipse', 'rect', 'polyline', 'line'].includes(el.tagName?.toLowerCase()) || isGroup) && !isFreeFrame && !isForeignObject && !isTable;
             const isCorner = ['nw', 'ne', 'se', 'sw'].includes(dir);
             const isCtrlPressedMove = event.ctrlKey || (event.sourceEvent && event.sourceEvent.ctrlKey) || isCtrlPressedRef.current;
@@ -8695,7 +8743,7 @@ const MainEditor = ({
                   }
                 }
               }
-            } else if (!isInteractiveButton && ((isCorner && (isScaledImage || isShape || isHotspotPreset || isSlideshowEl || isDecorator || (isText && !isForeignObject))) || (!isCorner && ((isText && !isForeignObject) || isHotspotPreset || isDecorator)))) {
+            } else if (!isInteractiveButton && ((isCorner && (isScaledImage || isShape || isHotspotPreset || isSlideshowEl || isDecorator || isTypography || (isText && !isForeignObject))) || (!isCorner && ((isText && !isForeignObject) || isHotspotPreset || isDecorator)))) {
               const s = Math.max(Math.abs(scaleX), Math.abs(scaleY)) * (Math.sign(scaleX) || 1);
               if (!isCorner && ((isText && !isForeignObject) || isHotspotPreset || isDecorator)) {
                 const sSide = (dir === 'n' || dir === 's') ? scaleY : scaleX;
@@ -9150,8 +9198,8 @@ const MainEditor = ({
                   const isDecorator = el.getAttribute('data-type') === 'decorator' || (el.id && el.id.startsWith('decorator-'));
                   const isTable = el.getAttribute('data-type') === 'table-frame' || el.getAttribute('data-type') === 'table' || (el.id && el.id.startsWith('table-'));
 
-                  // ── DECORATOR: update outer transform, NOT children ───────
-                  if (isDecorator) {
+                  // ── DECORATOR & TYPOGRAPHY: update outer transform, NOT children ───────
+                  if (isDecorator || isTypography) {
                     const scaleMatrix = new DOMMatrix()
                       .translate(worldAnchor.x, worldAnchor.y)
                       .scale(scaleX, scaleY)
