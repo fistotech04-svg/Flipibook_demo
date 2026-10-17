@@ -1,5 +1,6 @@
 //App.jsx
 import './App.css';
+import { lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
 import Signin from './pages/Signin';
@@ -16,24 +17,26 @@ import Billing from './pages/Settings/Billing';
 import VirtualStall from './pages/Settings/VirtualStall';
 import Support from './pages/Settings/Support';
 import About from './pages/About';
-import Explore from './pages/Explore';
 import Template from './pages/Template';
 import ContactUs from './pages/ContactUs';
-import Converter from './pages/Converter.jsx';
 import Unauthorized from './pages/Unauthorized';
 import NotFound from './pages/NotFound';
 import Editor from './Modules/Editer';
-import { MainEditor } from './components/TemplateEditor'; // Import MainEditor
 import PreviewPage from './pages/PreviewPage';
-import ARView from './pages/ARView';
-import ThreedEditor from './components/ThreedEditor/ThreedEditor';
-import CustomizedEditor from './components/CustomizedEditor/CustomizedEditor';
-import ShareViewBook from './pages/shareviewbook';
 import Viewprofile from './pages/Viewprofile';
 import { ToastProvider } from './components/CustomToast';
 import { ModernToastProvider } from './components/ModernToast';
 import ProtectedRoute from './components/ProtectedRoute';
 import NetworkStatus from './pages/NetworkStatus';
+
+// Heavy modules split via dynamic import (React.lazy) to eliminate build memory blowup & circular chunks
+const MainEditor = lazy(() => import('./components/TemplateEditor').then(m => ({ default: m.MainEditor })));
+const ThreedEditor = lazy(() => import('./components/ThreedEditor/ThreedEditor'));
+const CustomizedEditor = lazy(() => import('./components/CustomizedEditor/CustomizedEditor'));
+const Converter = lazy(() => import('./pages/Converter.jsx'));
+const Explore = lazy(() => import('./pages/Explore'));
+const ARView = lazy(() => import('./pages/ARView'));
+const ShareViewBook = lazy(() => import('./pages/shareviewbook'));
 
 function SettingsIndexRedirect() {
   let email = '';
@@ -57,7 +60,8 @@ function App() {
       <ModernToastProvider>
         <Router>
           <NetworkStatus />
-          <Routes>
+          <Suspense fallback={<div className="w-screen h-screen flex items-center justify-center bg-[#0e1015] text-white">Loading...</div>}>
+            <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Signin />} />
             <Route path="/signup" element={<Signup />} />
@@ -120,6 +124,7 @@ function App() {
             {/* Catch-all route for wrong URLs */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </Router>
       </ModernToastProvider>
     </ToastProvider>
