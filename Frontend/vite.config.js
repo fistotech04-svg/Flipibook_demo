@@ -32,9 +32,50 @@ export default defineConfig(({ mode }) => {
       exclude: ["mupdf"],
     },
     build: {
-      chunkSizeWarningLimit: 3000,
+      chunkSizeWarningLimit: 2000,
       sourcemap: false,
-      minify: false,
+      minify: "esbuild",
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes("node_modules")) {
+              if (
+                id.includes("three") ||
+                id.includes("@react-three") ||
+                id.includes("@dimforge/rapier3d-compat") ||
+                id.includes("cannon-es") ||
+                id.includes("ammo.js")
+              ) {
+                return "vendor-three";
+              }
+              if (
+                id.includes("fabric") ||
+                id.includes("konva") ||
+                id.includes("react-konva") ||
+                id.includes("paper")
+              ) {
+                return "vendor-canvas";
+              }
+              if (
+                id.includes("mupdf") ||
+                id.includes("pdfjs-dist") ||
+                id.includes("react-pdf") ||
+                id.includes("jspdf")
+              ) {
+                return "vendor-pdf";
+              }
+              if (
+                id.includes("exceljs") ||
+                id.includes("jszip") ||
+                id.includes("pako")
+              ) {
+                return "vendor-utils";
+              }
+              return "vendor";
+            }
+          },
+        },
+      },
     },
     define: {
       global: "window",
