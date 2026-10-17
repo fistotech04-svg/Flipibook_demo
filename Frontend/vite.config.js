@@ -40,6 +40,14 @@ export default defineConfig(({ mode }) => {
           manualChunks(id) {
             if (id.includes("node_modules")) {
               if (
+                id.includes("/react/") ||
+                id.includes("/react-dom/") ||
+                id.includes("/react-router/") ||
+                id.includes("/react-router-dom/")
+              ) {
+                return "vendor-react-core";
+              }
+              if (
                 id.includes("three") ||
                 id.includes("@react-three") ||
                 id.includes("@dimforge/rapier3d-compat") ||
@@ -48,13 +56,11 @@ export default defineConfig(({ mode }) => {
               ) {
                 return "vendor-three";
               }
-              if (
-                id.includes("fabric") ||
-                id.includes("konva") ||
-                id.includes("react-konva") ||
-                id.includes("paper")
-              ) {
-                return "vendor-canvas";
+              if (id.includes("fabric")) {
+                return "vendor-fabric";
+              }
+              if (id.includes("konva") || id.includes("react-konva")) {
+                return "vendor-konva";
               }
               if (
                 id.includes("mupdf") ||
