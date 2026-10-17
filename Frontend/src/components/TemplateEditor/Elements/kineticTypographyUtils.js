@@ -42,17 +42,17 @@ export const calculateKineticDimensions = (words = [], fontSize = 34, bgPadding 
   const lineArray = Array.isArray(words) ? words : (typeof words === 'string' ? words.split('\n') : []);
   const lines = lineArray.map(l => (typeof l === 'string' ? l.trim() : '')).filter(Boolean);
   if (lines.length === 0) {
-    return { width: 120, height: 60 };
+    return { width: 80, height: 40 };
   }
-  const maxLen = Math.max(...lines.map(l => l.length), 3);
+  const maxLen = Math.max(...lines.map(l => l.length), 1);
   const pad = typeof bgPadding === 'number' ? bgPadding : 12;
-  // Snug character width in bold uppercase sans fonts is ~0.60 * fontSize
-  const width = Math.round(maxLen * (fontSize * 0.60) + (pad * 2) + 12);
+  // Snug character width in bold uppercase sans fonts is ~0.55 * fontSize
+  const width = Math.round(maxLen * (fontSize * 0.55) + (pad * 2));
   // Snug height per line is ~1.08 * fontSize
-  const height = Math.round(lines.length * (fontSize * 1.08) + (pad * 2) + 6);
+  const height = Math.round(lines.length * (fontSize * 1.08) + (pad * 2));
   return {
-    width: Math.max(50, width),
-    height: Math.max(30, height)
+    width: Math.max(30, width),
+    height: Math.max(20, height)
   };
 };
 
