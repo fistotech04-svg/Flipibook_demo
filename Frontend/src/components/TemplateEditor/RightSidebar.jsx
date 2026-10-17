@@ -33,7 +33,6 @@ import MediaGalleryPopup from './MediaGalleryPopup';
 import { generateGradientString } from "../CustomizedEditor/AppearanceShared";
 import { createPortal } from 'react-dom';
 import { useParams, useLocation } from 'react-router-dom';
-import axios from 'axios';
 import { useToast } from '../CustomToast';
 const DimensionInput = ({ targetId, targetAttr, value, readOnly, onChange, className }) => {
   const [localVal, setLocalVal] = useState('');
@@ -42,7 +41,6 @@ const DimensionInput = ({ targetId, targetAttr, value, readOnly, onChange, class
 
   useEffect(() => {
     if (!targetId || readOnly) {
-      setLiveVal(null);
       return;
     }
 
@@ -65,7 +63,7 @@ const DimensionInput = ({ targetId, targetAttr, value, readOnly, onChange, class
             try {
               const domM = new DOMMatrix(transform);
               m = [domM.a, domM.b, domM.c, domM.d, domM.e, domM.f];
-            } catch (_) {
+            } catch {
               if (transform.includes('matrix')) {
                 const match = transform.match(/matrix\(([^)]+)\)/);
                 if (match) {
@@ -91,9 +89,9 @@ const DimensionInput = ({ targetId, targetAttr, value, readOnly, onChange, class
           const finalLiveVal = Number(rawVal.toFixed(1)).toString();
 
           setLiveVal((prev) => (prev !== finalLiveVal ? finalLiveVal : prev));
-        } catch (e) { }
-      } else {
-        setLiveVal(null);
+        } catch {
+          // Ignore dimension polling error
+        }
       }
       frameId = requestAnimationFrame(poll);
     };
@@ -101,7 +99,8 @@ const DimensionInput = ({ targetId, targetAttr, value, readOnly, onChange, class
     return () => cancelAnimationFrame(frameId);
   }, [targetId, targetAttr, readOnly]);
 
-  const displayValue = isEditing ? localVal : (liveVal !== null ? liveVal : value);
+  const effectiveLiveVal = (!targetId || readOnly) ? null : liveVal;
+  const displayValue = isEditing ? localVal : (effectiveLiveVal !== null ? effectiveLiveVal : value);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
@@ -167,26 +166,18 @@ const DimensionInput = ({ targetId, targetAttr, value, readOnly, onChange, class
 };
 
 const RightSidebar = ({
-  isDoublePage,
-  setIsDoublePage,
-  isRulerEnabled,
-  setIsRulerEnabled,
   activeMainTool,
   setActiveMainTool,
   activeTopTool,
   activePageIndex,
   pages,
   setPages,
-  updatePageBackground,
   selectedLayerId,
   setSelectedLayerId,
   multiSelectedIds = null,
   setMultiSelectedIds,
   updateElementAttribute,
   deleteLayer,
-  onPreview,
-  activePreviewDevice: activePreviewDeviceProp,
-  setActivePreviewDevice: setActivePreviewDeviceProp,
   flipbookDimensions = { width: 210, height: 297 },
   isPopupEditor = false,
   onCustomizePopup,
@@ -245,10 +236,6 @@ const RightSidebar = ({
 
 
 
-  // Convert mm to pixels at 96 DPI for the input display if no element selected
-  const baseWidthPx = Math.round(baseWidth * 96 / 25.4);
-  const baseHeightPx = Math.round(baseHeight * 96 / 25.4);
-
   const getDocumentInfo = (w, h) => {
     const roundedW = Math.round(w || 210);
     const roundedH = Math.round(h || 297);
@@ -287,18 +274,11 @@ const RightSidebar = ({
   };
   const fileInputRef = useRef(null);
   const toast = useToast();
-  const [activePreviewDevice, setActivePreviewDevice] = useState(localStorage.getItem('previewDevice') || 'Desktop');
-  const [dimensionUnit, setDimensionUnit] = useState('mm');
   const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
   const [isMediaGalleryOpen, setIsMediaGalleryOpen] = useState(false);
   const browseGalleryBtnRef = useRef(null);
-  const [isUnitDropdownOpen, setIsUnitDropdownOpen] = useState(false);
   const [isPageBgPickerOpen, setIsPageBgPickerOpen] = useState(false);
-  const unitRef = useRef(null);
-  const [expandedInteraction, setExpandedInteraction] = useState('call-click');
-  const [interactionTab, setInteractionTab] = useState('Call');
-  const [isInteractionMenuOpen, setIsInteractionMenuOpen] = useState(false);
-  const interactionMenuRef = useRef(null);
+  const dimensionUnit = 'mm';
 
   const updatePosition = (val, targetAttr) => {
     if (activeTopTool === 'interaction' || activeTopTool === 'animation') return;
@@ -310,41 +290,53 @@ const RightSidebar = ({
     let newVal = parseFloat(val);
 
     const transform = el.getAttribute('transform');
-    if (transform && transform.includes('matrix')) {
-      const match = transform.match(/matrix\(([^)]+)\)/);
-      if (match) {
-        const m = match[1].split(/[\s,]+/).map(parseFloat);
-        if (m.length === 6) {
-          const bbox = getVisualBBox(el);
-          const bounds = getCanvasBounds(el, flipbookDimensions?.width, flipbookDimensions?.height);
-          const visW = bbox.width * Math.abs(m[0]);
-          const visH = bbox.height * Math.abs(m[3]);
-
-          if (targetAttr === 'x') {
-            newVal = Math.max(bounds.minX, Math.min(bounds.maxX - visW, newVal));
-            const offsetX = bbox.x * m[0] + (m[0] < 0 ? bbox.width * m[0] : 0);
-            m[4] = newVal - offsetX;
-            updateElementAttribute(activePageIndex, selectedLayerId, {
-              'transform': `matrix(${m.join(', ')})`,
-              'data-x': m[4].toString()
-            });
-          } else {
-            newVal = Math.max(bounds.minY, Math.min(bounds.maxY - visH, newVal));
-            const offsetY = bbox.y * m[3] + (m[3] < 0 ? bbox.height * m[3] : 0);
-            m[5] = newVal - offsetY;
-            updateElementAttribute(activePageIndex, selectedLayerId, {
-              'transform': `matrix(${m.join(', ')})`,
-              'data-y': m[5].toString()
-            });
-          }
-          setTimeout(() => {
-            if (typeof window.drawOverlayHighlight === 'function') {
-              window.drawOverlayHighlight(el, 'selected');
-            }
-          }, 50);
-          return;
+    if (transform && (transform.includes('matrix') || transform.includes('translate'))) {
+      let m = [1, 0, 0, 1, 0, 0];
+      if (transform.includes('matrix')) {
+        const match = transform.match(/matrix\(([^)]+)\)/);
+        if (match) {
+          const parsedM = match[1].split(/[\s,]+/).map(parseFloat);
+          if (parsedM.length === 6) m = parsedM;
+        }
+      } else if (transform.includes('translate')) {
+        const match = transform.match(/translate\(\s*([-\d.]+)(?:[\s,]+([-\d.]+))?\s*\)/);
+        if (match) {
+          m[4] = parseFloat(match[1]) || 0;
+          m[5] = parseFloat(match[2]) || 0;
         }
       }
+
+      const bbox = getVisualBBox(el);
+      const bounds = getCanvasBounds(el, flipbookDimensions?.width, flipbookDimensions?.height);
+      const visW = bbox.width * Math.abs(m[0]);
+      const visH = bbox.height * Math.abs(m[3]);
+
+      if (targetAttr === 'x') {
+        newVal = Math.max(bounds.minX, Math.min(bounds.maxX - visW, newVal));
+        const offsetX = bbox.x * m[0] + (m[0] < 0 ? bbox.width * m[0] : 0);
+        m[4] = newVal - offsetX;
+      } else {
+        newVal = Math.max(bounds.minY, Math.min(bounds.maxY - visH, newVal));
+        const offsetY = bbox.y * m[3] + (m[3] < 0 ? bbox.height * m[3] : 0);
+        m[5] = newVal - offsetY;
+      }
+
+      const newTransform = (m[0] === 1 && m[1] === 0 && m[2] === 0 && m[3] === 1)
+        ? `translate(${m[4]}, ${m[5]})`
+        : `matrix(${m.join(', ')})`;
+
+      updateElementAttribute(activePageIndex, selectedLayerId, {
+        'transform': newTransform,
+        'data-x': m[4].toString(),
+        'data-y': m[5].toString()
+      });
+
+      setTimeout(() => {
+        if (typeof window.drawOverlayHighlight === 'function') {
+          window.drawOverlayHighlight(el, 'selected');
+        }
+      }, 50);
+      return;
     }
 
     if (targetAttr === 'x') {
@@ -381,14 +373,24 @@ const RightSidebar = ({
     const el = editorDoc.getElementById(selectedLayerId);
     if (el) {
       const transform = el.getAttribute('transform');
-      if (transform && transform.includes('matrix')) {
-        const match = transform.match(/matrix\(([^)]+)\)/);
-        if (match) {
-          const parsedM = match[1].split(/[\s,]+/).map(parseFloat);
-          if (parsedM.length === 6) {
-            m = parsedM;
+      if (transform) {
+        if (transform.includes('matrix')) {
+          const match = transform.match(/matrix\(([^)]+)\)/);
+          if (match) {
+            const parsedM = match[1].split(/[\s,]+/).map(parseFloat);
+            if (parsedM.length === 6) {
+              m = parsedM;
+              hasMatrix = true;
+              scale = Math.abs(targetAttr === 'width' ? m[0] : m[3]);
+            }
+          }
+        } else if (transform.includes('translate')) {
+          const match = transform.match(/translate\(\s*([-\d.]+)(?:[\s,]+([-\d.]+))?\s*\)/);
+          if (match) {
+            m[4] = parseFloat(match[1]) || 0;
+            m[5] = parseFloat(match[2]) || 0;
             hasMatrix = true;
-            scale = Math.abs(targetAttr === 'width' ? m[0] : m[3]);
+            scale = 1;
           }
         }
       }
@@ -476,40 +478,6 @@ const RightSidebar = ({
     updateElementAttribute(activePageIndex, selectedLayerId, elementAttr, finalVal);
   };
 
-  // Close unit dropdown on click outside
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (unitRef.current && !unitRef.current.contains(e.target)) {
-        setIsUnitDropdownOpen(false);
-      }
-      if (interactionMenuRef.current && !interactionMenuRef.current.contains(e.target)) {
-        setIsInteractionMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Sync with prop if provided, otherwise use local/localStorage
-  useEffect(() => {
-    if (activePreviewDeviceProp) setActivePreviewDevice(activePreviewDeviceProp);
-  }, [activePreviewDeviceProp]);
-
-  const handleDeviceChange = (device) => {
-    setActivePreviewDevice(device);
-    localStorage.setItem('previewDevice', device);
-    window.dispatchEvent(new CustomEvent('previewDeviceChange', { detail: device }));
-    setActivePreviewDeviceProp?.(device);
-  };
-
-  useEffect(() => {
-    const handleGlobalDeviceChange = (e) => {
-      setActivePreviewDevice(e.detail);
-    };
-    window.addEventListener('previewDeviceChange', handleGlobalDeviceChange);
-    return () => window.removeEventListener('previewDeviceChange', handleGlobalDeviceChange);
-  }, []);
-
   const presetColors = [
     '#ffffff', '#f3f4f6', '#e5e7eb', '#d1d5db', '#9ca3af', '#4b5563', '#1f2937', '#000000',
     '#eff6ff', '#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#2563eb', '#1d4ed8',
@@ -517,16 +485,6 @@ const RightSidebar = ({
     '#fff7ed', '#ffedd5', '#fed7aa', '#fdba74', '#fb923c', '#f97316', '#ea580c', '#c2410c',
     '#fef2f2', '#fee2e2', '#fecaca', '#fca5a5', '#f87171', '#ef4444', '#dc2626', '#b91c1c'
   ];
-
-  const [showUrlImport, setShowUrlImport] = useState(false);
-  const [urlInputText, setUrlInputText] = useState('');
-
-  const handleUrlImportSubmit = () => {
-    if (!urlInputText.trim()) return;
-    alert("Importing media from URL: " + urlInputText);
-    setUrlInputText('');
-    setShowUrlImport(false);
-  };
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
@@ -686,11 +644,19 @@ const RightSidebar = ({
             const bbox = getVisualBBox(actualEl);
             let m = [1, 0, 0, 1, 0, 0];
             const transform = actualEl.getAttribute('transform');
-            if (transform && transform.includes('matrix')) {
-              const match = transform.match(/matrix\(([^)]+)\)/);
-              if (match) {
-                const parsedM = match[1].split(/[\s,]+/).map(parseFloat);
-                if (parsedM.length === 6) m = parsedM;
+            if (transform) {
+              if (transform.includes('matrix')) {
+                const match = transform.match(/matrix\(([^)]+)\)/);
+                if (match) {
+                  const parsedM = match[1].split(/[\s,]+/).map(parseFloat);
+                  if (parsedM.length === 6) m = parsedM;
+                }
+              } else if (transform.includes('translate')) {
+                const match = transform.match(/translate\(\s*([-\d.]+)(?:[\s,]+([-\d.]+))?\s*\)/);
+                if (match) {
+                  m[4] = parseFloat(match[1]) || 0;
+                  m[5] = parseFloat(match[2]) || 0;
+                }
               }
             }
             w = (bbox.width * Math.abs(m[0])).toString();
@@ -1695,7 +1661,10 @@ const RightSidebar = ({
                           })()}
                           selectedLayerId={selectedElementProps.typographyId}
                           selectedTextId={selectedLayerId !== selectedElementProps.typographyId ? selectedLayerId : null}
-                          updateElementAttribute={(layerId, attr, val) => updateElementAttribute(activePageIndex, layerId, attr, val)}
+                          updateElementAttribute={(layerId, attr, val) => {
+                            window.__skipCanvasUpdateForPage = activePageIndex;
+                            updateElementAttribute(activePageIndex, layerId, attr, val);
+                          }}
                         />
                       ) : selectedElementProps?.isText ? (
                         <TextEditor

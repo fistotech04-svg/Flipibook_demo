@@ -699,7 +699,9 @@ const TableProperties = ({
         el.setAttribute('transform', `matrix(${normA} ${normB} ${normC} ${normD} ${m.e} ${m.f})`);
         syncChanges(el);
       }
-    } catch (e) { }
+    } catch {
+      // Ignore matrix normalization error
+    }
   };
 
   const checkAndFitTable = (el) => {
@@ -1562,7 +1564,7 @@ const TableProperties = ({
     const cColorRgba = hexToRgba(cellColor, cellOpacity);
     const bW = Math.max(1, Math.round(borderWidth / 2));
 
-    trs.forEach((tr, rIdx) => {
+    trs.forEach((tr) => {
       const newTd = document.createElement('td');
       newTd.setAttribute('contenteditable', 'true');
       newTd.style.border = `${bW}px ${borderStyle} ${bColorRgba}`;

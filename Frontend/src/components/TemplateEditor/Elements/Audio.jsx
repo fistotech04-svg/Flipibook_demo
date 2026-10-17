@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Audio = () => {
+const Audio = ({ isFullView }) => {
   const audioOptions = [
     {
       id: 'audio-icon',
@@ -123,7 +123,7 @@ const Audio = () => {
   };
 
   return (
-    <div className="grid grid-cols-2 gap-[0.5vw]">
+    <div className={`grid grid-cols-2 gap-[0.5vw] ${isFullView ? 'p-[0.5vw]' : ''}`}>
       {audioOptions.map((option) => (
         <div 
           key={option.id} 

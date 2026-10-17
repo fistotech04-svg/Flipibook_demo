@@ -2,8 +2,8 @@ import React from 'react';
 import { Table2 } from 'lucide-react';
 
 const Table = ({ isFullView }) => {
-  // Placeholder array
-  const placeholders = Array(isFullView ? 12 : 4).fill(0);
+  // Placeholder array (8 items for 2 rows of 4 cols in preview, 16 in full view)
+  const placeholders = Array(isFullView ? 16 : 8).fill(0);
 
   const getTableSvg = () => {
     const uniqueId = Date.now();

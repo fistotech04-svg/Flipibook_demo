@@ -14,22 +14,21 @@ import AnimatedDecorators from './Animated_Decorators';
 import MapStyle from './MapStyle';
 
 const TypographyElement = ({ isFullView }) => {
-  if (!isFullView) return null;
   return <TextElementStyle isFullView={isFullView} />;
 };
 
 const sectionData = [
-  { id: 'shapes',        title: 'Shapes',          component: Shapes },
-  { id: 'image-framing', title: 'Image Framing',   component: ImageFraming },
-  { id: 'qr-code',       title: 'QR Code',         component: QRCode },
-  { id: 'table',         title: 'Table',            component: Table },
-  { id: 'audio',         title: 'Audio',            component: Audio },
-  { id: 'embed',         title: '3rd Party Embed',  component: ThirdPartyEmbed },
-  { id: 'map',           title: 'Map',              component: MapStyle },
-  { id: 'typography',    title: 'Typography',       component: TypographyElement },
-  { id: 'buttons',       title: 'Buttons',          component: ButtonStyle },
-  { id: 'slideshow',     title: 'Slideshow',        component: SlideShowStyle },
-  { id: 'decorators',    title: 'Animated Decorators', component: AnimatedDecorators },
+  { id: 'shapes',        title: 'Shapes',              component: Shapes },
+  { id: 'typography',    title: 'Typography',           component: TypographyElement },
+  { id: 'buttons',       title: 'Buttons',              component: ButtonStyle },
+  { id: 'image-framing', title: 'Image Framing',       component: ImageFraming },
+  { id: 'qr-code',       title: 'QR Code',             component: QRCode },
+  { id: 'audio',         title: 'Audio',                component: Audio },
+  { id: 'embed',         title: '3rd Party Embed',      component: ThirdPartyEmbed },
+  { id: 'slideshow',     title: 'Slideshow',            component: SlideShowStyle },
+  { id: 'map',           title: 'Map',                  component: MapStyle },
+  { id: 'table',         title: 'Table',                component: Table },
+  { id: 'decorators',    title: 'Animated Decorators',  component: AnimatedDecorators },
 ];
 
 const Elements = () => {
@@ -83,5 +82,4 @@ const Elements = () => {
   );
 };
 
-export * from './useElementsEditor';
 export default Elements;
