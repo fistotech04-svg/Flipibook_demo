@@ -616,6 +616,9 @@ const Explore = () => {
 
     // Filter creators based on search
     const filteredCreators = topCreators.filter(creator => {
+        if (creator?.visibilitySettings?.showInExplore === false) {
+            return false;
+        }
         if (currentUserEmail && (creator.emailId?.toLowerCase() === currentUserEmail || creator.email?.toLowerCase() === currentUserEmail)) {
             return false;
         }

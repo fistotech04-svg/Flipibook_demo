@@ -159,6 +159,12 @@ const defaultProfile = {
   },
   followers: [],
   following: [],
+  visibilitySettings: {
+    showInExplore: true,
+    showContact: true,
+    showAddress: true,
+    showSocial: true
+  },
   bannerBg: {
     type: 'gradient',
     value: 'linear-gradient(to bottom right, #c1e8d7, #85d8c3, #60bba3)'
@@ -187,8 +193,12 @@ const Profile = () => {
   const context = useOutletContext();
   const navigate = useNavigate();
   const [localUser, setLocalUser] = useState(getInitialUserProfile);
-  const user = context?.user ? { ...defaultProfile, ...context.user } : localUser;
+  const contextUser = context?.user;
+  const user = React.useMemo(() => {
+    return contextUser ? { ...defaultProfile, ...contextUser } : localUser;
+  }, [contextUser, localUser]);
   const setUser = context?.setUser || setLocalUser;
+  const displayUser = user;
 
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const [activeStatsBookId, setActiveStatsBookId] = useState(null);
@@ -285,6 +295,11 @@ const Profile = () => {
                 services: p.services || prev.services || [],
                 followers: p.followers || prev.followers || [],
                 following: p.following || prev.following || [],
+                visibilitySettings: {
+                  ...defaultProfile.visibilitySettings,
+                  ...(prev.visibilitySettings || {}),
+                  ...(p.visibilitySettings || {})
+                },
                 socials: {
                   ...defaultProfile.socials,
                   ...(prev.socials || {}),
@@ -697,20 +712,22 @@ const Profile = () => {
 
               {/* Name and Email */}
               <h1 className="text-[1.5vw] font-semibold text-gray-900 mt-[0.5vw] truncate max-w-[18vw]">
-                {user.displayName?.trim() ? user.displayName.trim() : (user.name || 'User')}
+                {displayUser.displayName?.trim() ? displayUser.displayName.trim() : (displayUser.name || 'User')}
               </h1>
-              <div className="flex items-center gap-[0.4vw] text-[0.8vw] text-gray-500 mt-[0.2vw] truncate max-w-[18vw]">
-                <Icon icon="mdi:check-decagram" className="w-[1vw] h-[1vw] text-[#22c55e] flex-shrink-0" />
-                <span className="truncate font-medium">{user.email}</span>
-              </div>
+              {displayUser?.visibilitySettings?.showContact !== false && displayUser.email && (
+                <div className="flex items-center gap-[0.4vw] text-[0.8vw] text-gray-500 mt-[0.2vw] truncate max-w-[18vw]">
+                  <Icon icon="mdi:check-decagram" className="w-[1vw] h-[1vw] text-[#22c55e] flex-shrink-0" />
+                  <span className="truncate font-medium">{displayUser.email}</span>
+                </div>
+              )}
 
               {/* Stats: Flipbooks | Followers | Views */}
               {(() => {
                 const flipbooksCount = Array.isArray(flipbooks) ? flipbooks.length : 0;
-                const followersCount = Array.isArray(user.followers) ? user.followers.length : (typeof user.followers === 'number' ? user.followers : 0);
+                const followersCount = Array.isArray(displayUser.followers) ? displayUser.followers.length : (typeof displayUser.followers === 'number' ? displayUser.followers : 0);
                 const totalViews = Array.isArray(flipbooks)
                   ? flipbooks.reduce((acc, book) => acc + (Number(book?.viewsCount ?? book?.views ?? 0) || 0), 0)
-                  : (Number(user.views || 0));
+                  : (Number(displayUser.views || 0));
 
                 const formatStat = (num) => {
                   if (num >= 1000000) {
@@ -761,92 +778,97 @@ const Profile = () => {
               {/* Info Cards Container */}
               <div id="left-scroll-container" className="w-full mt-[1.2vw] pb-[2vw] flex flex-col flex-1 min-h-0 custom-scrollbar overflow-y-auto rounded-b-[1vw]">
 
-                <div className="p-[1vw] border-b border-gray-100">
-                  <h3 className="flex items-center gap-[0.5vw] text-[0.85vw] font-semibold text-gray-700 mb-[0.5vw]">
-                    <Info size="1vw" /> About
-                  </h3>
-                  <p className="text-[0.75vw] text-gray-500 leading-relaxed whitespace-pre-wrap">
-                    {user.about}
-                  </p>
-                </div>
-
-                <div className="p-[1vw] border-b border-gray-100 bg-[#FAFAFA]">
-                  <h3 className="flex items-center gap-[0.5vw] text-[0.85vw] font-semibold text-gray-700 mb-[0.5vw]">
-                    <Phone size="1vw" /> Contact Number
-                  </h3>
-                  <div className="flex flex-col gap-[0.2vw] text-[0.75vw] text-gray-500">
-                    {user.mobile && (
-                      <p>{user.countryCode ? user.countryCode + ' ' : ''}{user.mobile}</p>
-                    )}
-                    {Array.isArray(user.contactNumbers) && user.contactNumbers.map((c, i) => c?.number ? (
-                      <p key={i}>
-                        <span className="text-gray-400 text-[0.7vw]">{c.label ? `${c.label}: ` : ''}</span>
-                        {c.countryCode ? c.countryCode + ' ' : ''}{c.number}
-                      </p>
-                    ) : null)}
+                {displayUser.about && (
+                  <div className="p-[1vw] border-b border-gray-100">
+                    <h3 className="flex items-center gap-[0.5vw] text-[0.85vw] font-semibold text-gray-700 mb-[0.5vw]">
+                      <Info size="1vw" /> About
+                    </h3>
+                    <p className="text-[0.75vw] text-gray-500 leading-relaxed whitespace-pre-wrap">
+                      {displayUser.about}
+                    </p>
                   </div>
-                </div>
+                )}
+
+                {/* Contact Number Card */}
+                {displayUser?.visibilitySettings?.showContact !== false && (displayUser.mobile || (Array.isArray(displayUser.contactNumbers) && displayUser.contactNumbers.some(c => c?.number))) && (
+                  <div className="p-[1vw] border-b border-gray-100 bg-[#FAFAFA]">
+                    <h3 className="flex items-center gap-[0.5vw] text-[0.85vw] font-semibold text-gray-700 mb-[0.5vw]">
+                      <Phone size="1vw" /> Contact Number
+                    </h3>
+                    <div className="flex flex-col gap-[0.2vw] text-[0.75vw] text-gray-500">
+                      {displayUser.mobile && (
+                        <p>{displayUser.countryCode ? displayUser.countryCode + ' ' : ''}{displayUser.mobile}</p>
+                      )}
+                      {Array.isArray(displayUser.contactNumbers) && displayUser.contactNumbers.map((c, i) => c?.number ? (
+                        <p key={i}>
+                          <span className="text-gray-400 text-[0.7vw]">{c.label ? `${c.label}: ` : ''}</span>
+                          {c.countryCode ? c.countryCode + ' ' : ''}{c.number}
+                        </p>
+                      ) : null)}
+                    </div>
+                  </div>
+                )}
 
                 <div className="p-[1vw] border-b border-gray-100">
                   <h3 className="flex items-center gap-[0.5vw] text-[0.85vw] font-semibold text-gray-700 mb-[0.6vw]">
-                    {(user.company_logo_url || user.companyLogo) ? (
-                      <img src={user.company_logo_url || user.companyLogo} alt="Company Logo" className="w-[1.2vw] h-[1.2vw] object-contain rounded-[0.2vw]" />
+                    {(displayUser.company_logo_url || displayUser.companyLogo) ? (
+                      <img src={displayUser.company_logo_url || displayUser.companyLogo} alt="Company Logo" className="w-[1.2vw] h-[1.2vw] object-contain rounded-[0.2vw]" />
                     ) : (
                       <Building size="1vw" />
                     )}
                     Professional Details
                   </h3>
                   <div className="flex flex-col gap-[0.35vw] text-[0.75vw]">
-                    {user.profileType && (
+                    {displayUser.profileType && (
                       <p className="flex items-baseline gap-[0.3vw]">
                         <span className="font-semibold text-gray-800">Profile :</span>
-                        <span className="text-gray-500">{user.profileType}</span>
+                        <span className="text-gray-500">{displayUser.profileType}</span>
                       </p>
                     )}
-                    {user.companyName && (
+                    {displayUser.companyName && (
                       <p className="flex items-baseline gap-[0.3vw]">
                         <span className="font-semibold text-gray-800">Company Name :</span>
-                        <span className="text-gray-500">{user.companyName}</span>
+                        <span className="text-gray-500">{displayUser.companyName}</span>
                       </p>
                     )}
-                    {user.industryType && (
+                    {displayUser.industryType && (
                       <p className="flex items-baseline gap-[0.3vw]">
                         <span className="font-semibold text-gray-800">Industry Type :</span>
-                        <span className="text-gray-500">{user.industryType}</span>
+                        <span className="text-gray-500">{displayUser.industryType}</span>
                       </p>
                     )}
-                    {user.companyEmail && (
+                    {displayUser?.visibilitySettings?.showContact !== false && displayUser.companyEmail && (
                       <p className="flex items-baseline gap-[0.3vw]">
                         <span className="font-semibold text-gray-800">Company Gmail :</span>
-                        <span className="text-gray-500">{user.companyEmail}</span>
+                        <span className="text-gray-500">{displayUser.companyEmail}</span>
                       </p>
                     )}
-                    {user.website && (
+                    {displayUser?.visibilitySettings?.showContact !== false && displayUser.website && (
                       <p className="flex items-baseline gap-[0.3vw]">
                         <span className="font-semibold text-gray-800">Website :</span>
                         <a
-                          href={user.website?.startsWith('http') ? user.website : `https://${user.website}`}
+                          href={displayUser.website?.startsWith('http') ? displayUser.website : `https://${displayUser.website}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-[#4f46e5] underline hover:text-[#4338ca] transition-colors"
                         >
-                          {user.website.replace(/^https?:\/\//i, '')}
+                          {displayUser.website.replace(/^https?:\/\//i, '')}
                         </a>
                       </p>
                     )}
-                    {((Array.isArray(user.services) && user.services.length > 0) || (typeof user.services === 'string' && user.services.trim())) && (
+                    {((Array.isArray(displayUser.services) && displayUser.services.length > 0) || (typeof displayUser.services === 'string' && displayUser.services.trim())) && (
                       <p className="flex items-baseline gap-[0.3vw]">
                         <span className="font-semibold text-gray-800">Services :</span>
                         <span className="text-gray-500 leading-snug">
-                          {Array.isArray(user.services) ? user.services.join(', ') : user.services}
+                          {Array.isArray(displayUser.services) ? displayUser.services.join(', ') : displayUser.services}
                         </span>
                       </p>
                     )}
-                    {Array.isArray(user.contactNumbers) && user.contactNumbers.some(c => c?.number) && (
+                    {displayUser?.visibilitySettings?.showContact !== false && Array.isArray(displayUser.contactNumbers) && displayUser.contactNumbers.some(c => c?.number) && (
                       <div className="flex items-start gap-[0.3vw] mt-[0.1vw]">
                         <span className="font-semibold text-gray-800">Contact :</span>
                         <div className="flex flex-col text-gray-500">
-                          {user.contactNumbers.filter(c => c?.number).map((c, i) => (
+                          {displayUser.contactNumbers.filter(c => c?.number).map((c, i) => (
                             <span key={i} className="leading-snug">
                               {c.number}
                             </span>
@@ -857,19 +879,23 @@ const Profile = () => {
                   </div>
                 </div>
 
-                <div className="p-[1vw] border-b border-gray-100 bg-[#FAFAFA]">
-                  <h3 className="flex items-center gap-[0.5vw] text-[0.85vw] font-semibold text-gray-700 mb-[0.5vw]">
-                    <MapPin size="1vw" /> Address
-                  </h3>
-                  <div className="text-[0.75vw] flex flex-col gap-[0.3vw]  text-gray-500">
-                    {user.address1 || user.address2 ? <div>{[user.address1, user.address2].filter(Boolean).join(', ')}</div> : null}
-                    {user.city || user.state ? <div>{[user.city, user.state].filter(Boolean).join(', ')}</div> : null}
-                    {user.country || user.pincode ? <div>{[user.country, user.pincode].filter(Boolean).join(' - ')}</div> : null}
+                {/* Address Card */}
+                {displayUser?.visibilitySettings?.showAddress !== false && (displayUser.address1 || displayUser.address2 || displayUser.city || displayUser.state || displayUser.country || displayUser.pincode) && (
+                  <div className="p-[1vw] border-b border-gray-100 bg-[#FAFAFA]">
+                    <h3 className="flex items-center gap-[0.5vw] text-[0.85vw] font-semibold text-gray-700 mb-[0.5vw]">
+                      <MapPin size="1vw" /> Address
+                    </h3>
+                    <div className="text-[0.75vw] flex flex-col gap-[0.3vw]  text-gray-500">
+                      {displayUser.address1 || displayUser.address2 ? <div>{[displayUser.address1, displayUser.address2].filter(Boolean).join(', ')}</div> : null}
+                      {displayUser.city || displayUser.state ? <div>{[displayUser.city, displayUser.state].filter(Boolean).join(', ')}</div> : null}
+                      {displayUser.country || displayUser.pincode ? <div>{[displayUser.country, displayUser.pincode].filter(Boolean).join(' - ')}</div> : null}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {(() => {
-                  const socials = user?.socials || {};
+                {/* Social Media Links */}
+                {displayUser?.visibilitySettings?.showSocial !== false && (() => {
+                  const socials = displayUser?.socials || {};
                   const hasAny = Boolean(
                     socials.website?.trim() ||
                     socials.linkedin?.trim() ||
@@ -881,7 +907,7 @@ const Profile = () => {
                   if (!hasAny) return null;
 
                   return (
-                    <div className="p-[1vw] flex gap-[0.6vw] justify-center items-center flex-wrap">
+                    <div className="p-[1vw] flex gap-[0.6vw] justify-start items-center flex-wrap">
                       {socials.website?.trim() && (
                         <div
                           title="Website"

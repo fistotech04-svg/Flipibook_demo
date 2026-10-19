@@ -241,6 +241,8 @@ router.get("/creator", async (req, res) => {
             state: profile?.state || '',
             country: profile?.country || 'INDIA',
             socials: profile?.socials || {},
+            contactNumbers: profile?.contactNumbers || [],
+            visibilitySettings: profile?.visibilitySettings || { showInExplore: true, showContact: true, showAddress: true, showSocial: true },
             followers: profile?.followers || [],
             following: profile?.following || [],
             isFollowing: isFollowingCreator,
@@ -313,6 +315,7 @@ router.get("/top-creators", async (req, res) => {
                 followers: followersArr,
                 followersCount: followersArr.length,
                 following: p.following || [],
+                visibilitySettings: p.visibilitySettings || { showInExplore: true, showContact: true, showAddress: true, showSocial: true },
                 isFollowing: currentEmail ? followersArr.some(f => f.toLowerCase() === currentEmail) : false
             };
         });
@@ -339,6 +342,7 @@ router.get("/top-creators", async (req, res) => {
                     followers: [],
                     followersCount: 0,
                     following: [],
+                    visibilitySettings: { showInExplore: true, showContact: true, showAddress: true, showSocial: true },
                     isFollowing: false
                 };
             } else if (!creatorMap[emailKey].name && u.name) {
@@ -347,6 +351,9 @@ router.get("/top-creators", async (req, res) => {
         });
 
         let creatorsList = Object.values(creatorMap);
+
+        // Filter out any creators who have disabled "Show my profile in Explore Page"
+        creatorsList = creatorsList.filter(c => c.visibilitySettings?.showInExplore !== false);
 
         // Exclude current logged-in user's own profile if provided
         const excludeEmail = (req.query.excludeEmail || req.query.currentEmail || req.query.emailId || req.query.email || '').trim().toLowerCase();

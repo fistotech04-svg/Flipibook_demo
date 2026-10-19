@@ -120,6 +120,12 @@ const profileSchema = new mongoose.Schema({
     type: [String],
     default: []
   },
+  visibilitySettings: {
+    showInExplore: { type: Boolean, default: true },
+    showContact: { type: Boolean, default: true },
+    showAddress: { type: Boolean, default: true },
+    showSocial: { type: Boolean, default: true }
+  },
   createdAt: {
     type: Date,
     default: Date.now

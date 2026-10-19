@@ -7,6 +7,7 @@ import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
 import { parsePhoneNumberFromString, isValidPhoneNumber } from 'libphonenumber-js';
 import { resolveUploadsPath } from '../../../utils/supabaseUtils';
+import { useToast } from '../../../components/CustomToast';
 
 // Reusable phone component with the exact same UI, dropdown, length validation, and green checkmark as Interaction WhatsApp
 const ProfilePhoneField = ({ value, countryCode, onChange, onBlur, placeholder = "1234567890", hasError }) => {
@@ -185,19 +186,74 @@ const ProfilePhoneField = ({ value, countryCode, onChange, onBlur, placeholder =
   );
 };
 
+const normalizeForComparison = (obj) => {
+  if (!obj) return '';
+  const normalized = {
+    ...obj,
+    visibilitySettings: {
+      showInExplore: true,
+      showContact: true,
+      showAddress: true,
+      showSocial: true,
+      ...(obj.visibilitySettings || {})
+    },
+    socials: {
+      website: '',
+      instagram: '',
+      linkedin: '',
+      facebook: '',
+      whatsapp: '',
+      ...(obj.socials || {})
+    }
+  };
+  return JSON.stringify(normalized);
+};
+
 const EditProfile = ({ user, setUser }) => {
-  const [editedUser, setEditedUser] = useState(user);
+  // Ensure initial editedUser has complete defaults for visibilitySettings
+  const [editedUser, setEditedUser] = useState(() => ({
+    ...user,
+    visibilitySettings: {
+      showInExplore: true,
+      showContact: true,
+      showAddress: true,
+      showSocial: true,
+      ...(user?.visibilitySettings || {})
+    }
+  }));
+  const [isDirty, setIsDirty] = useState(false);
   const [errors, setErrors] = useState({});
   const [isSaving, setIsSaving] = useState(false);
 
+  const { showToast, error: showErrorToast, success: showSuccessToast } = useToast();
   const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
 
-  useEffect(() => {
-    setEditedUser(user);
-    setErrors({});
-  }, [user]);
+  // Track initial normalized user to avoid re-syncing while user is actively editing
+  const initialUserNormalizedRef = useRef(normalizeForComparison(user));
+  const hasUserChangedRef = useRef(false);
 
-  const isEdited = JSON.stringify(user) !== JSON.stringify(editedUser);
+  useEffect(() => {
+    const currentNorm = normalizeForComparison(user);
+    // If incoming user identity changed or was freshly loaded from backend, sync unless user is editing
+    if (initialUserNormalizedRef.current !== currentNorm) {
+      if (!isDirty) {
+        initialUserNormalizedRef.current = currentNorm;
+        setEditedUser({
+          ...user,
+          visibilitySettings: {
+            showInExplore: true,
+            showContact: true,
+            showAddress: true,
+            showSocial: true,
+            ...(user?.visibilitySettings || {})
+          }
+        });
+        setErrors({});
+      }
+    }
+  }, [user, isDirty]);
+
+  const isEdited = isDirty || (normalizeForComparison(user) !== normalizeForComparison(editedUser));
 
   const validate = () => {
     let newErrors = {};
@@ -220,11 +276,16 @@ const EditProfile = ({ user, setUser }) => {
     if (editedUser.website && !urlRegex.test(editedUser.website)) newErrors.website = "Invalid URL format";
     if (editedUser.pincode && !/^\d{5,6}$/.test(editedUser.pincode)) newErrors.pincode = "Invalid Pin Code";
 
-    if (editedUser.socials?.website && !urlRegex.test(editedUser.socials.website)) newErrors.socialWebsite = "Invalid URL format";
-    if (editedUser.socials?.instagram && !urlRegex.test(editedUser.socials.instagram)) newErrors.instagram = "Invalid URL format";
-    if (editedUser.socials?.linkedin && !urlRegex.test(editedUser.socials.linkedin)) newErrors.linkedin = "Invalid URL format";
-    if (editedUser.socials?.facebook && !urlRegex.test(editedUser.socials.facebook)) newErrors.facebook = "Invalid URL format";
-    if (editedUser.socials?.whatsapp && !urlRegex.test(editedUser.socials.whatsapp)) newErrors.whatsapp = "Invalid URL format";
+    // Validate active social links: if a social platform is added, its link cannot be empty
+    activeSocialKeys.forEach((key) => {
+      const platform = socialPlatformConfig[key];
+      const val = editedUser.socials?.[key];
+      if (!val || !val.trim()) {
+        newErrors[platform.errKey] = `Please enter ${platform.label} link`;
+      } else if (!urlRegex.test(val.trim())) {
+        newErrors[platform.errKey] = "Invalid URL format";
+      }
+    });
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -259,13 +320,22 @@ const EditProfile = ({ user, setUser }) => {
         }
         break;
       case 'website':
+        if (value && !urlRegex.test(value)) newErrors[field] = "Invalid URL format";
+        else delete newErrors[field];
+        break;
       case 'socialWebsite':
       case 'instagram':
       case 'linkedin':
       case 'facebook':
       case 'whatsapp':
-        if (value && !urlRegex.test(value)) newErrors[field] = "Invalid URL format";
-        else delete newErrors[field];
+        if (!value || !value.trim()) {
+          const platformLabel = field === 'socialWebsite' ? 'Website' : field.charAt(0).toUpperCase() + field.slice(1);
+          newErrors[field] = `Please enter ${platformLabel} link`;
+        } else if (!urlRegex.test(value.trim())) {
+          newErrors[field] = "Invalid URL format";
+        } else {
+          delete newErrors[field];
+        }
         break;
       case 'pincode':
         if (value && !/^\d{5,6}$/.test(value)) newErrors.pincode = "Invalid Pin Code";
@@ -278,7 +348,24 @@ const EditProfile = ({ user, setUser }) => {
   };
 
   const handleSave = async () => {
-    if (!validate()) return;
+    if (!validate()) {
+      // Find which social link might be missing to provide a tailored toast message
+      const missingSocialKey = activeSocialKeys.find((key) => {
+        const val = editedUser.socials?.[key];
+        return !val || !val.trim();
+      });
+      if (missingSocialKey) {
+        const platform = socialPlatformConfig[missingSocialKey];
+        if (showErrorToast) {
+          showErrorToast(`Please enter your ${platform?.label || 'social'} link`);
+        }
+      } else {
+        if (showErrorToast) {
+          showErrorToast("Please fix the errors before saving");
+        }
+      }
+      return;
+    }
     setIsSaving(true);
     try {
       const email = editedUser.email || editedUser.emailId;
@@ -302,6 +389,7 @@ const EditProfile = ({ user, setUser }) => {
             ...(p.socials || {})
           }
         };
+        setIsDirty(false);
         if (setUser) setUser(merged);
 
         try {
@@ -317,22 +405,27 @@ const EditProfile = ({ user, setUser }) => {
           }));
           window.dispatchEvent(new CustomEvent('profileUpdate', { detail: merged }));
         } catch (e) {}
+        if (showSuccessToast) showSuccessToast("Profile updated successfully");
       } else {
+        setIsDirty(false);
         if (setUser) setUser(editedUser);
         try {
           localStorage.setItem('user_profile', JSON.stringify(editedUser));
           window.dispatchEvent(new CustomEvent('profileUpdate', { detail: editedUser }));
         } catch (e) {}
+        if (showSuccessToast) showSuccessToast("Profile updated successfully");
       }
     } catch (err) {
       console.error("Error saving profile:", err);
       if (setUser) setUser(editedUser);
+      if (showErrorToast) showErrorToast("Failed to save changes. Please try again.");
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleCancel = () => {
+    setIsDirty(false);
     setEditedUser(user);
     setErrors({});
   };
@@ -357,7 +450,11 @@ const EditProfile = ({ user, setUser }) => {
         type="button"
         disabled={isSaving || !isEdited}
         onClick={handleSave}
-        className="flex items-center gap-[0.3vw] px-[1.2vw] py-[0.55vw] bg-[#34a853] hover:bg-[#2d9249] rounded-[0.5vw] text-[0.85vw] font-medium text-white transition-colors shadow-sm disabled:opacity-50"
+        className={`flex items-center gap-[0.3vw] px-[1.2vw] py-[0.55vw] rounded-[0.5vw] text-[0.85vw] font-medium text-white transition-all shadow-sm ${
+          isSaving || !isEdited
+            ? 'bg-[#34a853]/50 cursor-not-allowed opacity-50'
+            : 'bg-[#34a853] hover:bg-[#2d9249] cursor-pointer opacity-100 shadow-md hover:shadow-lg'
+        }`}
       >
         {isSaving ? (
           <Icon icon="line-md:loading-loop" className="w-[0.9vw] h-[0.9vw]" />
@@ -376,7 +473,116 @@ const EditProfile = ({ user, setUser }) => {
   const [isAddingService, setIsAddingService] = useState(false);
   const [newServiceInput, setNewServiceInput] = useState('');
   const [isAddingSocial, setIsAddingSocial] = useState(false);
-  const [selectedSocialToAdd, setSelectedSocialToAdd] = useState('twitter');
+
+  // Social platform definitions
+  const socialPlatformConfig = {
+    website: {
+      key: 'website',
+      label: 'Website',
+      placeholder: 'https://www.fistotech.com',
+      badgeBg: 'bg-[#1a1a1a]',
+      icon: 'lucide:globe',
+      isLucide: true,
+      errKey: 'socialWebsite'
+    },
+    instagram: {
+      key: 'instagram',
+      label: 'Instagram',
+      placeholder: 'https://www.instagram.com/fistotech',
+      badgeBg: 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500',
+      icon: 'mdi:instagram',
+      errKey: 'instagram'
+    },
+    linkedin: {
+      key: 'linkedin',
+      label: 'LinkedIn',
+      placeholder: 'https://www.linkedin.com/company/fistotech',
+      badgeBg: 'bg-[#0077b5]',
+      icon: 'mdi:linkedin',
+      errKey: 'linkedin'
+    },
+    facebook: {
+      key: 'facebook',
+      label: 'Facebook',
+      placeholder: 'https://www.facebook.com/fistotech',
+      badgeBg: 'bg-[#1877f2]',
+      icon: 'mdi:facebook',
+      errKey: 'facebook'
+    },
+    whatsapp: {
+      key: 'whatsapp',
+      label: 'WhatsApp',
+      placeholder: 'https://wa.me/919876543210',
+      badgeBg: 'bg-[#25d366]',
+      icon: 'mdi:whatsapp',
+      errKey: 'whatsapp'
+    }
+  };
+
+  // Helper to get keys that have values in socials object
+  const getFilledSocialKeys = (socialsObj) => {
+    if (!socialsObj) return [];
+    const ordered = ['website', 'instagram', 'linkedin', 'facebook', 'whatsapp'];
+    return ordered.filter(k => Boolean(socialsObj[k] && typeof socialsObj[k] === 'string' && socialsObj[k].trim() !== ''));
+  };
+
+  // Track active/visible social platform keys in the UI
+  const [activeSocialKeys, setActiveSocialKeys] = useState(() => getFilledSocialKeys(user?.socials));
+  const socialDropdownRef = useRef(null);
+
+  // Sync active keys when user changes externally (unless user is actively editing)
+  useEffect(() => {
+    if (!isDirty) {
+      setActiveSocialKeys(getFilledSocialKeys(user?.socials));
+    }
+  }, [user, isDirty]);
+
+  // Close social dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (socialDropdownRef.current && !socialDropdownRef.current.contains(e.target)) {
+        setIsAddingSocial(false);
+      }
+    };
+    if (isAddingSocial) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isAddingSocial]);
+
+  const handleAddSocial = (key) => {
+    if (!activeSocialKeys.includes(key)) {
+      setActiveSocialKeys(prev => [...prev, key]);
+    }
+    setIsAddingSocial(false);
+    setIsDirty(true);
+  };
+
+  const handleRemoveSocial = (key) => {
+    setActiveSocialKeys(prev => prev.filter(k => k !== key));
+    setEditedUser(prev => ({
+      ...prev,
+      socials: {
+        ...(prev?.socials || {}),
+        [key]: ''
+      }
+    }));
+    const errKey = socialPlatformConfig[key]?.errKey;
+    if (errKey && errors[errKey]) {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next[errKey];
+        return next;
+      });
+    }
+    setIsDirty(true);
+  };
+
+  const availableSocialOptions = Object.values(socialPlatformConfig).filter(
+    p => !activeSocialKeys.includes(p.key)
+  );
 
   const profileTypeOptions = [
     { label: 'Individual', icon: 'lucide:user' },
@@ -443,6 +649,8 @@ const EditProfile = ({ user, setUser }) => {
   };
 
   const handleAddContactNumber = () => {
+    if (contactNumbersList.length >= 4) return;
+    setIsDirty(true);
     const nextIndex = contactNumbersList.length + 1;
     const nextList = [
       ...contactNumbersList,
@@ -452,6 +660,7 @@ const EditProfile = ({ user, setUser }) => {
   };
 
   const handleRemoveContactNumber = (index) => {
+    setIsDirty(true);
     const nextList = contactNumbersList.filter((_, i) => i !== index);
     setEditedUser({ ...editedUser, contactNumbers: nextList });
   };
@@ -824,14 +1033,16 @@ const EditProfile = ({ user, setUser }) => {
                 })}
               </div>
 
-              {/* Add Contact Number Button */}
-              <button
-                type="button"
-                onClick={handleAddContactNumber}
-                className="flex items-center gap-[0.3vw] px-[1vw] py-[0.5vw] border border-[#EC5137] text-[#EC5137] rounded-[0.4vw] text-[0.78vw] font-medium hover:bg-[#EC5137]/5 transition-colors"
-              >
-                <span>+</span> Add Contact Number
-              </button>
+              {/* Add Contact Number Button (max 4 total: initial 2 + 2 extra) */}
+              {contactNumbersList.length < 4 && (
+                <button
+                  type="button"
+                  onClick={handleAddContactNumber}
+                  className="flex items-center gap-[0.3vw] px-[1vw] py-[0.5vw] border border-[#EC5137] text-[#EC5137] rounded-[0.4vw] text-[0.78vw] font-medium hover:bg-[#EC5137]/5 transition-colors"
+                >
+                  <span>+</span> Add Contact Number
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -920,140 +1131,92 @@ const EditProfile = ({ user, setUser }) => {
           </div>
 
           <div className="flex flex-col gap-[1vw]">
-            {/* Website */}
-            <div className="flex items-center gap-[0.8vw]">
-              <div className="w-[2.6vw] h-[2.6vw] bg-[#1a1a1a] rounded-[0.5vw] flex items-center justify-center shrink-0">
-                <Globe className="w-[1.4vw] h-[1.4vw] text-white" />
-              </div>
-              <input
-                type="text"
-                placeholder="https://www.fistotech.com"
-                value={editedUser?.socials?.website || ''}
-                onChange={(e) => {
-                  setEditedUser({ ...editedUser, socials: { ...editedUser.socials, website: e.target.value } });
-                  setErrors({ ...errors, socialWebsite: null });
-                }}
-                onBlur={(e) => validateField('socialWebsite', e.target.value)}
-                className="flex-1 border border-gray-200 rounded-[0.6vw] px-[1vw] py-[0.65vw] text-[0.85vw] focus:outline-none focus:border-gray-300 text-gray-700 bg-white"
-              />
-              <button
-                type="button"
-                onClick={() => setEditedUser({ ...editedUser, socials: { ...editedUser.socials, website: '' } })}
-                className="w-[2.6vw] h-[2.6vw] border border-gray-200 rounded-[0.5vw] flex items-center justify-center hover:bg-gray-50 text-gray-400 hover:text-gray-700 transition-colors bg-white shrink-0"
-              >
-                <X className="w-[1vw] h-[1vw]" />
-              </button>
-            </div>
+            {activeSocialKeys.map((key) => {
+              const platform = socialPlatformConfig[key];
+              if (!platform) return null;
+              const hasErr = Boolean(errors[platform.errKey]);
 
-            {/* Instagram */}
-            <div className="flex items-center gap-[0.8vw]">
-              <div className="w-[2.6vw] h-[2.6vw] bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500 rounded-[0.5vw] flex items-center justify-center shrink-0">
-                <Icon icon="mdi:instagram" className="w-[1.5vw] h-[1.5vw] text-white" />
-              </div>
-              <input
-                type="text"
-                placeholder="https://www.instagram.com/fistotech"
-                value={editedUser?.socials?.instagram || ''}
-                onChange={(e) => {
-                  setEditedUser({ ...editedUser, socials: { ...editedUser.socials, instagram: e.target.value } });
-                  setErrors({ ...errors, instagram: null });
-                }}
-                onBlur={(e) => validateField('instagram', e.target.value)}
-                className="flex-1 border border-gray-200 rounded-[0.6vw] px-[1vw] py-[0.65vw] text-[0.85vw] focus:outline-none focus:border-gray-300 text-gray-700 bg-white"
-              />
-              <button
-                type="button"
-                onClick={() => setEditedUser({ ...editedUser, socials: { ...editedUser.socials, instagram: '' } })}
-                className="w-[2.6vw] h-[2.6vw] border border-gray-200 rounded-[0.5vw] flex items-center justify-center hover:bg-gray-50 text-gray-400 hover:text-gray-700 transition-colors bg-white shrink-0"
-              >
-                <X className="w-[1vw] h-[1vw]" />
-              </button>
-            </div>
+              return (
+                <div key={key} className="flex flex-col gap-[0.2vw]">
+                  <div className="flex items-center gap-[0.8vw]">
+                    <div className={`w-[2.6vw] h-[2.6vw] ${platform.badgeBg} rounded-[0.5vw] flex items-center justify-center shrink-0`}>
+                      {platform.isLucide ? (
+                        <Globe className="w-[1.4vw] h-[1.4vw] text-white" />
+                      ) : (
+                        <Icon icon={platform.icon} className="w-[1.5vw] h-[1.5vw] text-white" />
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder={platform.placeholder}
+                      value={editedUser?.socials?.[key] || ''}
+                      onChange={(e) => {
+                        setEditedUser(prev => ({
+                          ...prev,
+                          socials: { ...(prev?.socials || {}), [key]: e.target.value }
+                        }));
+                        setIsDirty(true);
+                        if (errors[platform.errKey]) {
+                          setErrors(prev => ({ ...prev, [platform.errKey]: null }));
+                        }
+                      }}
+                      onBlur={(e) => validateField(platform.errKey, e.target.value)}
+                      className={`flex-1 border ${hasErr ? 'border-red-500' : 'border-gray-200'} rounded-[0.6vw] px-[1vw] py-[0.65vw] text-[0.85vw] focus:outline-none focus:border-gray-300 text-gray-700 bg-white`}
+                    />
+                    <button
+                      type="button"
+                      title={`Remove ${platform.label}`}
+                      onClick={() => handleRemoveSocial(key)}
+                      className="w-[2.6vw] h-[2.6vw] border border-gray-200 rounded-[0.5vw] flex items-center justify-center hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors bg-white shrink-0 cursor-pointer"
+                    >
+                      <X className="w-[1vw] h-[1vw]" />
+                    </button>
+                  </div>
+                  {hasErr && (
+                    <p className="text-red-500 text-[0.68vw] pl-[3.4vw]">{errors[platform.errKey]}</p>
+                  )}
+                </div>
+              );
+            })}
 
-            {/* LinkedIn */}
-            <div className="flex items-center gap-[0.8vw]">
-              <div className="w-[2.6vw] h-[2.6vw] bg-[#0077b5] rounded-[0.5vw] flex items-center justify-center shrink-0">
-                <Icon icon="mdi:linkedin" className="w-[1.5vw] h-[1.5vw] text-white" />
-              </div>
-              <input
-                type="text"
-                placeholder="https://www.linkedin.com/company/fistotech"
-                value={editedUser?.socials?.linkedin || ''}
-                onChange={(e) => {
-                  setEditedUser({ ...editedUser, socials: { ...editedUser.socials, linkedin: e.target.value } });
-                  setErrors({ ...errors, linkedin: null });
-                }}
-                onBlur={(e) => validateField('linkedin', e.target.value)}
-                className="flex-1 border border-gray-200 rounded-[0.6vw] px-[1vw] py-[0.65vw] text-[0.85vw] focus:outline-none focus:border-gray-300 text-gray-700 bg-white"
-              />
-              <button
-                type="button"
-                onClick={() => setEditedUser({ ...editedUser, socials: { ...editedUser.socials, linkedin: '' } })}
-                className="w-[2.6vw] h-[2.6vw] border border-gray-200 rounded-[0.5vw] flex items-center justify-center hover:bg-gray-50 text-gray-400 hover:text-gray-700 transition-colors bg-white shrink-0"
-              >
-                <X className="w-[1vw] h-[1vw]" />
-              </button>
-            </div>
-
-            {/* Facebook */}
-            <div className="flex items-center gap-[0.8vw]">
-              <div className="w-[2.6vw] h-[2.6vw] bg-[#1877f2] rounded-[0.5vw] flex items-center justify-center shrink-0">
-                <Icon icon="mdi:facebook" className="w-[1.5vw] h-[1.5vw] text-white" />
-              </div>
-              <input
-                type="text"
-                placeholder="https://www.facebook.com/fistotech"
-                value={editedUser?.socials?.facebook || ''}
-                onChange={(e) => {
-                  setEditedUser({ ...editedUser, socials: { ...editedUser.socials, facebook: e.target.value } });
-                  setErrors({ ...errors, facebook: null });
-                }}
-                onBlur={(e) => validateField('facebook', e.target.value)}
-                className="flex-1 border border-gray-200 rounded-[0.6vw] px-[1vw] py-[0.65vw] text-[0.85vw] focus:outline-none focus:border-gray-300 text-gray-700 bg-white"
-              />
-              <button
-                type="button"
-                onClick={() => setEditedUser({ ...editedUser, socials: { ...editedUser.socials, facebook: '' } })}
-                className="w-[2.6vw] h-[2.6vw] border border-gray-200 rounded-[0.5vw] flex items-center justify-center hover:bg-gray-50 text-gray-400 hover:text-gray-700 transition-colors bg-white shrink-0"
-              >
-                <X className="w-[1vw] h-[1vw]" />
-              </button>
-            </div>
-
-            {/* WhatsApp */}
-            <div className="flex items-center gap-[0.8vw]">
-              <div className="w-[2.6vw] h-[2.6vw] bg-[#25d366] rounded-[0.5vw] flex items-center justify-center shrink-0">
-                <Icon icon="mdi:whatsapp" className="w-[1.5vw] h-[1.5vw] text-white" />
-              </div>
-              <input
-                type="text"
-                placeholder="https://wa.me/919876543210"
-                value={editedUser?.socials?.whatsapp || ''}
-                onChange={(e) => {
-                  setEditedUser({ ...editedUser, socials: { ...editedUser.socials, whatsapp: e.target.value } });
-                  setErrors({ ...errors, whatsapp: null });
-                }}
-                onBlur={(e) => validateField('whatsapp', e.target.value)}
-                className="flex-1 border border-gray-200 rounded-[0.6vw] px-[1vw] py-[0.65vw] text-[0.85vw] focus:outline-none focus:border-gray-300 text-gray-700 bg-white"
-              />
-              <button
-                type="button"
-                onClick={() => setEditedUser({ ...editedUser, socials: { ...editedUser.socials, whatsapp: '' } })}
-                className="w-[2.6vw] h-[2.6vw] border border-gray-200 rounded-[0.5vw] flex items-center justify-center hover:bg-gray-50 text-gray-400 hover:text-gray-700 transition-colors bg-white shrink-0"
-              >
-                <X className="w-[1vw] h-[1vw]" />
-              </button>
-            </div>
-
-            {/* + Add Social Links Button */}
-            <div className="mt-[0.2vw]">
+            {/* + Add Social Links Dropdown Button */}
+            <div className="relative mt-[0.2vw]" ref={socialDropdownRef}>
               <button
                 type="button"
                 onClick={() => setIsAddingSocial(!isAddingSocial)}
-                className="flex items-center gap-[0.3vw] px-[1vw] py-[0.5vw] border border-[#EC5137] text-[#EC5137] rounded-[0.4vw] text-[0.78vw] font-medium hover:bg-[#EC5137]/5 transition-colors"
+                className="flex items-center gap-[0.3vw] px-[1vw] py-[0.5vw] border border-[#EC5137] text-[#EC5137] rounded-[0.4vw] text-[0.78vw] font-medium hover:bg-[#EC5137]/5 transition-colors cursor-pointer"
               >
                 <span>+</span> Add Social Links
               </button>
+
+              {/* Dropdown list of platforms not yet added */}
+              {isAddingSocial && (
+                <div className="absolute left-0 mt-[0.4vw] w-[14vw] bg-white border border-gray-200 rounded-[0.6vw] shadow-lg py-[0.4vw] z-50 animate-in fade-in zoom-in-95 duration-100">
+                  {availableSocialOptions.length > 0 ? (
+                    availableSocialOptions.map((opt) => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => handleAddSocial(opt.key)}
+                        className="w-full flex items-center gap-[0.6vw] px-[0.8vw] py-[0.5vw] text-[0.82vw] text-gray-700 hover:bg-gray-50 text-left transition-colors cursor-pointer"
+                      >
+                        <div className={`w-[1.6vw] h-[1.6vw] ${opt.badgeBg} rounded-[0.35vw] flex items-center justify-center shrink-0`}>
+                          {opt.isLucide ? (
+                            <Globe className="w-[0.9vw] h-[0.9vw] text-white" />
+                          ) : (
+                            <Icon icon={opt.icon} className="w-[1vw] h-[1vw] text-white" />
+                          )}
+                        </div>
+                        <span className="font-medium text-gray-800">{opt.label}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-[0.8vw] py-[0.5vw] text-[0.75vw] text-gray-400 text-center">
+                      All social platforms added
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -1083,13 +1246,16 @@ const EditProfile = ({ user, setUser }) => {
                 <button
                   type="button"
                   onClick={() => {
-                    const currentVal = editedUser?.visibilitySettings?.showInExplore !== false;
-                    setEditedUser({
-                      ...editedUser,
-                      visibilitySettings: {
-                        ...(editedUser?.visibilitySettings || {}),
-                        showInExplore: !currentVal
-                      }
+                    setIsDirty(true);
+                    setEditedUser(prev => {
+                      const currentVal = prev?.visibilitySettings?.showInExplore !== false;
+                      return {
+                        ...prev,
+                        visibilitySettings: {
+                          ...(prev?.visibilitySettings || {}),
+                          showInExplore: !currentVal
+                        }
+                      };
                     });
                   }}
                   className="relative inline-flex items-center w-[2.7vw] h-[1.6vw] shrink-0 cursor-pointer focus:outline-none"
@@ -1124,21 +1290,22 @@ const EditProfile = ({ user, setUser }) => {
             {/* Checkbox Items */}
             <div className="flex flex-col gap-[0.75vw] pt-[0.4vw]">
               {/* Option 1 */}
-              <label className="flex items-center gap-[0.6vw] cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={editedUser?.visibilitySettings?.showContact !== false}
-                  onChange={(e) => {
-                    setEditedUser({
-                      ...editedUser,
+              <div
+                onClick={() => {
+                  setIsDirty(true);
+                  setEditedUser(prev => {
+                    const currentVal = prev?.visibilitySettings?.showContact !== false;
+                    return {
+                      ...prev,
                       visibilitySettings: {
-                        ...(editedUser?.visibilitySettings || {}),
-                        showContact: e.target.checked
+                        ...(prev?.visibilitySettings || {}),
+                        showContact: !currentVal
                       }
-                    });
-                  }}
-                  className="hidden"
-                />
+                    };
+                  });
+                }}
+                className="flex items-center gap-[0.6vw] cursor-pointer select-none"
+              >
                 <div
                   className={`w-[1vw] h-[1vw] rounded-[0.2vw] flex items-center justify-center transition-colors shrink-0 ${
                     editedUser?.visibilitySettings?.showContact !== false
@@ -1153,24 +1320,25 @@ const EditProfile = ({ user, setUser }) => {
                 <span className="text-[0.75vw] text-gray-500">
                   Show <strong className="font-semibold text-gray-900">contact information</strong> like email, phone and website in your public profile
                 </span>
-              </label>
+              </div>
 
               {/* Option 2 */}
-              <label className="flex items-center gap-[0.6vw] cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={editedUser?.visibilitySettings?.showAddress !== false}
-                  onChange={(e) => {
-                    setEditedUser({
-                      ...editedUser,
+              <div
+                onClick={() => {
+                  setIsDirty(true);
+                  setEditedUser(prev => {
+                    const currentVal = prev?.visibilitySettings?.showAddress !== false;
+                    return {
+                      ...prev,
                       visibilitySettings: {
-                        ...(editedUser?.visibilitySettings || {}),
-                        showAddress: e.target.checked
+                        ...(prev?.visibilitySettings || {}),
+                        showAddress: !currentVal
                       }
-                    });
-                  }}
-                  className="hidden"
-                />
+                    };
+                  });
+                }}
+                className="flex items-center gap-[0.6vw] cursor-pointer select-none"
+              >
                 <div
                   className={`w-[1vw] h-[1vw] rounded-[0.2vw] flex items-center justify-center transition-colors shrink-0 ${
                     editedUser?.visibilitySettings?.showAddress !== false
@@ -1185,24 +1353,25 @@ const EditProfile = ({ user, setUser }) => {
                 <span className="text-[0.75vw] text-gray-500">
                   Show <strong className="font-semibold text-gray-900">Address</strong> in your public profile
                 </span>
-              </label>
+              </div>
 
               {/* Option 3 */}
-              <label className="flex items-center gap-[0.6vw] cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={editedUser?.visibilitySettings?.showSocial !== false}
-                  onChange={(e) => {
-                    setEditedUser({
-                      ...editedUser,
+              <div
+                onClick={() => {
+                  setIsDirty(true);
+                  setEditedUser(prev => {
+                    const currentVal = prev?.visibilitySettings?.showSocial !== false;
+                    return {
+                      ...prev,
                       visibilitySettings: {
-                        ...(editedUser?.visibilitySettings || {}),
-                        showSocial: e.target.checked
+                        ...(prev?.visibilitySettings || {}),
+                        showSocial: !currentVal
                       }
-                    });
-                  }}
-                  className="hidden"
-                />
+                    };
+                  });
+                }}
+                className="flex items-center gap-[0.6vw] cursor-pointer select-none"
+              >
                 <div
                   className={`w-[1vw] h-[1vw] rounded-[0.2vw] flex items-center justify-center transition-colors shrink-0 ${
                     editedUser?.visibilitySettings?.showSocial !== false
@@ -1217,7 +1386,7 @@ const EditProfile = ({ user, setUser }) => {
                 <span className="text-[0.75vw] text-gray-500">
                   Show <strong className="font-semibold text-gray-900">Social Media</strong> Navigation Icons in your public profile
                 </span>
-              </label>
+              </div>
             </div>
           </div>
         </section>

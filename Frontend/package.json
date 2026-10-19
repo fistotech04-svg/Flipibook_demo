@@ -30,6 +30,7 @@
     "axios": "^1.13.2",
     "bwip-js": "^4.10.1",
     "cannon-es": "^0.20.0",
+    "country-state-city": "^3.2.1",
     "dom-to-image-more": "^3.7.2",
     "dotenv": "^17.2.3",
     "fabric": "^7.2.0",

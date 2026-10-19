@@ -49,6 +49,12 @@ const defaultProfile = {
     facebook: '',
     whatsapp: ''
   },
+  visibilitySettings: {
+    showInExplore: true,
+    showContact: true,
+    showAddress: true,
+    showSocial: true
+  },
   bannerBg: {
     type: 'gradient',
     value: 'linear-gradient(to bottom right, #c1e8d7, #85d8c3, #60bba3)'
@@ -134,6 +140,11 @@ const SettingsLayout = () => {
                   ...defaultProfile.socials,
                   ...(prev.socials || {}),
                   ...(p.socials || {})
+                },
+                visibilitySettings: {
+                  ...defaultProfile.visibilitySettings,
+                  ...(prev.visibilitySettings || {}),
+                  ...(p.visibilitySettings || {})
                 }
               };
               return updated;

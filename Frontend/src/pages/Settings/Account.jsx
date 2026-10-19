@@ -168,7 +168,7 @@ const Account = () => {
       </div>
 
       {/* Active Sessions Card */}
-      <div className="w-full bg-white border border-gray-200/90 rounded-[1.2vw] p-[1.8vw] shadow-[0_2px_12px_rgba(0,0,0,0.03)] mt-[1.5vw] mb-[2vw]">
+      <div className="w-full bg-[#FBFBFC] border border-gray-200/80 rounded-[1.2vw] p-[1.8vw] shadow-[0_2px_12px_rgba(0,0,0,0.02)] mt-[1.5vw] mb-[2vw]">
         {/* Card Header with Top-Right Action Buttons */}
         <div className="flex items-start justify-between mb-[1.5vw]">
           <div>
@@ -207,30 +207,34 @@ const Account = () => {
         {/* Sessions List */}
         <div className="flex flex-col gap-[0.9vw]">
           {/* Session 1: Current Session */}
-          <div className="w-full bg-[#F9FAFB] border border-gray-100 rounded-[1vw] p-[1.1vw] flex items-center justify-between">
-            <div className="flex items-center gap-[1vw]">
+          <div className="w-full bg-white border border-gray-200/70 rounded-[1vw] px-[1.2vw] py-[1.1vw] grid grid-cols-12 items-center shadow-[0_1px_4px_rgba(0,0,0,0.02)]">
+            {/* Device & Details (identical to other sessions) */}
+            <div className="col-span-3 flex items-center gap-[1vw]">
               <Icon icon="uim:windows" className="w-[2vw] h-[2vw] shrink-0 text-[#0078D4]" />
               <div className="flex flex-col">
-                <span className="text-[0.95vw] font-bold text-gray-900">
+                <span className="text-[0.95vw] font-bold text-gray-900 leading-none">
                   Chrome on Windows
                 </span>
-                <span className="text-[0.75vw] text-gray-400 mt-[0.1vw]">
-                  Coimbatore, India <span className="text-gray-300">•</span> <span className="text-gray-500 font-medium">Active Now</span>
+                <span className="text-[0.75vw] text-gray-400 mt-[0.35vw]">
+                  Coimbatore, India <span className="text-gray-300">-</span> <span className="text-gray-500 font-medium">Active Now</span>
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center">
-              <span className="bg-[#DCFCE7] text-[#16A34A] text-[0.72vw] font-semibold px-[0.9vw] py-[0.25vw] rounded-full">
+            {/* Current Session Badge Column */}
+            <div className="col-span-2 flex items-center justify-center">
+              <span className="bg-[#DCFCE7] text-[#16A34A] text-[0.72vw] font-semibold px-[0.85vw] py-[0.2vw] rounded-full inline-flex items-center justify-center leading-normal">
                 Current Section
               </span>
             </div>
 
-            <div className="text-[0.78vw] text-gray-400 font-medium">
+            {/* IP Address */}
+            <div className="col-span-3 text-[0.78vw] text-gray-400 font-medium pl-[1vw]">
               IP 123.3445.455.345
             </div>
 
-            <div className="flex flex-col text-right pr-[2vw]">
+            {/* Last Activated */}
+            <div className="col-span-2 flex flex-col">
               <span className="text-[0.75vw] text-gray-400">
                 Last Activated
               </span>
@@ -238,27 +242,36 @@ const Account = () => {
                 Apr 29, 2026 - 10:45 Am
               </span>
             </div>
+
+            {/* Action placeholder */}
+            <div className="col-span-2 flex justify-end"></div>
           </div>
 
           {/* Session 2 */}
-          <div className="w-full bg-[#F9FAFB] border border-gray-100 rounded-[1vw] p-[1.1vw] flex items-center justify-between">
-            <div className="flex items-center gap-[1vw]">
+          <div className="w-full bg-white border border-gray-200/70 rounded-[1vw] px-[1.2vw] py-[1.1vw] grid grid-cols-12 items-center shadow-[0_1px_4px_rgba(0,0,0,0.02)]">
+            {/* Device & Details */}
+            <div className="col-span-3 flex items-center gap-[1vw]">
               <Icon icon="uim:windows" className="w-[2vw] h-[2vw] shrink-0 text-[#0078D4]" />
               <div className="flex flex-col">
-                <span className="text-[0.95vw] font-bold text-gray-900">
+                <span className="text-[0.95vw] font-bold text-gray-900 leading-none">
                   Chrome on Windows
                 </span>
-                <span className="text-[0.75vw] text-gray-400 mt-[0.1vw]">
-                  Coimbatore, India <span className="text-gray-300">•</span> Last Active 2 hours ago
+                <span className="text-[0.75vw] text-gray-400 mt-[0.35vw]">
+                  Coimbatore, India <span className="text-gray-300">-</span> Last Active 2 hours ago
                 </span>
               </div>
             </div>
 
-            <div className="text-[0.78vw] text-gray-400 font-medium">
+            {/* Spacer Column */}
+            <div className="col-span-2"></div>
+
+            {/* IP Address */}
+            <div className="col-span-3 text-[0.78vw] text-gray-400 font-medium pl-[1vw]">
               IP 123.3445.455.345
             </div>
 
-            <div className="flex flex-col">
+            {/* Last Activated */}
+            <div className="col-span-2 flex flex-col">
               <span className="text-[0.75vw] text-gray-400">
                 Last Activated
               </span>
@@ -267,34 +280,43 @@ const Account = () => {
               </span>
             </div>
 
-            <button
-              type="button"
-              className="flex items-center gap-[0.4vw] bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[0.78vw] font-medium px-[1vw] py-[0.48vw] rounded-[0.5vw] shadow-2xs transition-colors cursor-pointer"
-            >
-              <Icon icon="lucide:log-out" className="w-[0.85vw] h-[0.85vw] text-gray-500" strokeWidth="2" />
-              <span>Logout</span>
-            </button>
+            {/* Logout Button */}
+            <div className="col-span-2 flex justify-end">
+              <button
+                type="button"
+                className="flex items-center gap-[0.4vw] bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[0.78vw] font-medium px-[1.1vw] py-[0.48vw] rounded-[0.5vw] shadow-2xs transition-colors cursor-pointer"
+              >
+                <Icon icon="lucide:log-out" className="w-[0.85vw] h-[0.85vw] text-gray-500" strokeWidth="2" />
+                <span>Logout</span>
+              </button>
+            </div>
           </div>
 
           {/* Session 3 */}
-          <div className="w-full bg-[#F9FAFB] border border-gray-100 rounded-[1vw] p-[1.1vw] flex items-center justify-between">
-            <div className="flex items-center gap-[1vw]">
+          <div className="w-full bg-white border border-gray-200/70 rounded-[1vw] px-[1.2vw] py-[1.1vw] grid grid-cols-12 items-center shadow-[0_1px_4px_rgba(0,0,0,0.02)]">
+            {/* Device & Details */}
+            <div className="col-span-3 flex items-center gap-[1vw]">
               <Icon icon="uim:windows" className="w-[2vw] h-[2vw] shrink-0 text-[#0078D4]" />
               <div className="flex flex-col">
-                <span className="text-[0.95vw] font-bold text-gray-900">
+                <span className="text-[0.95vw] font-bold text-gray-900 leading-none">
                   Chrome on Windows
                 </span>
-                <span className="text-[0.75vw] text-gray-400 mt-[0.1vw]">
-                  Coimbatore, India <span className="text-gray-300">•</span> Last Active 1 day ago
+                <span className="text-[0.75vw] text-gray-400 mt-[0.35vw]">
+                  Coimbatore, India <span className="text-gray-300">-</span> Last Active 1 day ago
                 </span>
               </div>
             </div>
 
-            <div className="text-[0.78vw] text-gray-400 font-medium">
+            {/* Spacer Column */}
+            <div className="col-span-2"></div>
+
+            {/* IP Address */}
+            <div className="col-span-3 text-[0.78vw] text-gray-400 font-medium pl-[1vw]">
               IP 123.3445.455.345
             </div>
 
-            <div className="flex flex-col">
+            {/* Last Activated */}
+            <div className="col-span-2 flex flex-col">
               <span className="text-[0.75vw] text-gray-400">
                 Last Activated
               </span>
@@ -303,34 +325,43 @@ const Account = () => {
               </span>
             </div>
 
-            <button
-              type="button"
-              className="flex items-center gap-[0.4vw] bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[0.78vw] font-medium px-[1vw] py-[0.48vw] rounded-[0.5vw] shadow-2xs transition-colors cursor-pointer"
-            >
-              <Icon icon="lucide:log-out" className="w-[0.85vw] h-[0.85vw] text-gray-500" strokeWidth="2" />
-              <span>Logout</span>
-            </button>
+            {/* Logout Button */}
+            <div className="col-span-2 flex justify-end">
+              <button
+                type="button"
+                className="flex items-center gap-[0.4vw] bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[0.78vw] font-medium px-[1.1vw] py-[0.48vw] rounded-[0.5vw] shadow-2xs transition-colors cursor-pointer"
+              >
+                <Icon icon="lucide:log-out" className="w-[0.85vw] h-[0.85vw] text-gray-500" strokeWidth="2" />
+                <span>Logout</span>
+              </button>
+            </div>
           </div>
 
           {/* Session 4 */}
-          <div className="w-full bg-[#F9FAFB] border border-gray-100 rounded-[1vw] p-[1.1vw] flex items-center justify-between">
-            <div className="flex items-center gap-[1vw]">
+          <div className="w-full bg-white border border-gray-200/70 rounded-[1vw] px-[1.2vw] py-[1.1vw] grid grid-cols-12 items-center shadow-[0_1px_4px_rgba(0,0,0,0.02)]">
+            {/* Device & Details */}
+            <div className="col-span-3 flex items-center gap-[1vw]">
               <Icon icon="uim:windows" className="w-[2vw] h-[2vw] shrink-0 text-[#0078D4]" />
               <div className="flex flex-col">
-                <span className="text-[0.95vw] font-bold text-gray-900">
+                <span className="text-[0.95vw] font-bold text-gray-900 leading-none">
                   Chrome on Windows
                 </span>
-                <span className="text-[0.75vw] text-gray-400 mt-[0.1vw]">
-                  Coimbatore, India <span className="text-gray-300">•</span> Last Active 1 hours ago
+                <span className="text-[0.75vw] text-gray-400 mt-[0.35vw]">
+                  Coimbatore, India <span className="text-gray-300">-</span> Last Active 1 hours ago
                 </span>
               </div>
             </div>
 
-            <div className="text-[0.78vw] text-gray-400 font-medium">
+            {/* Spacer Column */}
+            <div className="col-span-2"></div>
+
+            {/* IP Address */}
+            <div className="col-span-3 text-[0.78vw] text-gray-400 font-medium pl-[1vw]">
               IP 123.3445.455.345
             </div>
 
-            <div className="flex flex-col">
+            {/* Last Activated */}
+            <div className="col-span-2 flex flex-col">
               <span className="text-[0.75vw] text-gray-400">
                 Last Activated
               </span>
@@ -339,13 +370,16 @@ const Account = () => {
               </span>
             </div>
 
-            <button
-              type="button"
-              className="flex items-center gap-[0.4vw] bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[0.78vw] font-medium px-[1vw] py-[0.48vw] rounded-[0.5vw] shadow-2xs transition-colors cursor-pointer"
-            >
-              <Icon icon="lucide:log-out" className="w-[0.85vw] h-[0.85vw] text-gray-500" strokeWidth="2" />
-              <span>Logout</span>
-            </button>
+            {/* Logout Button */}
+            <div className="col-span-2 flex justify-end">
+              <button
+                type="button"
+                className="flex items-center gap-[0.4vw] bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[0.78vw] font-medium px-[1.1vw] py-[0.48vw] rounded-[0.5vw] shadow-2xs transition-colors cursor-pointer"
+              >
+                <Icon icon="lucide:log-out" className="w-[0.85vw] h-[0.85vw] text-gray-500" strokeWidth="2" />
+                <span>Logout</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -443,7 +477,7 @@ const Account = () => {
             {/* Row 3: Chrome on Android - Completed */}
             <div className="grid grid-cols-6 items-center px-[1.4vw] py-[1.1vw] hover:bg-gray-50/50 transition-colors">
               <div className="flex items-center gap-[0.7vw] font-bold text-gray-900">
-                <Icon icon="logos:android-icon" className="w-[1.3vw] h-[1.3vw] shrink-0" />
+                <Icon icon="ant-design:android-filled" className="w-[1.4vw] h-[1.4vw] shrink-0 text-[#3DDC84]" />
                 <span>Chrome on Android</span>
               </div>
               <div className="text-gray-500 font-normal">

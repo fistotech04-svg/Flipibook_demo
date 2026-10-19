@@ -395,6 +395,7 @@ export default function CreatorProfileModal({ isOpen, onClose, creator, isPrevie
             socials: creator?.socials || {},
             followers: creator?.followers || [],
             following: creator?.following || [],
+            visibilitySettings: creator?.visibilitySettings || { showInExplore: true, showContact: true, showAddress: true, showSocial: true },
             bannerBg: creator?.bannerBg || { type: 'gradient', value: 'linear-gradient(120deg, #9fe6cb 0%, #72ceaf 50%, #9fe6cb 100%)' },
             companyLogo: creator?.companyLogo || ''
         };
@@ -623,7 +624,7 @@ export default function CreatorProfileModal({ isOpen, onClose, creator, isPrevie
                                         ) : (
                                             <>
                                                 <h2 className="text-[18px] font-bold text-gray-900 text-center truncate w-full">{profileUser?.name || 'Creator'}</h2>
-                                                {profileUser?.email && (
+                                                {profileUser?.visibilitySettings?.showContact !== false && profileUser?.email && (
                                                     <p className="text-[11px] text-gray-400 text-center truncate w-full">{profileUser?.email}</p>
                                                 )}
                                                 {/* Followers & Following Stats */}
@@ -650,17 +651,19 @@ export default function CreatorProfileModal({ isOpen, onClose, creator, isPrevie
                                     {!isLoading && (
                                         <div className="w-full flex flex-col pb-8">
                                             {/* About */}
-                                            <div className="px-4 py-3">
-                                                <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-gray-700 mb-1.5">
-                                                    <Icon icon="mdi:information" className="w-4 h-4 text-gray-600" /> About
-                                                </h3>
-                                                <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap pl-5 pr-2">
-                                                    {profileUser?.about || "“Bring your content to life with a real, interactive experience”"}
-                                                </p>
-                                            </div>
+                                            {profileUser?.about && (
+                                                <div className="px-4 py-3">
+                                                    <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-gray-700 mb-1.5">
+                                                        <Icon icon="mdi:information" className="w-4 h-4 text-gray-600" /> About
+                                                    </h3>
+                                                    <p className="text-[11px] text-gray-500 leading-relaxed whitespace-pre-wrap pl-5 pr-2">
+                                                        {profileUser.about}
+                                                    </p>
+                                                </div>
+                                            )}
 
                                             {/* Contact Number */}
-                                            {profileUser?.mobile ? (
+                                            {profileUser?.visibilitySettings?.showContact !== false && profileUser?.mobile ? (
                                                 <div className="px-4 py-3 bg-[#FAFAFA]">
                                                     <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-gray-700 mb-1.5">
                                                         <Icon icon="ph:phone-call-fill" className="w-4 h-4 text-gray-600" /> Contact Number
@@ -680,20 +683,22 @@ export default function CreatorProfileModal({ isOpen, onClose, creator, isPrevie
                                                     Company / Organization Details
                                                 </h3>
                                                 <div className="flex flex-col gap-1.5 text-[11px] pl-5 pr-2">
-                                                    <p><span className="font-semibold text-gray-700">Name :</span> <span className="text-gray-500">{profileUser?.companyName || 'Not specified'}</span></p>
-                                                    <p><span className="font-semibold text-gray-700">Industry Type :</span> <span className="text-gray-500">{profileUser?.industryType || 'Not specified'}</span></p>
-                                                    <p><span className="font-semibold text-gray-700">Gmail :</span> <span className="text-gray-500">{profileUser?.companyEmail || profileUser?.email || 'Not specified'}</span></p>
-                                                    {profileUser?.website ? (
-                                                        <p><span className="font-semibold text-gray-700">Website :</span> <a href={profileUser?.website.startsWith('http') ? profileUser?.website : `https://${profileUser?.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">{profileUser?.website}</a></p>
-                                                    ) : (
-                                                        <p><span className="font-semibold text-gray-700">Website :</span> <span className="text-gray-500">Not specified</span></p>
+                                                    {profileUser?.companyName && <p><span className="font-semibold text-gray-700">Name :</span> <span className="text-gray-500">{profileUser.companyName}</span></p>}
+                                                    {profileUser?.industryType && <p><span className="font-semibold text-gray-700">Industry Type :</span> <span className="text-gray-500">{profileUser.industryType}</span></p>}
+                                                    {profileUser?.visibilitySettings?.showContact !== false && (profileUser?.companyEmail || profileUser?.email) && (
+                                                        <p><span className="font-semibold text-gray-700">Gmail :</span> <span className="text-gray-500">{profileUser?.companyEmail || profileUser?.email}</span></p>
                                                     )}
-                                                    <p><span className="font-semibold text-gray-700">Services :</span> <span className="text-gray-500">{Array.isArray(profileUser?.services) && profileUser?.services.length > 0 ? profileUser?.services.join(', ') : (typeof profileUser?.services === 'string' && profileUser?.services ? profileUser?.services : 'Not specified')}</span></p>
+                                                    {profileUser?.visibilitySettings?.showContact !== false && profileUser?.website && (
+                                                        <p><span className="font-semibold text-gray-700">Website :</span> <a href={profileUser.website.startsWith('http') ? profileUser.website : `https://${profileUser.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">{profileUser.website}</a></p>
+                                                    )}
+                                                    {((Array.isArray(profileUser?.services) && profileUser.services.length > 0) || (typeof profileUser?.services === 'string' && profileUser?.services)) && (
+                                                        <p><span className="font-semibold text-gray-700">Services :</span> <span className="text-gray-500">{Array.isArray(profileUser.services) ? profileUser.services.join(', ') : profileUser.services}</span></p>
+                                                    )}
                                                 </div>
                                             </div>
 
                                             {/* Address */}
-                                            {(profileUser?.address1 || profileUser?.address2 || profileUser?.city || profileUser?.state) ? (
+                                            {profileUser?.visibilitySettings?.showAddress !== false && (profileUser?.address1 || profileUser?.address2 || profileUser?.city || profileUser?.state) ? (
                                                 <div className="px-4 py-3 bg-[#FAFAFA] rounded-b-xl">
                                                     <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-gray-700 mb-1.5">
                                                         <Icon icon="carbon:location-filled" className="w-4 h-4 text-gray-600" /> Address
@@ -887,7 +892,7 @@ export default function CreatorProfileModal({ isOpen, onClose, creator, isPrevie
                                             ) : (
                                                 <>
                                                     <h2 className="text-[1.3vw] font-bold text-gray-900 mt-[0.8vw] w-full px-[1.5vw] text-center truncate">{profileUser?.name || 'Creator'}</h2>
-                                                    {profileUser?.email && (
+                                                    {profileUser?.visibilitySettings?.showContact !== false && profileUser?.email && (
                                                         <p className="text-[0.7vw] text-gray-400 px-[1.5vw] text-center truncate">{profileUser?.email}</p>
                                                     )}
                                                     {/* Followers & Following Stats */}
@@ -932,17 +937,19 @@ export default function CreatorProfileModal({ isOpen, onClose, creator, isPrevie
                                             ) : (
                                                 <div id="left-scroll-container" className={`w-full mt-[1vw] pb-[2vw] flex flex-col flex-1 min-h-0 no-scrollbar text-left rounded-b-[1vw] ${isChildScrollable ? 'overflow-y-auto' : 'overflow-hidden'}`}>
                                                     {/* About */}
-                                                    <div className="px-[1.5vw] py-[0.8vw]">
-                                                        <h3 className="flex items-center gap-[0.5vw] text-[0.85vw] font-semibold text-gray-700 mb-[0.5vw]">
-                                                            <Icon icon="mdi:information" className="w-[1vw] h-[1vw] text-gray-600" /> About
-                                                        </h3>
-                                                        <p className="text-[0.75vw] text-gray-500 leading-relaxed whitespace-pre-wrap">
-                                                            {profileUser?.about || "“Bring your content to life with a real, interactive experience”"}
-                                                        </p>
-                                                    </div>
+                                                    {profileUser?.about && (
+                                                        <div className="px-[1.5vw] py-[0.8vw]">
+                                                            <h3 className="flex items-center gap-[0.5vw] text-[0.85vw] font-semibold text-gray-700 mb-[0.5vw]">
+                                                                <Icon icon="mdi:information" className="w-[1vw] h-[1vw] text-gray-600" /> About
+                                                            </h3>
+                                                            <p className="text-[0.75vw] text-gray-500 leading-relaxed whitespace-pre-wrap">
+                                                                {profileUser.about}
+                                                            </p>
+                                                        </div>
+                                                    )}
 
                                                     {/* Contact Number */}
-                                                    {profileUser?.mobile ? (
+                                                    {profileUser?.visibilitySettings?.showContact !== false && profileUser?.mobile ? (
                                                         <div className="px-[1.5vw] py-[0.8vw] bg-[#FAFAFA]">
                                                             <h3 className="flex items-center gap-[0.5vw] text-[0.85vw] font-semibold text-gray-700 mb-[0.5vw]">
                                                                 <Icon icon="ph:phone-call-fill" className="w-[1vw] h-[1vw] text-gray-600" /> Contact Number
@@ -962,20 +969,22 @@ export default function CreatorProfileModal({ isOpen, onClose, creator, isPrevie
                                                             Company / Organization Details
                                                         </h3>
                                                         <div className="flex flex-col gap-[0.4vw]  gap-[0.3vw] text-[0.75vw]">
-                                                            <p><span className="font-semibold text-gray-700">Name :</span> <span className="text-gray-500">{profileUser?.companyName || 'Not specified'}</span></p>
-                                                            <p><span className="font-semibold text-gray-700">Industry Type :</span> <span className="text-gray-500">{profileUser?.industryType || 'Not specified'}</span></p>
-                                                            <p><span className="font-semibold text-gray-700">Gmail :</span> <span className="text-gray-500">{profileUser?.companyEmail || profileUser?.email || 'Not specified'}</span></p>
-                                                            {profileUser?.website ? (
-                                                                <p><span className="font-semibold text-gray-700">Website :</span> <a href={profileUser?.website.startsWith('http') ? profileUser?.website : `https://${profileUser?.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">{profileUser?.website}</a></p>
-                                                            ) : (
-                                                                <p><span className="font-semibold text-gray-700">Website :</span> <span className="text-gray-500">Not specified</span></p>
+                                                            {profileUser?.companyName && <p><span className="font-semibold text-gray-700">Name :</span> <span className="text-gray-500">{profileUser.companyName}</span></p>}
+                                                            {profileUser?.industryType && <p><span className="font-semibold text-gray-700">Industry Type :</span> <span className="text-gray-500">{profileUser.industryType}</span></p>}
+                                                            {profileUser?.visibilitySettings?.showContact !== false && (profileUser?.companyEmail || profileUser?.email) && (
+                                                                <p><span className="font-semibold text-gray-700">Gmail :</span> <span className="text-gray-500">{profileUser?.companyEmail || profileUser?.email}</span></p>
                                                             )}
-                                                            <p><span className="font-semibold text-gray-700">Services :</span> <span className="text-gray-500">{Array.isArray(profileUser?.services) && profileUser?.services.length > 0 ? profileUser?.services.join(', ') : (typeof profileUser?.services === 'string' && profileUser?.services ? profileUser?.services : 'Not specified')}</span></p>
+                                                            {profileUser?.visibilitySettings?.showContact !== false && profileUser?.website && (
+                                                                <p><span className="font-semibold text-gray-700">Website :</span> <a href={profileUser?.website.startsWith('http') ? profileUser?.website : `https://${profileUser?.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">{profileUser?.website}</a></p>
+                                                            )}
+                                                            {((Array.isArray(profileUser?.services) && profileUser?.services.length > 0) || (typeof profileUser?.services === 'string' && profileUser?.services)) && (
+                                                                <p><span className="font-semibold text-gray-700">Services :</span> <span className="text-gray-500">{Array.isArray(profileUser.services) ? profileUser.services.join(', ') : profileUser.services}</span></p>
+                                                            )}
                                                         </div>
                                                     </div>
 
                                                     {/* Address */}
-                                                    {(profileUser?.address1 || profileUser?.address2 || profileUser?.city || profileUser?.state) ? (
+                                                    {profileUser?.visibilitySettings?.showAddress !== false && (profileUser?.address1 || profileUser?.address2 || profileUser?.city || profileUser?.state) ? (
                                                         <div className="px-[1.5vw] py-[0.8vw] bg-[#FAFAFA] rounded-b-[1vw]">
                                                             <h3 className="flex items-center gap-[0.5vw] text-[0.85vw] font-semibold text-gray-700 mb-[0.5vw]">
                                                                 <Icon icon="carbon:location-filled" className="w-[1vw] h-[1vw] text-gray-600" /> Address

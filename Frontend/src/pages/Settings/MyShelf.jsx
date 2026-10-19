@@ -37,15 +37,22 @@ import cover3 from '../../assets/Explore/c-bg3.png';
 import cover4 from '../../assets/Explore/c-bg4.png';
 import cover5 from '../../assets/Explore/c-bg5.png';
 
+import blueshade from '../../assets/Bookshelf/blueshelf/blueshade.svg';
+import bluesheet from '../../assets/Bookshelf/blueshelf/bluesheet.svg';
+import blueshelfwood from '../../assets/Bookshelf/blueshelf/blueshelfwood.svg';
+import bluedecor from '../../assets/Bookshelf/blueshelf/bluedecor.svg';
+
 const covers = [cover1, cover2, cover3, cover4, cover5];
 
 const shelfOptions = [
+  { id: 'customize4', name: 'Blue Shelf', img: blueshade },
   { id: 'customize1', name: 'Modern White', img: customize1 },
   { id: 'customize2', name: 'Classic Wood', img: customize2 },
   { id: 'customize3', name: 'Dark Oak', img: customize3 },
 ];
 
 const MyShelf = () => {
+  const [currentView, setCurrentView] = useState('overview'); // 'overview' | 'shelf_detail'
   const [view, setView] = useState('shelf');
   const [showShelfModal, setShowShelfModal] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -319,8 +326,8 @@ const MyShelf = () => {
   // Sync active shelf style with the selected folder
   useEffect(() => {
     const currentFolder = folders.find(f => f.name === selectedFolder);
-    if (currentFolder) {
-      setActiveShelfStyle(`customize${currentFolder.shelf_design || 1}`);
+    if (currentFolder && currentFolder.shelf_design) {
+      setActiveShelfStyle(`customize${currentFolder.shelf_design}`);
     }
   }, [folders, selectedFolder]);
 
@@ -575,6 +582,22 @@ const MyShelf = () => {
           bookWidth: '13%',
           bookStyle: { bottom: '76%', padding: '0 10%' }
         };
+      case 'customize4':
+        return {
+          type: 'rows',
+          bg: bluesheet,
+          rowAsset: blueshelfwood,
+          rowCount: calculatedRowCount,
+          bgStretch: true,
+          noZone: true,
+          decorBottom: bluedecor,
+          padding: 'px-0',
+          rowPadding: '0 5%',
+          topOffset: 6,
+          spacing: 26,
+          bookWidth: '11.5%',
+          bookStyle: { bottom: '51%', padding: '0 8%' }
+        };
       case 'customize3':
         return {
           type: 'rows',
@@ -627,30 +650,111 @@ const MyShelf = () => {
     <div className="flex flex-col w-full h-full px-4 pb-0 pt-1 overflow-visible font-sans text-gray-800">
 
       {/* Header */}
-      <div className="flex justify-between items-start mb-3 -mt-2">
+      <div className="flex justify-between items-start mb-6 -mt-2">
         <div>
-          <h1 className="text-2xl font-bold mb-1">My Shelf</h1>
-          <p className="text-[11px] mt-0.5 text-[#94a3b8]">PNG format keeps your logo clean and background-free</p>
+          <div className="flex items-center gap-3">
+            {currentView === 'shelf_detail' && (
+              <button
+                onClick={() => setCurrentView('overview')}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors text-gray-600 hover:text-gray-900"
+                title="Back to All Shelves"
+              >
+                <Icon icon="lucide:arrow-left" className="w-5 h-5" />
+              </button>
+            )}
+            <h1 className="text-2xl font-bold mb-1">My Shelf</h1>
+          </div>
+          <p className="text-[12px] mt-0.5 text-[#94a3b8]">Mange your subscription, payment methods, billing details and invoices.</p>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setView('shelf')}
-            className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-semibold transition-all duration-200 border ${view === 'shelf' ? 'bg-gray-50 text-[#1e293b] shadow-inner border-gray-200' : 'bg-white text-[#94a3b8] hover:text-[#64748b] shadow-[0_2px_8px_rgba(0,0,0,0.04)] border-transparent hover:border-gray-50'}`}
-          >
-            <svg viewBox="0 0 24 24" fill="currentColor" className={`w-5 h-5 ${view === 'shelf' ? 'text-gray-500' : 'text-[#94a3b8]'}`}>
-              <path fillRule="evenodd" clipRule="evenodd" d="M 2 3 h 20 v 5 H 2 Z M 13.5 4 h 1.2 v 4 h -1.2 Z M 15.1 4 h 1.2 v 4 h -1.2 Z M 16.7 4 h 1.2 v 4 h -1.2 Z M 18.3 4 h 1.2 v 4 h -1.2 Z M 2 9.5 h 20 v 5 H 2 Z M 3.5 10.5 h 1.2 v 4 h -1.2 Z M 5.1 10.5 h 1.2 v 4 h -1.2 Z M 6.7 10.5 h 1.2 v 4 h -1.2 Z M 8.5 14.5 L 9.7 10.5 h 1.2 L 9.7 14.5 Z M 2 16 h 20 v 5 H 2 Z M 3.5 17 h 1.2 v 4 h -1.2 Z M 5.1 17 h 1.2 v 4 h -1.2 Z M 13.5 18.4 h 4 v 1.2 h -4 Z M 14.5 19.8 h 4 v 1.2 h -4 Z" />
-            </svg>
-            <span>Shelf View</span>
-          </button>
-          <button
-            onClick={() => setView('list')}
-            className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-semibold transition-all duration-200 border ${view === 'list' ? 'bg-gray-50 text-[#1e293b] shadow-inner border-gray-200' : 'bg-white text-[#94a3b8] hover:text-[#64748b] shadow-[0_2px_8px_rgba(0,0,0,0.04)] border-transparent hover:border-gray-50'}`}
-          >
-            <Icon icon="circum:box-list" className={`w-5 h-5 ${view === 'list' ? 'text-gray-500' : 'text-[#94a3b8]'}`} />
-            <span>List View</span>
-          </button>
-        </div>
+        {currentView === 'shelf_detail' && (
+          <div className="flex gap-3">
+            <button
+              onClick={() => setView('shelf')}
+              className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-semibold transition-all duration-200 border ${view === 'shelf' ? 'bg-gray-50 text-[#1e293b] shadow-inner border-gray-200' : 'bg-white text-[#94a3b8] hover:text-[#64748b] shadow-[0_2px_8px_rgba(0,0,0,0.04)] border-transparent hover:border-gray-50'}`}
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className={`w-5 h-5 ${view === 'shelf' ? 'text-gray-500' : 'text-[#94a3b8]'}`}>
+                <path fillRule="evenodd" clipRule="evenodd" d="M 2 3 h 20 v 5 H 2 Z M 13.5 4 h 1.2 v 4 h -1.2 Z M 15.1 4 h 1.2 v 4 h -1.2 Z M 16.7 4 h 1.2 v 4 h -1.2 Z M 18.3 4 h 1.2 v 4 h -1.2 Z M 2 9.5 h 20 v 5 H 2 Z M 3.5 10.5 h 1.2 v 4 h -1.2 Z M 5.1 10.5 h 1.2 v 4 h -1.2 Z M 6.7 10.5 h 1.2 v 4 h -1.2 Z M 8.5 14.5 L 9.7 10.5 h 1.2 L 9.7 14.5 Z M 2 16 h 20 v 5 H 2 Z M 3.5 17 h 1.2 v 4 h -1.2 Z M 5.1 17 h 1.2 v 4 h -1.2 Z M 13.5 18.4 h 4 v 1.2 h -4 Z M 14.5 19.8 h 4 v 1.2 h -4 Z" />
+              </svg>
+              <span>Shelf View</span>
+            </button>
+            <button
+              onClick={() => setView('list')}
+              className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-semibold transition-all duration-200 border ${view === 'list' ? 'bg-gray-50 text-[#1e293b] shadow-inner border-gray-200' : 'bg-white text-[#94a3b8] hover:text-[#64748b] shadow-[0_2px_8px_rgba(0,0,0,0.04)] border-transparent hover:border-gray-50'}`}
+            >
+              <Icon icon="circum:box-list" className={`w-5 h-5 ${view === 'list' ? 'text-gray-500' : 'text-[#94a3b8]'}`} />
+              <span>List View</span>
+            </button>
+          </div>
+        )}
       </div>
+
+      {currentView === 'overview' ? (
+        /* Shelves Overview Grid matching screenshot */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start max-w-5xl">
+          {/* Shelf Cards (First shelf uses blueshade.svg as requested) */}
+          {folders.map((folder, idx) => {
+            const shelfTitle = idx === 0 && folder.name === 'My Flipbooks' ? 'Pumps based shelfs' : folder.name;
+            return (
+              <div
+                key={folder.name || idx}
+                onClick={() => {
+                  setSelectedFolder(folder.name);
+                  setActiveShelfStyle('customize4');
+                  setCurrentView('shelf_detail');
+                }}
+                className="group cursor-pointer flex flex-col items-center"
+              >
+                <div className="w-full aspect-[354/200] rounded-xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md hover:border-gray-200 transition-all duration-200 bg-white flex items-center justify-center">
+                  <img
+                    src={blueshade}
+                    alt={shelfTitle}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+                <span className="mt-3 text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+                  {shelfTitle}
+                </span>
+              </div>
+            );
+          })}
+
+          {/* Create New Shelf Dashed Card */}
+          <div className="w-full aspect-[354/200] rounded-2xl border-2 border-dashed border-[#FCA5A5] bg-[#FEF2F2]/20 flex flex-col items-center justify-center p-6 text-center hover:bg-[#FEF2F2]/40 transition-colors">
+            {/* Shelf Illustration / Icon with glowing rays */}
+            <div className="relative mb-3 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center relative">
+                {/* Subtle rays */}
+                <span className="absolute -top-1 w-1 h-1.5 bg-orange-300 rounded-full"></span>
+                <span className="absolute -top-0.5 -right-0.5 w-1 h-1.5 bg-orange-300 rounded-full rotate-45"></span>
+                <span className="absolute -top-0.5 -left-0.5 w-1 h-1.5 bg-orange-300 rounded-full -rotate-45"></span>
+                {/* Floating shelf icon */}
+                <div className="w-7 h-2.5 bg-[#EA580C]/80 rounded-sm relative flex items-center justify-center shadow-sm">
+                  <div className="w-3.5 h-1 bg-white/70 rounded-full"></div>
+                </div>
+                {/* Plus badge */}
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#FF5733] rounded-full text-white flex items-center justify-center text-[10px] font-bold shadow-sm">
+                  +
+                </div>
+              </div>
+            </div>
+
+            <h3 className="text-sm font-bold text-gray-900 mb-1">Create New Shelf</h3>
+            <p className="text-[11px] text-gray-500 mb-4 max-w-[240px] leading-relaxed">
+              Design a new shelf, add your flipbooks and share with your clients
+            </p>
+
+            <button
+              onClick={() => setShowAddShelfModal(true)}
+              className="px-5 py-2 bg-[#FF5733] hover:bg-[#E04D2D] active:scale-95 text-white text-xs font-semibold rounded-lg shadow-sm transition-all duration-150 flex items-center gap-1.5"
+            >
+              <span>+</span>
+              <span>Create New Shelf</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Detailed Bookshelf / List View */
+        <>
 
       {/* Toolbar */}
       {openDropdown && (
@@ -822,7 +926,7 @@ const MyShelf = () => {
                                       key={`empty-${i}-${bIdx}`}
                                       onDragOver={handleDragOver}
                                       onDrop={(e) => handleDrop(e, i * 6 + bIdx)}
-                                      className={`relative flex justify-center items-end ${activeShelfStyle === 'customize2' ? (i === activeAssets.rowCount - 1 ? 'translate-y-4' : 'translate-y-0') : 'translate-y-2'} ${bIdx === 0 ? 'translate-x-3' : bIdx === 1 ? 'translate-x-3' : bIdx === 2 ? 'translate-x-4' : ''}`}
+                                      className={`relative flex justify-center items-end ${activeShelfStyle === 'customize2' ? (i === activeAssets.rowCount - 1 ? 'translate-y-4' : 'translate-y-0') : activeShelfStyle === 'customize4' ? '-translate-y-1' : 'translate-y-2'} ${bIdx === 0 ? 'translate-x-3' : bIdx === 1 ? 'translate-x-3' : bIdx === 2 ? 'translate-x-4' : ''}`}
                                       style={{ width: activeAssets.bookWidth || '12%' }}
                                     />
                                   );
@@ -841,7 +945,7 @@ const MyShelf = () => {
                                     onDragOver={handleDragOver}
                                     onDrop={(e) => handleDrop(e, i * 6 + bIdx)}
                                     onDragEnd={handleDragEnd}
-                                    className={`relative group cursor-pointer flex justify-center items-end ${activeShelfStyle === 'customize2' ? (i === activeAssets.rowCount - 1 ? 'translate-y-4' : 'translate-y-0') : 'translate-y-2'} ${openMenuId === `${i}-${bIdx}` ? 'z-40' : 'hover:z-30'} ${bIdx === 0 ? 'translate-x-3' : bIdx === 1 ? 'translate-x-3' : bIdx === 2 ? 'translate-x-4' : ''} ${draggedBookIndex === (i * 6 + bIdx) ? 'opacity-50' : ''}`}
+                                    className={`relative group cursor-pointer flex justify-center items-end ${activeShelfStyle === 'customize2' ? (i === activeAssets.rowCount - 1 ? 'translate-y-4' : 'translate-y-0') : activeShelfStyle === 'customize4' ? '-translate-y-1' : 'translate-y-2'} ${openMenuId === `${i}-${bIdx}` ? 'z-40' : 'hover:z-30'} ${bIdx === 0 ? 'translate-x-3' : bIdx === 1 ? 'translate-x-3' : bIdx === 2 ? 'translate-x-4' : ''} ${draggedBookIndex === (i * 6 + bIdx) ? 'opacity-50' : ''}`}
                                     style={{ width: activeAssets.bookWidth || '12%' }}
                                   >
                                     <div className="w-[100%] aspect-[2.5/3.5] relative rounded-[3px] drop-shadow-md transition-transform origin-bottom group-hover:scale-105 overflow-hidden">
@@ -990,6 +1094,11 @@ const MyShelf = () => {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+            {activeAssets.decorBottom && (
+              <div className="absolute bottom-0 left-0 w-full pointer-events-none z-10">
+                <img src={activeAssets.decorBottom} alt="Shelf Decor" className="w-full h-auto object-cover" />
               </div>
             )}
               </div>
@@ -1182,6 +1291,8 @@ const MyShelf = () => {
 
         </div>
       </div>
+      </>
+      )}
 
       {/* Change Shelf Modal */}
       {showShelfModal && (
