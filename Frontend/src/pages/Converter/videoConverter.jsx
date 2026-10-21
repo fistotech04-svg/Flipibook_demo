@@ -103,7 +103,13 @@ const VideoConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
 
   const estimatedConvertedSize = calculateEstimatedSize();
 
-  const formats = ['MP4', 'WEBM', 'MOV', 'GIF', 'AVI'];
+  const allFormats = ['MP4', 'WEBM', 'MOV', 'GIF', 'AVI'];
+  const normOriginal = originalFormat?.toUpperCase() || 'MP4';
+  // Put current original upload format at the 1st place, followed by the rest
+  const formats = [
+    ...(allFormats.includes(normOriginal) ? [normOriginal] : []),
+    ...allFormats.filter((f) => f !== normOriginal),
+  ];
 
   const resolutionOptions = [
     'Original (Keep Same)',
@@ -286,11 +292,13 @@ const VideoConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
                       className="w-full h-full object-contain"
                     />
                   </div>
-                ) : isVideoFile || convertedBlobUrl ? (
+                ) : isVideoFile || (isConverted && convertedBlobUrl) ? (
                   <video
                     ref={videoRef}
-                    key={convertedBlobUrl || 'original_video'}
-                    src={convertedBlobUrl || file.previewUrl}
+                    key={isConverted && convertedBlobUrl ? 'converted_video' : 'original_video'}
+                    src={isConverted && convertedBlobUrl ? convertedBlobUrl : file.previewUrl}
+                    playsInline
+                    preload="auto"
                     className="w-full h-full object-cover"
                     onTimeUpdate={() => {
                       if (videoRef.current) {
@@ -441,7 +449,16 @@ const VideoConverter = ({ onBack, onConvert, onReset, fileData, initialConfig })
             <div className="mt-6">
               <button
                 type="button"
-                onClick={() => setIsConverted(false)}
+                onClick={() => {
+                  setIsConverted(false);
+                  setConvertedBlobUrl(null);
+                  setIsPlaying(false);
+                  setCurrentTime(0);
+                  if (videoRef.current) {
+                    videoRef.current.pause();
+                    videoRef.current.currentTime = 0;
+                  }
+                }}
                 className="inline-flex items-center gap-2 px-8 py-2.5 bg-white border border-[#d1d5db] hover:bg-[#f8fafc] active:scale-98 rounded-[6px] text-sm font-medium text-[#1e293b] shadow-sm transition-all cursor-pointer"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

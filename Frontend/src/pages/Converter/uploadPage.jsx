@@ -38,6 +38,32 @@ const UploadPage = ({ onBack, onContinue, initialConfig }) => {
   const handleFileChange = (file) => {
     if (!file) return;
 
+    // Validate image format against allowed types (JPG, PNG, WEBP, AVIF, TIFF)
+    if (initialConfig?.type === 'image') {
+      const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'avif', 'tiff', 'tif'];
+      const fileExt = file.name ? file.name.split('.').pop().toLowerCase() : '';
+      if (!allowedExts.includes(fileExt)) {
+        alert(`Unsupported file format (.${fileExt}). Please upload a valid image format: JPG, PNG, WEBP, AVIF, or TIFF.`);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
+    }
+
+    // Validate video format against allowed types (MP4, WEBM, MOV, GIF, AVI)
+    if (initialConfig?.type === 'video') {
+      const allowedVideoExts = ['mp4', 'webm', 'mov', 'gif', 'avi'];
+      const fileExt = file.name ? file.name.split('.').pop().toLowerCase() : '';
+      if (!allowedVideoExts.includes(fileExt)) {
+        alert(`Unsupported file format (.${fileExt}). Please upload a valid video format: MP4, WEBM, MOV, GIF, or AVI.`);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
+    }
+
     // Immediately trigger warm-up if CAD file
     if (file.name && file.name.match(/\.(step|stp|iges|igs)$/i)) {
       warmUpOcct();
@@ -134,9 +160,9 @@ const UploadPage = ({ onBack, onContinue, initialConfig }) => {
 
   // Accepted file types depending on converter mode
   const getAcceptTypes = () => {
-    if (initialConfig?.type === 'video') return 'video/*';
+    if (initialConfig?.type === 'video') return '.mp4,.webm,.mov,.gif,.avi,video/mp4,video/webm,video/quicktime,image/gif,video/x-msvideo';
     if (initialConfig?.type === '3d-model') return '.step,.stp,.iges,.igs,.stl,.obj,.glb,.gltf';
-    if (initialConfig?.type === 'image') return 'image/*';
+    if (initialConfig?.type === 'image') return '.jpg,.jpeg,.png,.webp,.avif,.tiff,.tif,image/jpeg,image/png,image/webp,image/avif,image/tiff';
     return '*/*';
   };
 
@@ -230,13 +256,13 @@ const UploadPage = ({ onBack, onContinue, initialConfig }) => {
           ) : initialConfig?.type === 'video' || initialConfig?.id === 'video' ? (
             <div className="mt-4 flex flex-col items-center gap-1 text-center">
               <span className="text-[12px] text-[#64748b]">
-                Supported Formats: <strong className="text-[#334155]">MP4, MOV, AVI, MKV, WEBM, WMV</strong>
+                Supported Formats: <strong className="text-[#334155]">MP4, WEBM, MOV, GIF, AVI</strong>
               </span>
             </div>
           ) : (
             <div className="mt-4 flex flex-col items-center gap-1 text-center">
               <span className="text-[12px] text-[#64748b]">
-                Supported Formats: <strong className="text-[#334155]">JPG, PNG, WEBP, SVG, GIF, BMP</strong>
+                Supported Formats: <strong className="text-[#334155]">JPG, PNG, WEBP, AVIF, TIFF</strong>
               </span>
             </div>
           )}

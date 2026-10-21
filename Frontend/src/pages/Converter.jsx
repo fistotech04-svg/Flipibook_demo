@@ -81,8 +81,7 @@ const Converter = () => {
           initialConfig={selectedConfig}
           onBack={() => setStep('upload')}
           onReset={() => {
-            setStep('select');
-            setSelectedConfig(null);
+            setStep('upload');
             setUploadedFile(null);
           }}
         />
@@ -96,8 +95,7 @@ const Converter = () => {
           initialConfig={selectedConfig}
           onBack={() => setStep('upload')}
           onReset={() => {
-            setStep('select');
-            setSelectedConfig(null);
+            setStep('upload');
             setUploadedFile(null);
           }}
         />
@@ -111,8 +109,7 @@ const Converter = () => {
           initialConfig={selectedConfig}
           onBack={() => setStep('upload')}
           onReset={() => {
-            setStep('select');
-            setSelectedConfig(null);
+            setStep('upload');
             setUploadedFile(null);
           }}
         />
@@ -126,8 +123,7 @@ const Converter = () => {
           initialConfig={selectedConfig}
           onBack={() => setStep('upload')}
           onReset={() => {
-            setStep('select');
-            setSelectedConfig(null);
+            setStep('upload');
             setUploadedFile(null);
           }}
         />
@@ -141,8 +137,7 @@ const Converter = () => {
           initialConfig={selectedConfig}
           onBack={() => setStep('upload')}
           onReset={() => {
-            setStep('select');
-            setSelectedConfig(null);
+            setStep('upload');
             setUploadedFile(null);
           }}
         />
@@ -155,8 +150,7 @@ const Converter = () => {
         initialConfig={selectedConfig}
         onBack={() => setStep('upload')}
         onReset={() => {
-          setStep('select');
-          setSelectedConfig(null);
+          setStep('upload');
           setUploadedFile(null);
         }}
       />
