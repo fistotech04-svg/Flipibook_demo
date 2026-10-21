@@ -80,9 +80,85 @@ export const handleAddElementToSvg = ({
 
   // If map element is added with small default size (<= 180), adapt to page canvas size
   const isMap = importedElement.getAttribute('data-type') === 'map' || importedElement.id?.startsWith('map-');
+  const isTable = importedElement.getAttribute('data-type') === 'table-frame' ||
+                  importedElement.getAttribute('data-type') === 'table' ||
+                  importedElement.id?.startsWith('table-');
   let foChild = importedElement.querySelector('foreignObject, rect');
   let elW = foChild ? parseFloat(foChild.getAttribute('width') || '100') : 100;
   let elH = foChild ? parseFloat(foChild.getAttribute('height') || '100') : 100;
+
+  if (isTable) {
+    const rows = importedElement.querySelectorAll('tr').length || parseInt(importedElement.getAttribute('data-rows') || '3', 10);
+    let targetW, targetH;
+
+    if (pw <= 400) {
+      // Millimeter canvas (e.g. A4 210x297, A5 148x210, DL 99x210, Square 210x210, Landscape 297x210)
+      const marginX = pw > 150 ? 20 : (pw > 100 ? 15 : 10);
+      targetW = Math.round(Math.min(pw - marginX * 2, pw * 0.82));
+      const maxH = Math.round(ph * 0.45);
+      targetH = Math.round(Math.min(maxH, Math.max(rows * 22, Math.round(targetW * 0.41))));
+    } else {
+      // Pixel canvas (e.g. 800x600, 1000x1400)
+      const marginX = Math.round(pw * 0.08);
+      targetW = Math.round(pw * 0.8);
+      const maxH = Math.round(ph * 0.5);
+      targetH = Math.round(Math.min(maxH, Math.max(rows * 55, Math.round(targetW * 0.35))));
+    }
+
+    elW = targetW;
+    elH = targetH;
+
+    const fo = importedElement.querySelector('foreignObject');
+    if (fo) {
+      fo.setAttribute('width', targetW.toString());
+      fo.setAttribute('height', targetH.toString());
+      // Strip whitespace text nodes inside foreignObject and wrapper
+      Array.from(fo.childNodes).forEach(n => {
+        if (n.nodeType === 3 && !n.textContent.trim()) n.remove();
+      });
+      const wrap = fo.querySelector('.table-card-wrapper, .table-container');
+      if (wrap) {
+        wrap.style.whiteSpace = 'normal';
+        wrap.style.lineHeight = 'normal';
+        wrap.style.display = 'block';
+        wrap.style.width = '100%';
+        wrap.style.height = '100%';
+        wrap.style.boxSizing = 'border-box';
+        wrap.style.overflow = 'hidden';
+        Array.from(wrap.childNodes).forEach(n => {
+          if (n.nodeType === 3 && !n.textContent.trim()) n.remove();
+        });
+      }
+      const tbl = fo.querySelector('table');
+      if (tbl) {
+        tbl.style.width = '100%';
+        tbl.style.height = '100%';
+        tbl.style.tableLayout = 'fixed';
+        tbl.style.borderCollapse = 'collapse';
+        tbl.style.boxSizing = 'border-box';
+        tbl.style.backgroundColor = '#ffffff';
+        const trList = tbl.querySelectorAll('tr');
+        const rLen = trList.length || 1;
+        trList.forEach(tr => {
+          tr.style.height = `${(100 / rLen).toFixed(3)}%`;
+          tr.style.boxSizing = 'border-box';
+          const tdList = tr.querySelectorAll('td, th');
+          const cLen = tdList.length || 1;
+          tdList.forEach(cell => {
+            cell.style.width = `${(100 / cLen).toFixed(3)}%`;
+            cell.style.height = '100%';
+            cell.style.boxSizing = 'border-box';
+            cell.style.backgroundColor = '#ffffff';
+          });
+        });
+      }
+    }
+    const rect = importedElement.querySelector('rect.svg-table-overlay, rect.svg-image-stroke-overlay, rect');
+    if (rect) {
+      rect.setAttribute('width', targetW.toString());
+      rect.setAttribute('height', targetH.toString());
+    }
+  }
 
   if (isMap && elW <= 180) {
     let targetW, targetH;
@@ -133,13 +209,53 @@ export const handleAddElementToSvg = ({
     }
   }
 
+  // If kinetic or motion-graphic typography element, adapt to page canvas size
+  const isKinetic = importedElement.getAttribute('data-typography-type') === 'kinetic' ||
+                    (importedElement.getAttribute('data-type') === 'text' && (importedElement.id?.startsWith('typography-') || !!importedElement.querySelector('.kinetic-container')));
+  const isMotionGraphic = importedElement.getAttribute('data-typography-type') === 'motion-graphic' ||
+                    !!importedElement.querySelector('.motion-text-content, .motion-subtext-content, .motion-outer-glow, .flipi-line, .box-accent-frame, .yt-logo-badge');
+  const isKineticOrMotionGraphic = isKinetic || isMotionGraphic;
+
+  if (isKineticOrMotionGraphic) {
+    const fo = importedElement.querySelector('foreignObject');
+    if (fo) {
+      const curFoW = parseFloat(fo.getAttribute('width') || '0');
+      const maxAllowedW = Math.round(pw * 0.95);
+      if (curFoW > maxAllowedW && maxAllowedW > 50) {
+        fo.setAttribute('width', maxAllowedW.toString());
+        elW = maxAllowedW;
+      } else if (curFoW > 0) {
+        elW = curFoW;
+      }
+    }
+  }
+
   if (dropPoint) {
-    const currentTransform = importedElement.getAttribute('transform') || '';
-    // Strip old translate if replacing
-    importedElement.setAttribute('transform', `translate(${Math.round(dropPoint.x - (elW / 2))}, ${Math.round(dropPoint.y - (elH / 2))})`);
-  } else if (!importedElement.getAttribute('transform') || (isMap && importedElement.getAttribute('transform')?.includes('15'))) {
-    const cx = Math.round(Math.max(0, (pw - elW) / 2));
-    const cy = Math.round(Math.max(0, (ph - elH) / 2));
+    if (isTable) {
+      const marginX = pw <= 400 ? (pw > 150 ? 15 : 8) : 20;
+      const marginY = ph <= 400 ? (ph > 150 ? 15 : 8) : 20;
+      const minX = marginX;
+      const maxX = Math.max(minX, pw - elW - marginX);
+      const minY = marginY;
+      const maxY = Math.max(minY, ph - elH - marginY);
+
+      const posX = Math.round(Math.max(minX, Math.min(maxX, dropPoint.x - (elW / 2))));
+      const posY = Math.round(Math.max(minY, Math.min(maxY, dropPoint.y - (elH / 2))));
+      importedElement.setAttribute('transform', `translate(${posX}, ${posY})`);
+    } else {
+      const minX = 5;
+      const maxX = Math.max(minX, pw - elW - 5);
+      const minY = 5;
+      const maxY = Math.max(minY, ph - elH - 5);
+      const posX = Math.round(Math.max(minX, Math.min(maxX, dropPoint.x - (elW / 2))));
+      const posY = Math.round(Math.max(minY, Math.min(maxY, dropPoint.y - (elH / 2))));
+      importedElement.setAttribute('transform', `translate(${posX}, ${posY})`);
+    }
+  } else if (isTable || isKineticOrMotionGraphic || !importedElement.getAttribute('transform') || (isMap && importedElement.getAttribute('transform')?.includes('15'))) {
+    const minX = 10;
+    const minY = 10;
+    const cx = Math.round(Math.max(minX, Math.min(pw - elW - minX, (pw - elW) / 2)));
+    const cy = Math.round(Math.max(minY, Math.min(ph - elH - minY, (ph - elH) / 2)));
     importedElement.setAttribute('transform', `translate(${cx}, ${cy})`);
   }
 
@@ -376,7 +492,7 @@ export const fillElementShapeWithPattern = ({
  */
 export const handleElementsDropData = (data, displayIndex, dropPoint) => {
   if (!data) return false;
-  if (['button', 'text', 'slideshow', 'image-frame', 'map', 'qrcode', 'decorator'].includes(data.type)) {
+  if (['button', 'text', 'slideshow', 'image-frame', 'map', 'qrcode', 'decorator', 'table'].includes(data.type)) {
     console.log(`${data.type} Dropped:`, data);
     window.dispatchEvent(new CustomEvent('add-element-to-editor', {
       detail: {
@@ -462,7 +578,34 @@ export const isAudioGroup = (el) => {
  * so clicking inside them drags or selects the compound parent unit.
  */
 export const getElementCompoundTarget = (current) => {
-  if (!current || typeof current.closest !== 'function') return null;
+  if (!current) return null;
+
+  // Tables are single compound elements; clicking or typing inside them keeps the table element selected!
+  let tableGroup = null;
+  if (typeof current.closest === 'function') {
+    tableGroup = current.closest('[data-type="table-frame"], [data-type="table"], [id^="table-"], g[id*="table"]');
+  }
+  if (!tableGroup) {
+    let node = current;
+    while (node && node.nodeType === 1 && node !== document.body) {
+      const tag = node.tagName?.toLowerCase();
+      const dt = node.getAttribute ? node.getAttribute('data-type') : null;
+      const nid = node.id || '';
+      if (dt === 'table-frame' || dt === 'table' || nid.startsWith('table-') || (tag === 'g' && nid.includes('table'))) {
+        tableGroup = node;
+        break;
+      }
+      node = node.parentElement || node.parentNode;
+    }
+  }
+  if (tableGroup) {
+    if (!tableGroup.id) {
+      tableGroup.id = `table-${Date.now()}`;
+    }
+    return tableGroup;
+  }
+
+  if (typeof current.closest !== 'function') return null;
 
   // Slideshows are single compound elements; drag the whole slideshow!
   const slideshowGroup = current.closest('[data-type="slideshow"], [data-is-slideshow="true"], [id^="slideshow-"]');
@@ -480,6 +623,12 @@ export const getElementCompoundTarget = (current) => {
       buttonGroup.id = `button-${Date.now()}`;
     }
     return buttonGroup;
+  }
+
+  // Typography elements (Motion Graphics & Kinetic) are single compound units; clicking/dragging any child selects the whole group!
+  const typographyGroup = current.closest('g[data-type="text"][id*="typography-"], g[data-typography-type="motion-graphic"], g[data-typography-type="kinetic"]');
+  if (typographyGroup) {
+    return typographyGroup;
   }
 
   // Animated Decorators (Starbursts) are compound elements; drag the whole decorator!
@@ -786,7 +935,9 @@ export const resizeAudioGroup = ({
     const newSx = newW / innerWidth;
     const newSy = newH / innerHeight;
     el.setAttribute('transform', `translate(${newTx}, ${newTy}) scale(${newSx}, ${newSy})`);
-  } catch (e) { }
+  } catch (error) {
+    console.debug('Failed to transform component SVG group:', error);
+  }
 
   if (typeof drawOverlayHighlight === 'function') {
     const highlightType = (currentFrameIdRef?.current && el.id !== currentFrameIdRef.current) ? 'child-selected' : 'selected';
@@ -1437,7 +1588,7 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
         const imgTag2 = imgEl.tagName?.toLowerCase();
         if (imgTag2 === 'image') {
           imgEl.setAttribute('href', url);
-          try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (err) { }
+          try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch { /* ignore */ }
         } else if (imgTag2 === 'img') {
           imgEl.src = url;
         } else {
@@ -1445,7 +1596,7 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
         }
         window.dispatchEvent(new CustomEvent('slideshow-index-changed', { detail: { id: el.id, index: nextIndex } }));
         renderOverlays();
-      } catch (err) { }
+      } catch { /* ignore */ }
     };
 
     window.addEventListener('force-slideshow-advance', handleForceAdvance);
@@ -1545,7 +1696,7 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
         const imgTag = imgEl.tagName?.toLowerCase();
         if (imgTag === 'image') {
           imgEl.setAttribute('href', url);
-          try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch (err) { }
+          try { imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', url); } catch { /* ignore */ }
         } else if (imgTag === 'img') {
           imgEl.src = url;
         } else {
@@ -1555,7 +1706,7 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
         slideshowEl.setAttribute('data-active-index', nextIndex.toString());
         slideshowEl._lastSlideTime = Date.now();
         window.dispatchEvent(new CustomEvent('slideshow-index-changed', { detail: { id: slideshowEl.id, index: nextIndex } }));
-      } catch (err) { }
+      } catch { /* ignore */ }
     };
 
     const handleMouseDown = (e) => {

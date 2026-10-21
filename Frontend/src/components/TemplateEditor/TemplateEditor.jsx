@@ -5401,6 +5401,89 @@ const TemplateEditor = () => {
                 }
               });
 
+              // Ensure existing tables fit inside page boundaries
+              const svgDocEl = doc.querySelector('svg');
+              if (svgDocEl) {
+                let pageW = 210, pageH = 297;
+                const vb = svgDocEl.getAttribute('viewBox');
+                if (vb) {
+                  const p = vb.trim().split(/[\s,]+/).map(parseFloat);
+                  if (p.length === 4 && p[2] > 0 && p[3] > 0) {
+                    pageW = p[2];
+                    pageH = p[3];
+                  }
+                }
+                const tables = doc.querySelectorAll('[data-type="table-frame"], [data-type="table"], [id^="table-"]');
+                tables.forEach(tEl => {
+                  const fo = tEl.querySelector('foreignObject');
+                  if (!fo) return;
+                  let curW = parseFloat(fo.getAttribute('width') || '170');
+                  let curH = parseFloat(fo.getAttribute('height') || '60');
+                  let posX = 0, posY = 0;
+                  const tr = tEl.getAttribute('transform') || '';
+                  const m = tr.match(/translate\(\s*([-\d.]+)[,\s]+([-\d.]+)\s*\)/);
+                  if (m) {
+                    posX = parseFloat(m[1]);
+                    posY = parseFloat(m[2]);
+                  }
+                  const marginX = pageW <= 400 ? (pageW > 150 ? 20 : 10) : Math.round(pageW * 0.08);
+                  const maxW = pageW - marginX * 2;
+                  let changed = false;
+                  if (curW > maxW || (posX + curW) > pageW || posX < 0) {
+                    curW = Math.min(curW, maxW);
+                    posX = Math.round(Math.max(marginX, (pageW - curW) / 2));
+                    fo.setAttribute('width', curW.toString());
+                    const ov = tEl.querySelector('.svg-table-overlay, .svg-image-stroke-overlay');
+                    if (ov) ov.setAttribute('width', curW.toString());
+                    changed = true;
+                  }
+                  const maxH = Math.round(pageH * 0.7);
+                  if (curH > maxH || (posY + curH) > pageH || posY < 0) {
+                    const rows = tEl.querySelectorAll('tr').length || 3;
+                    curH = Math.round(Math.min(maxH, Math.max(rows * (pageW <= 400 ? 16 : 45), pageH * 0.22)));
+                    posY = Math.round(Math.max(15, Math.min(pageH - curH - 15, (pageH - curH) / 2)));
+                    fo.setAttribute('height', curH.toString());
+                    const ov = tEl.querySelector('.svg-table-overlay, .svg-image-stroke-overlay');
+                    if (ov) ov.setAttribute('height', curH.toString());
+                    changed = true;
+                  }
+                  // Also clean whitespace text nodes inside foreignObject and wrapper
+                  Array.from(fo.childNodes).forEach(n => {
+                    if (n.nodeType === 3 && !n.textContent.trim()) {
+                      n.remove();
+                      changed = true;
+                    }
+                  });
+                  const wr = fo.querySelector('.table-card-wrapper, .table-container');
+                  if (wr) {
+                    wr.style.whiteSpace = 'normal';
+                    wr.style.lineHeight = 'normal';
+                    wr.style.display = 'block';
+                    wr.style.width = '100%';
+                    wr.style.height = '100%';
+                    wr.style.boxSizing = 'border-box';
+                    wr.style.overflow = 'hidden';
+                    Array.from(wr.childNodes).forEach(n => {
+                      if (n.nodeType === 3 && !n.textContent.trim()) {
+                        n.remove();
+                        changed = true;
+                      }
+                    });
+                  }
+                  const tbl = fo.querySelector('table');
+                  if (tbl) {
+                    tbl.style.width = '100%';
+                    tbl.style.height = '100%';
+                    tbl.style.tableLayout = 'fixed';
+                    tbl.style.borderCollapse = 'collapse';
+                    tbl.style.boxSizing = 'border-box';
+                  }
+                  if (changed) {
+                    tEl.setAttribute('transform', `translate(${posX}, ${posY})`);
+                  }
+                });
+              }
+
               // Serialize doc back to updatedHtml so the rebuilt elements are saved to state
               updatedHtml = new XMLSerializer().serializeToString(doc);
 

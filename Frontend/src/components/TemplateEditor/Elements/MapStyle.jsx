@@ -362,9 +362,11 @@ const MapStyle = ({ isFullView }) => {
     }));
   };
 
+  const displayTemplates = isFullView ? MAP_TEMPLATES : MAP_TEMPLATES.slice(0, 4);
+
   return (
     <div className={`w-full grid grid-cols-2 gap-[0.75vw] ${isFullView ? 'p-[0.5vw]' : ''}`}>
-      {MAP_TEMPLATES.map((tmpl) => (
+      {displayTemplates.map((tmpl) => (
         <div
           key={tmpl.id}
           draggable="true"

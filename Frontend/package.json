@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -33,6 +33,7 @@
     "country-state-city": "^3.2.1",
     "dom-to-image-more": "^3.7.2",
     "dotenv": "^17.2.3",
+    "exceljs": "^4.4.0",
     "fabric": "^7.2.0",
     "face-api.js": "^0.20.0",
     "file-saver": "^2.0.5",
