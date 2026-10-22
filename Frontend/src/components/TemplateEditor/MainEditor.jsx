@@ -23,16 +23,21 @@ import { checkSpellingAndGrammar, getSpellingSuggestions } from './spellGrammarC
 import {
   useElementsEditor,
   handleElementsDropData,
-  fillElementShapeWithPattern,
-  isElementShape as checkIsElementShape,
+  handleElementShapeDropFill,
   getElementCompoundTarget,
   getTargetElementShapeOrFrameId,
-  resizeInteractiveButton,
-  resizeAudioGroup,
-  isAudioGroup as checkIsAudioGroup,
+  getElementVisualBBox,
+  handleElementGroupResize,
+  handleInteractiveButtonResize,
+  resizeTableGroup,
   isSlideshowGroup,
-  getSlideshowBBox,
-  resizeSlideshowGroup
+  isDecoratorGroup,
+  isTypographyGroup,
+  isTableGroup,
+  handleMapResize,
+  handleMapChildIframeResize,
+  getButtonTextTargetForEditing,
+  removeSlideshowTransitionClones
 } from './Elements/useElementsEditor';
 
 const PENCIL_CURSOR = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24'><g fill='none' fill-rule='evenodd'><path d='m12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035q-.016-.005-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.017-.018m.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093q.019.005.029-.008l.004-.014l-.034-.614q-.005-.018-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01z' /><path fill='%23000' d='M20.131 3.16a3 3 0 0 0-4.242 0l-.707.708l4.95 4.95l.706-.707a3 3 0 0 0 0-4.243l-.707-.707Zm-1.414 7.072l-4.95-4.95l-9.09 9.091a1.5 1.5 0 0 0-.401.724l-1.029 4.455a1 1 0 0 0 1.2 1.2l4.456-1.028a1.5 1.5 0 0 0 .723-.401z' /></g></svg>") 1 16, crosshair`;
@@ -69,51 +74,8 @@ export const formatSmoothPathD = (pts) => {
 export const getVisualBBox = (el) => {
   if (!el || typeof el.getBBox !== 'function') return { x: 0, y: 0, width: 0, height: 0 };
 
-  const ssBBox = getSlideshowBBox(el);
-  if (ssBBox) return ssBBox;
-
-  // ── TYPOGRAPHY BOUNDING BOX (Kinetic & Motion Graphic) ──
-  const isTypoGroup = el.tagName?.toLowerCase() === 'g' && (
-    el.getAttribute('data-typography-type') ||
-    (el.id && el.id.startsWith('typography-')) ||
-    el.querySelector?.('.kinetic-container, .motion-click-boundary')
-  );
-  if (isTypoGroup) {
-    const motionBoundary = el.querySelector('.motion-click-boundary');
-    if (motionBoundary) {
-      const mw = parseFloat(motionBoundary.getAttribute('width')) || 0;
-      const mh = parseFloat(motionBoundary.getAttribute('height')) || 0;
-      const mx = parseFloat(motionBoundary.getAttribute('x') || '0');
-      const my = parseFloat(motionBoundary.getAttribute('y') || '0');
-      if (mw > 0 && mh > 0) {
-        return { x: mx, y: my, width: mw, height: mh };
-      }
-    }
-    const kineticContainer = el.querySelector('.kinetic-container');
-    const fo = el.querySelector('foreignObject');
-    if (kineticContainer && fo) {
-      const words = Array.from(kineticContainer.querySelectorAll('.word'));
-      const textLines = words.map(w => (w.textContent || '').trim()).filter(Boolean);
-      const fs = parseFloat(el.getAttribute('data-font-size')) || parseFloat(kineticContainer.style.fontSize) || 34;
-      const pad = parseFloat(el.getAttribute('data-bg-padding')) || parseFloat(kineticContainer.style.padding) || 12;
-      const maxLen = Math.max(...textLines.map(l => l.length), 1);
-      const snugW = Math.round(maxLen * (fs * 0.55) + (pad * 2));
-      const snugH = Math.round(textLines.length * (fs * 1.08) + (pad * 2));
-      const fox = parseFloat(fo.getAttribute('x') || '0');
-      const foy = parseFloat(fo.getAttribute('y') || '0');
-      return { x: fox, y: foy, width: Math.max(30, snugW), height: Math.max(20, snugH) };
-    }
-    const bgRect = el.querySelector('rect.typography-bg');
-    if (bgRect) {
-      const rw = parseFloat(bgRect.getAttribute('width')) || 0;
-      const rh = parseFloat(bgRect.getAttribute('height')) || 0;
-      const rx = parseFloat(bgRect.getAttribute('x') || '0');
-      const ry = parseFloat(bgRect.getAttribute('y') || '0');
-      if (rw > 0 && rh > 0) {
-        return { x: rx, y: ry, width: rw, height: rh };
-      }
-    }
-  }
+  const elemBBox = getElementVisualBBox(el);
+  if (elemBBox) return elemBBox;
 
   const isUserGroup = el.tagName?.toLowerCase() === 'g' && (
     el.getAttribute('data-type') === 'group' ||
@@ -475,6 +437,7 @@ const svgGlobalStyles = `
     user-select: none !important;
     -webkit-user-select: none !important;
     pointer-events: auto !important;
+    cursor: inherit;
   }
 
   .page-svg-container svg [data-type="button"] text,
@@ -486,13 +449,6 @@ const svgGlobalStyles = `
 
   .page-svg-container svg * {
     cursor: default;
-  }
-
-  .page-svg-container svg text,
-  .page-svg-container svg tspan {
-    user-select: none !important;
-    -webkit-user-select: none !important;
-    cursor: inherit;
   }
 
   /* Allow text selection when editing */
@@ -636,357 +592,7 @@ const svgGlobalStyles = `
     pointer-events: auto !important;
   }
 
-  /* Map Element Overrides & Container Responsiveness */
-  [data-type="map"] foreignObject {
-    overflow: hidden !important;
-    border-radius: 0px !important;
-  }
-  [data-type="map"] foreignObject > div.map-root-container,
-  [data-type="map"] foreignObject > div:first-child {
-    border-radius: 0px !important;
-    width: 100% !important;
-    height: 100% !important;
-    white-space: normal !important;
-    overflow: hidden !important;
-    line-height: normal !important;
-    position: relative !important;
-    container-type: size !important;
-  }
-  [data-type="map"] foreignObject div,
-  [data-type="map"] foreignObject span,
-  [data-type="map"] foreignObject a,
-  [data-type="map"] foreignObject p {
-    white-space: normal !important;
-    word-wrap: normal !important;
-    word-break: normal !important;
-    overflow-wrap: normal !important;
-  }
-  [data-type="map"] foreignObject .map-stage {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    transform-origin: 0 0 !important;
-    overflow: hidden !important;
-  }
-  [data-type="map"] foreignObject .map-overlay-wrapper {
-    position: absolute !important;
-    inset: 0 !important;
-    pointer-events: none !important;
-  }
-  [data-type="map"] foreignObject iframe {
-    pointer-events: none !important;
-    border: none !important;
-    display: block !important;
-  }
-  .page-svg-container [data-type="map"] foreignObject svg,
-  [data-type="map"] foreignObject svg,
-  [data-type="map"] foreignObject svg.svg-icon-override {
-    width: auto !important;
-    height: auto !important;
-    max-width: none !important;
-    max-height: none !important;
-    display: inline-block !important;
-    flex-shrink: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-  [data-type="map"] foreignObject .map-card-overlay {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-    pointer-events: auto !important;
-    box-sizing: border-box !important;
-  }
-  [data-type="map"] foreignObject .map-card-overlay * {
-    line-height: normal;
-    box-sizing: border-box;
-  }
-  [data-type="map"] foreignObject .map-nowrap,
-  [data-type="map"] foreignObject [data-nowrap="true"] {
-    white-space: nowrap !important;
-  }
-
-  /* Fluid map responsive rules */
-  [data-type="map"] foreignObject .map-top-badge {
-    max-width: 88% !important;
-  }
-  [data-type="map"] foreignObject .map-top-badge .map-badge-title,
-  [data-type="map"] foreignObject .map-top-badge .map-badge-subtitle {
-    max-width: clamp(90px, 45cqw, 160px) !important;
-  }
-  [data-type="map"] foreignObject .map-card-actions {
-    max-height: 52% !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: flex-end !important;
-  }
-  [data-type="map"] foreignObject .map-actions-row {
-    display: flex !important;
-    gap: clamp(2px, 1.5cqw, 5px) !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-  }
-  [data-type="map"] foreignObject .map-action-btn {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: clamp(2px, 1cqw, 4px) !important;
-    padding: clamp(3px, 1.2cqh, 5px) clamp(2px, 1cqw, 5px) !important;
-    border-radius: clamp(4px, 1.5cqw, 6px) !important;
-    font-size: clamp(7.5px, 2.7cqw, 9.5px) !important;
-    font-weight: 600 !important;
-    text-decoration: none !important;
-    cursor: pointer !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    min-width: 0 !important;
-  }
-  [data-type="map"] foreignObject .map-btn-text {
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    font-size: inherit !important;
-  }
-
-  /* Container Queries for compact map elements */
-  @container (max-height: 190px) {
-    [data-type="map"] foreignObject .map-drag-pill {
-      display: none !important;
-    }
-    [data-type="map"] foreignObject .map-biz-category {
-      display: none !important;
-    }
-    [data-type="map"] foreignObject .map-top-badge .map-badge-subtitle {
-      display: none !important;
-    }
-    [data-type="map"] foreignObject .map-top-badge {
-      padding: 2px 6px 2px 3px !important;
-      top: 4px !important;
-    }
-    [data-type="map"] foreignObject .map-biz-row {
-      margin-bottom: 2px !important;
-      gap: 4px !important;
-    }
-    [data-type="map"] foreignObject .map-biz-img {
-      width: 26px !important;
-      height: 26px !important;
-    }
-    [data-type="map"] foreignObject .map-card-actions {
-      padding: 4px 6px 5px !important;
-    }
-  }
-
-  @container (max-height: 140px) {
-    [data-type="map"] foreignObject .map-top-badge {
-      display: none !important;
-    }
-    [data-type="map"] foreignObject .map-biz-meta {
-      display: none !important;
-    }
-    [data-type="map"] foreignObject .map-biz-img {
-      width: 20px !important;
-      height: 20px !important;
-    }
-    [data-type="map"] foreignObject .map-card-actions {
-      padding: 3px 5px 3px !important;
-    }
-  }
-
-  @container (max-width: 230px) {
-    [data-type="map"] foreignObject .map-actions-row {
-      gap: 2px !important;
-    }
-    [data-type="map"] foreignObject .map-action-btn {
-      padding: 3px 2px !important;
-      font-size: 7.5px !important;
-    }
-    [data-type="map"] foreignObject .map-action-btn svg {
-      width: 8px !important;
-      height: 8px !important;
-      min-width: 8px !important;
-      max-width: 8px !important;
-      min-height: 8px !important;
-      max-height: 8px !important;
-    }
-  }
-
-  @container (max-width: 175px) {
-    [data-type="map"] foreignObject .map-action-btn-secondary:last-child {
-      display: none !important;
-    }
-    [data-type="map"] foreignObject .map-action-btn-primary {
-      flex: 1.2 !important;
-    }
-    [data-type="map"] foreignObject .map-action-btn-secondary {
-      flex: 1 !important;
-    }
-  /* Table Frame ForeignObject Overrides */
-  [data-type="table-frame"] foreignObject,
-  [data-type="table"] foreignObject,
-  [id^="table-"] foreignObject {
-    overflow: visible !important;
-  }
-
-  [data-type="table-frame"] foreignObject > div,
-  [data-type="table"] foreignObject > div,
-  [id^="table-"] foreignObject > div,
-  foreignObject > div.table-card-wrapper,
-  foreignObject > div.table-container {
-    width: 100% !important;
-    height: 100% !important;
-    display: block !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    box-sizing: border-box !important;
-    white-space: normal !important;
-    line-height: normal !important;
-    overflow: hidden !important;
-    pointer-events: auto !important;
-  }
-
-  /* Scrollable Table support */
-  [data-type="table-frame"][data-scrollable="true"] foreignObject > div,
-  [data-type="table"][data-scrollable="true"] foreignObject > div,
-  [id^="table-"][data-scrollable="true"] foreignObject > div,
-  foreignObject[data-scrollable="true"] > div.table-card-wrapper,
-  foreignObject[data-scrollable="true"] > div.table-container,
-  div.table-card-wrapper.table-scrollable,
-  div.table-container.table-scrollable,
-  div.table-card-wrapper[data-scrollable="true"],
-  div.table-container[data-scrollable="true"] {
-    overflow: auto !important;
-    overflow-x: auto !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    pointer-events: auto !important;
-  }
-
-  [data-type="table-frame"] table,
-  [data-type="table"] table,
-  [id^="table-"] table,
-  .table-card-wrapper table {
-    width: max-content !important;
-    min-width: auto !important;
-    max-width: none !important;
-    height: max-content !important;
-    min-height: auto !important;
-    flex: none !important;
-    table-layout: auto !important;
-    border-collapse: collapse !important;
-    box-sizing: border-box !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    white-space: normal !important;
-    transform: none !important;
-    will-change: auto !important;
-  }
-
-  [data-type="table-frame"][data-scrollable="true"] table,
-  [data-type="table"][data-scrollable="true"] table,
-  [id^="table-"][data-scrollable="true"] table,
-  .table-card-wrapper.table-scrollable table,
-  .table-container.table-scrollable table,
-  .table-card-wrapper[data-scrollable="true"] table,
-  .table-container[data-scrollable="true"] table {
-    width: max-content !important;
-    min-width: auto !important;
-    max-width: none !important;
-    height: max-content !important;
-    min-height: auto !important;
-    flex: none !important;
-    table-layout: auto !important;
-  }
-
-  div.table-card-wrapper::-webkit-scrollbar,
-  div.table-container::-webkit-scrollbar,
-  [data-type="table-frame"] foreignObject > div::-webkit-scrollbar,
-  [data-type="table"] foreignObject > div::-webkit-scrollbar,
-  [id^="table-"] foreignObject > div::-webkit-scrollbar,
-  [data-type="table-frame"] *::-webkit-scrollbar,
-  [data-type="table"] *::-webkit-scrollbar,
-  [id^="table-"] *::-webkit-scrollbar {
-    width: 4px !important;
-    height: 4px !important;
-    background: transparent !important;
-  }
-
-  div.table-card-wrapper::-webkit-scrollbar-track,
-  div.table-container::-webkit-scrollbar-track,
-  [data-type="table-frame"] foreignObject > div::-webkit-scrollbar-track,
-  [data-type="table"] foreignObject > div::-webkit-scrollbar-track,
-  [id^="table-"] foreignObject > div::-webkit-scrollbar-track,
-  [data-type="table-frame"] *::-webkit-scrollbar-track,
-  [data-type="table"] *::-webkit-scrollbar-track,
-  [id^="table-"] *::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.05) !important;
-    border-radius: 4px !important;
-    border: none !important;
-  }
-
-  div.table-card-wrapper::-webkit-scrollbar-thumb,
-  div.table-container::-webkit-scrollbar-thumb,
-  [data-type="table-frame"] foreignObject > div::-webkit-scrollbar-thumb,
-  [data-type="table"] foreignObject > div::-webkit-scrollbar-thumb,
-  [id^="table-"] foreignObject > div::-webkit-scrollbar-thumb,
-  [data-type="table-frame"] *::-webkit-scrollbar-thumb,
-  [data-type="table"] *::-webkit-scrollbar-thumb,
-  [id^="table-"] *::-webkit-scrollbar-thumb {
-    background: #94a3b8 !important;
-    border-radius: 4px !important;
-    border: none !important;
-  }
-
-  div.table-card-wrapper::-webkit-scrollbar-thumb:hover,
-  div.table-container::-webkit-scrollbar-thumb:hover,
-  [data-type="table-frame"] foreignObject > div::-webkit-scrollbar-thumb:hover,
-  [data-type="table"] foreignObject > div::-webkit-scrollbar-thumb:hover,
-  [id^="table-"] foreignObject > div::-webkit-scrollbar-thumb:hover,
-  [data-type="table-frame"] *::-webkit-scrollbar-thumb:hover,
-  [data-type="table"] *::-webkit-scrollbar-thumb:hover,
-  [id^="table-"] *::-webkit-scrollbar-thumb:hover {
-    background: #64748b !important;
-  }
-
-  [data-type="table-frame"] tbody,
-  [data-type="table"] tbody,
-  [id^="table-"] tbody,
-  .table-card-wrapper tbody {
-    width: 100% !important;
-    height: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    transform: none !important;
-    will-change: auto !important;
-  }
-
-  [data-type="table-frame"] tr,
-  [data-type="table"] tr,
-  [id^="table-"] tr,
-  .table-card-wrapper tr {
-    height: auto !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    transform: none !important;
-    will-change: auto !important;
-  }
-
-  [data-type="table-frame"] td,
-  [data-type="table"] td,
-  [id^="table-"] td,
-  .table-card-wrapper td {
-    transform: none !important;
-    will-change: auto !important;
-    box-sizing: border-box !important;
-  }
-
-  [data-type="table-frame"][data-scrollable="true"] td,
-  [data-type="table"][data-scrollable="true"] td,
-  [id^="table-"][data-scrollable="true"] td,
-  .table-card-wrapper.table-scrollable td,
-  .table-container.table-scrollable td,
-  .table-card-wrapper[data-scrollable="true"] td,
-  .table-container[data-scrollable="true"] td {
-    min-width: 65px !important;
-    box-sizing: border-box !important;
-  }
+  /* Elements Styles (Map, Table, etc.) are dynamically managed via useElementsEditor */
 
   .hide-controls::-webkit-media-controls {
     display: none !important;
@@ -4583,73 +4189,7 @@ const MainEditor = ({
       // getBoundingClientRect() also works correctly for cropped elements since the browser
       // already clips the visual bounds via clipPath — so we no longer exclude isCropModeEl.
       if (!isFrame && !isLine) {
-        let localBBox = getVisualBBox(el);
-        const isHotspot = el.getAttribute('data-is-hotspot') === 'true';
-        const isInteractiveButton = (isHotspot || el.getAttribute('data-type') === 'button') && el.querySelector('rect') !== null && (el.querySelector('text') !== null || el.querySelector('[data-type="text"]') !== null);
-        if (isInteractiveButton) {
-          const rectChild = el.querySelector('rect');
-          if (rectChild) {
-            const w = parseFloat(rectChild.getAttribute('width')) || 0;
-            const h = parseFloat(rectChild.getAttribute('height')) || 0;
-            const x = parseFloat(rectChild.getAttribute('x') || '0');
-            const y = parseFloat(rectChild.getAttribute('y') || '0');
-            if (w > 0 && h > 0) {
-              localBBox = { x, y, width: w, height: h };
-            }
-          }
-          if (!localBBox || localBBox.width <= 0 || localBBox.height <= 0) {
-            localBBox = { x: 0, y: 0, width: 80, height: 32 };
-          }
-        } else if (isHotspot && !isInteractiveButton) {
-          const imgChild = el.querySelector('image, svg, rect');
-          if (imgChild) {
-            const w = parseFloat(imgChild.getAttribute('width') || imgChild.viewBox?.baseVal?.width) || 0;
-            const h = parseFloat(imgChild.getAttribute('height') || imgChild.viewBox?.baseVal?.height) || 0;
-            const x = parseFloat(imgChild.getAttribute('x') || '0');
-            const y = parseFloat(imgChild.getAttribute('y') || '0');
-            if (w > 0 && h > 0) {
-              localBBox = { x, y, width: w, height: h };
-            }
-          }
-          if (!localBBox || localBBox.width <= 0 || localBBox.height <= 0) {
-            localBBox = { x: 0, y: 0, width: 48, height: 48 };
-          }
-        } else if (el.getAttribute('data-type') === 'decorator' || (el.id && el.id.startsWith('decorator-'))) {
-          const fo = el.querySelector('foreignObject') || el.querySelector('rect');
-          if (fo) {
-            const w = parseFloat(fo.getAttribute('width')) || 0;
-            const h = parseFloat(fo.getAttribute('height')) || 0;
-            const x = parseFloat(fo.getAttribute('x') || '0');
-            const y = parseFloat(fo.getAttribute('y') || '0');
-            if (w > 0 && h > 0) {
-              localBBox = { x, y, width: w, height: h };
-            }
-          }
-        } else if (el.getAttribute('data-type') === 'map' || (el.id && el.id.startsWith('map-'))) {
-          const fo = el.querySelector('foreignObject') || el.querySelector('rect');
-          if (fo) {
-            const w = parseFloat(fo.getAttribute('width')) || 0;
-            const h = parseFloat(fo.getAttribute('height')) || 0;
-            const x = parseFloat(fo.getAttribute('x') || '0');
-            const y = parseFloat(fo.getAttribute('y') || '0');
-            if (w > 0 && h > 0) {
-              localBBox = { x, y, width: w, height: h };
-            }
-          }
-        } else if (el.getAttribute('data-type') === 'table-frame' || el.getAttribute('data-type') === 'table' || (el.id && el.id.startsWith('table-'))) {
-          const fo = el.querySelector('foreignObject') || el.querySelector('rect');
-          if (fo) {
-            const w = parseFloat(fo.getAttribute('width')) || 0;
-            const h = parseFloat(fo.getAttribute('height')) || 0;
-            const x = parseFloat(fo.getAttribute('x') || '0');
-            const y = parseFloat(fo.getAttribute('y') || '0');
-            if (w > 0 && h > 0) {
-              localBBox = { x, y, width: w, height: h };
-            }
-          }
-        } else if (el.getAttribute('data-typography-type') || (el.id && el.id.startsWith('typography-')) || el.querySelector?.('.kinetic-container, .motion-click-boundary')) {
-          localBBox = getVisualBBox(el);
-        }
+        const localBBox = getVisualBBox(el);
         const elScreenCtm = el.getScreenCTM();
 
         if (localBBox && localBBox.width > 0 && localBBox.height > 0 && elScreenCtm) {
@@ -6674,22 +6214,21 @@ const MainEditor = ({
               }
             }
 
-            if (checkIsElementShape(shapeEl)) {
-              fillElementShapeWithPattern({
-                shapeEl,
-                svg,
-                targetShapeId,
-                dataUrl,
-                imgWidth,
-                imgHeight,
-                pageIdx,
-                updatePageHtml,
-                saveModifiedPageHtml,
-                setSingleSelection,
-                setSelectedLayerId,
-                setActiveMainTool,
-                drawOverlayHighlight
-              });
+            if (handleElementShapeDropFill({
+              shapeEl,
+              svg,
+              targetShapeId,
+              dataUrl,
+              imgWidth,
+              imgHeight,
+              pageIdx,
+              updatePageHtml,
+              saveModifiedPageHtml,
+              setSingleSelection,
+              setSelectedLayerId,
+              setActiveMainTool,
+              drawOverlayHighlight
+            })) {
               return;
             }
 
@@ -7433,18 +6972,7 @@ const MainEditor = ({
       return hotspotGroup;
     }
 
-    // Tables are single compound elements; clicking or dragging inside them targets the parent table!
-    const tableGroup = current && typeof current.closest === 'function'
-      ? current.closest('[data-type="table-frame"], [data-type="table"], [id^="table-"]')
-      : null;
-    if (tableGroup) {
-      if (!tableGroup.id) {
-        tableGroup.id = `table-${Date.now()}`;
-      }
-      return tableGroup;
-    }
-
-    // Compound Elements from Elements system (buttons, embed frames, image frames, audio frames)
+    // Compound Elements from Elements system (tables, buttons, slideshows, embed frames, image frames, audio frames, typography, decorators)
     const elementCompoundTarget = getElementCompoundTarget(current);
     if (elementCompoundTarget) {
       return elementCompoundTarget;
@@ -8314,51 +7842,6 @@ const MainEditor = ({
                 matrix = getElementMatrix(el);
               }
               bbox = getVisualBBox(el);
-              if ((el.getAttribute('data-is-hotspot') === 'true' || el.getAttribute('data-type') === 'button') && el.querySelector('rect') && (el.querySelector('text') || el.querySelector('[data-type="text"]'))) {
-                const rc = el.querySelector('rect');
-                const rw = parseFloat(rc.getAttribute('width')) || 0;
-                const rh = parseFloat(rc.getAttribute('height')) || 0;
-                const rx = parseFloat(rc.getAttribute('x') || '0');
-                const ry = parseFloat(rc.getAttribute('y') || '0');
-                if (rw > 0 && rh > 0) {
-                  bbox = { x: rx, y: ry, width: rw, height: rh };
-                }
-              } else if (el.getAttribute('data-type') === 'decorator' || (el.id && el.id.startsWith('decorator-'))) {
-                const fo = el.querySelector('foreignObject') || el.querySelector('rect');
-                if (fo) {
-                  const rw = parseFloat(fo.getAttribute('width')) || 0;
-                  const rh = parseFloat(fo.getAttribute('height')) || 0;
-                  const rx = parseFloat(fo.getAttribute('x') || '0');
-                  const ry = parseFloat(fo.getAttribute('y') || '0');
-                  if (rw > 0 && rh > 0) {
-                    bbox = { x: rx, y: ry, width: rw, height: rh };
-                  }
-                }
-              } else if (el.getAttribute('data-type') === 'map' || (el.id && el.id.startsWith('map-'))) {
-                const fo = el.querySelector('foreignObject') || el.querySelector('rect');
-                if (fo) {
-                  const rw = parseFloat(fo.getAttribute('width')) || 0;
-                  const rh = parseFloat(fo.getAttribute('height')) || 0;
-                  const rx = parseFloat(fo.getAttribute('x') || '0');
-                  const ry = parseFloat(fo.getAttribute('y') || '0');
-                  if (rw > 0 && rh > 0) {
-                    bbox = { x: rx, y: ry, width: rw, height: rh };
-                  }
-                }
-              } else if (el.getAttribute('data-type') === 'table-frame' || el.getAttribute('data-type') === 'table' || (el.id && el.id.startsWith('table-'))) {
-                const fo = el.querySelector('foreignObject') || el.querySelector('rect');
-                if (fo) {
-                  const rw = parseFloat(fo.getAttribute('width')) || 0;
-                  const rh = parseFloat(fo.getAttribute('height')) || 0;
-                  const rx = parseFloat(fo.getAttribute('x') || '0');
-                  const ry = parseFloat(fo.getAttribute('y') || '0');
-                  if (rw > 0 && rh > 0) {
-                    bbox = { x: rx, y: ry, width: rw, height: rh };
-                  }
-                }
-              } else if (el.getAttribute('data-typography-type') || (el.id && el.id.startsWith('typography-')) || el.querySelector?.('.kinetic-container, .motion-click-boundary')) {
-                bbox = getVisualBBox(el);
-              }
             }
 
             const svg = el.ownerSVGElement || canvasSvg;
@@ -8663,21 +8146,19 @@ const MainEditor = ({
             const isScaledImage = isImage && !isElementInCropMode;
             const isText = el.getAttribute('data-type') === 'text' || el.tagName?.toLowerCase() === 'text';
             const isForeignObject = el.tagName?.toLowerCase() === 'foreignobject';
-            const isTypography = el.getAttribute('data-typography-type') || (el.id && el.id.startsWith('typography-')) || el.querySelector?.('.kinetic-container, .motion-click-boundary');
+            const isTypography = isTypographyGroup(el);
             const isHotspotIconGroup = el.getAttribute('data-is-hotspot') === 'true' && (el.tagName?.toLowerCase() === 'g' || el.tagName?.toLowerCase() === 'svg');
             const isGroup = (el.tagName?.toLowerCase() === 'g' || el.tagName === 'multi') && el.getAttribute('data-is-hotspot') !== 'true';
-            const isTable = el.getAttribute('data-type') === 'table-frame' || el.getAttribute('data-type') === 'table' || (el.id && el.id.startsWith('table-'));
+            const isTable = isTableGroup(el);
             const isFreeFrame = ((el.getAttribute('data-name') === 'Free Frame' && el.tagName?.toLowerCase() === 'rect') || isForeignObject) && !isTypography;
             const isShape = (['path', 'polygon', 'circle', 'ellipse', 'rect', 'polyline', 'line'].includes(el.tagName?.toLowerCase()) || isGroup) && !isFreeFrame && !isForeignObject && !isTable;
             const isCorner = ['nw', 'ne', 'se', 'sw'].includes(dir);
             const isCtrlPressedMove = event.ctrlKey || (event.sourceEvent && event.sourceEvent.ctrlKey) || isCtrlPressedRef.current;
 
             const isHotspot = el.getAttribute('data-is-hotspot') === 'true';
-            const isDecorator = el.getAttribute('data-type') === 'decorator' || (el.id && el.id.startsWith('decorator-'));
+            const isDecorator = isDecoratorGroup(el);
             const isInteractiveButton = (isHotspot || el.getAttribute('data-type') === 'button') && state.childrenData && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'rect') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
             const isHotspotPreset = isHotspot && !isInteractiveButton;
-
-            const isInteractiveUniform = isInteractiveButton && (dir === 'n' || dir === 's');
 
             if (isInteractiveButton) {
               if (isCorner) {
@@ -8758,43 +8239,7 @@ const MainEditor = ({
 
             // ── TABLE RESIZING: Directly resize foreignObject & overlay rect bounds ──
             if (isTable) {
-              const newLocalX = state.localAnchor.x + (bbox.x - state.localAnchor.x) * scaleX;
-              const newLocalY = state.localAnchor.y + (bbox.y - state.localAnchor.y) * scaleY;
-              const newLocalRight = state.localAnchor.x + ((bbox.x + bbox.width) - state.localAnchor.x) * scaleX;
-              const newLocalBottom = state.localAnchor.y + ((bbox.y + bbox.height) - state.localAnchor.y) * scaleY;
-
-              const finalX = Math.min(newLocalX, newLocalRight);
-              const finalY = Math.min(newLocalY, newLocalBottom);
-              const finalWidth = Math.max(20, Math.abs(newLocalRight - newLocalX));
-              const finalHeight = Math.max(15, Math.abs(newLocalBottom - newLocalY));
-
-              const fo = el.querySelector('foreignObject');
-              const overlay = el.querySelector('rect.svg-table-overlay') || el.querySelector('rect');
-
-              const safeW = Math.round(finalWidth * 100) / 100;
-              const safeH = Math.round(finalHeight * 100) / 100;
-              const safeX = Math.round(finalX * 100) / 100;
-              const safeY = Math.round(finalY * 100) / 100;
-
-              if (fo) {
-                fo.setAttribute('x', safeX);
-                fo.setAttribute('y', safeY);
-                fo.setAttribute('width', safeW);
-                fo.setAttribute('height', safeH);
-              }
-              if (overlay) {
-                overlay.setAttribute('x', safeX);
-                overlay.setAttribute('y', safeY);
-                overlay.setAttribute('width', safeW);
-                overlay.setAttribute('height', safeH);
-              }
-
-              el.setAttribute('data-width', safeW);
-              el.setAttribute('data-height', safeH);
-
-              if (typeof drawOverlayHighlight === 'function') {
-                drawOverlayHighlight(el, 'selected');
-              }
+              resizeTableGroup({ el, state, bbox, scaleX, scaleY, drawOverlayHighlight });
               return;
             }
 
@@ -8923,80 +8368,8 @@ const MainEditor = ({
                 if (el.tagName.toLowerCase() === 'foreignobject') {
                   const iframe = el.querySelector('iframe');
                   if (iframe) {
-                    const isMap = el.closest('[data-type="map"]') || el.getAttribute('data-type') === 'map' || (el.id && el.id.startsWith('map-'));
-                    if (isMap) {
-                      let stage = el.querySelector('.map-stage');
-                      const baseW = 320;
-                      const scale = adjustedWidth < baseW ? (adjustedWidth / baseW) : 1;
-                      const innerW = adjustedWidth < baseW ? baseW : adjustedWidth;
-                      const innerH = Math.round(adjustedHeight / scale);
-
-                      if (stage) {
-                        stage.style.setProperty('width', innerW + 'px', 'important');
-                        stage.style.setProperty('height', innerH + 'px', 'important');
-                        stage.style.setProperty('transform', `scale(${scale})`, 'important');
-                        stage.style.setProperty('transform-origin', '0 0', 'important');
-                      } else {
-                        const rootContainer = el.querySelector('.map-root-container') || el.querySelector('div');
-                        if (rootContainer) {
-                          stage = document.createElement('div');
-                          stage.className = 'map-stage';
-                          stage.style.cssText = `position: absolute; top: 0; left: 0; width: ${innerW}px; height: ${innerH}px; transform: scale(${scale}); transform-origin: 0 0; overflow: hidden;`;
-                          const existingChildren = Array.from(rootContainer.children);
-                          if (iframe.parentElement === rootContainer) {
-                            stage.appendChild(iframe);
-                          }
-                          const overlayWrapper = document.createElement('div');
-                          overlayWrapper.className = 'map-overlay-wrapper';
-                          overlayWrapper.style.cssText = 'position: absolute; inset: 0; pointer-events: none;';
-                          existingChildren.forEach(child => {
-                            if (child !== iframe) {
-                              overlayWrapper.appendChild(child);
-                            }
-                          });
-                          stage.appendChild(overlayWrapper);
-                          rootContainer.appendChild(stage);
-                        }
-                      }
-
-                      iframe.setAttribute('width', innerW.toString());
-                      iframe.setAttribute('height', innerH.toString());
-                      iframe.style.setProperty('width', innerW + 'px', 'important');
-                      iframe.style.setProperty('height', innerH + 'px', 'important');
-                      iframe.style.setProperty('transform', 'none', 'important');
-                      iframe.style.setProperty('pointer-events', 'none', 'important');
-                      iframe.style.setProperty('border', 'none', 'important');
-                      iframe.style.setProperty('display', 'block', 'important');
-
-                      const parentMap = el.closest('[data-type="map"]');
-                      if (parentMap) {
-                        const rect = parentMap.querySelector('rect');
-                        if (rect) {
-                          rect.setAttribute('x', adjustedX);
-                          rect.setAttribute('y', adjustedY);
-                          rect.setAttribute('width', adjustedWidth);
-                          rect.setAttribute('height', adjustedHeight);
-                        }
-                      }
-                    } else {
-                      const origW = parseFloat(iframe.getAttribute('data-original-width')) || 640;
-                      const origH = parseFloat(iframe.getAttribute('data-original-height')) || 360;
-                      iframe.setAttribute('data-original-width', origW.toString());
-                      iframe.setAttribute('data-original-height', origH.toString());
-                      iframe.setAttribute('width', origW.toString());
-                      iframe.setAttribute('height', origH.toString());
-                      iframe.style.setProperty('width', origW + 'px', 'important');
-                      iframe.style.setProperty('height', origH + 'px', 'important');
-                      iframe.style.setProperty('transform-origin', '0 0', 'important');
-                      iframe.style.setProperty('pointer-events', 'auto', 'important');
-                      iframe.style.setProperty('border', 'none', 'important');
-                      iframe.style.setProperty('display', 'block', 'important');
-
-                      if (origW > 0 && origH > 0 && adjustedWidth > 0 && adjustedHeight > 0) {
-                        const scaleX = adjustedWidth / origW;
-                        const scaleY = adjustedHeight / origH;
-                        iframe.style.setProperty('transform', `scale(${scaleX}, ${scaleY})`, 'important');
-                      }
+                    if (!handleMapResize({ el, adjustedWidth, adjustedHeight, adjustedX, adjustedY })) {
+                      handleMapChildIframeResize({ child: el, imgW: adjustedWidth, imgH: adjustedHeight });
                     }
                   }
                   const video = el.querySelector('video');
@@ -9190,57 +8563,24 @@ const MainEditor = ({
                   // No CTM conversion needed — just compute new position in <g> local space.
 
                   const la = state.localAnchor; // anchor in <g> local space
-                  const isHotspot = el.getAttribute('data-is-hotspot') === 'true';
-                  const isInteractiveButton = (isHotspot || el.getAttribute('data-type') === 'button') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'rect') && state.childrenData.some(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute('data-type') === 'text');
-                  const isAudio = checkIsAudioGroup(el);
-                  const isSlideshow = isSlideshowGroup(el);
 
-                  const isDecorator = el.getAttribute('data-type') === 'decorator' || (el.id && el.id.startsWith('decorator-'));
-                  const isTable = el.getAttribute('data-type') === 'table-frame' || el.getAttribute('data-type') === 'table' || (el.id && el.id.startsWith('table-'));
-
-                  // ── DECORATOR & TYPOGRAPHY: update outer transform, NOT children ───────
-                  if (isDecorator || isTypography) {
-                    const scaleMatrix = new DOMMatrix()
-                      .translate(worldAnchor.x, worldAnchor.y)
-                      .scale(scaleX, scaleY)
-                      .translate(-worldAnchor.x, -worldAnchor.y);
-                    const nextMatrix = scaleMatrix.multiply(matrix);
-                    el.setAttribute('transform', matrixToTransform(nextMatrix));
-                    if (typeof drawOverlayHighlight === 'function') {
-                      drawOverlayHighlight(el, 'selected');
-                    }
+                  // ── ELEMENTS GROUP RESIZE DISPATCHER (Decorator, Typography, Slideshow, Audio) ──
+                  if (handleElementGroupResize({
+                    el,
+                    state,
+                    matrix,
+                    scaleX,
+                    scaleY,
+                    worldAnchor,
+                    matrixToTransform,
+                    drawOverlayHighlight,
+                    currentFrameIdRef,
+                    finalX,
+                    finalY,
+                    finalWidth,
+                    finalHeight
+                  })) {
                     return;
-                  }
-
-
-
-                  if (isSlideshow) {
-                    resizeSlideshowGroup({
-                      el,
-                      worldAnchor,
-                      scaleX,
-                      scaleY,
-                      matrix,
-                      matrixToTransform,
-                      drawOverlayHighlight,
-                      currentFrameIdRef
-                    });
-                    return; // preserve internal relative frame coordinates and pattern fills
-                  }
-
-                  if ((isHotspot && !isInteractiveButton) || isAudio) {
-                    resizeAudioGroup({
-                      el,
-                      state,
-                      matrix,
-                      finalX,
-                      finalY,
-                      finalWidth,
-                      finalHeight,
-                      drawOverlayHighlight,
-                      currentFrameIdRef
-                    });
-                    return; // skip children modification
                   }
 
                   state.childrenData.forEach(cData => {
@@ -9398,27 +8738,7 @@ const MainEditor = ({
                         if (tag === 'foreignobject') {
                           const iframe = child.querySelector('iframe');
                           if (iframe) {
-                            const isMap = child.closest('[data-type="map"]') || child.getAttribute('data-type') === 'map' || (child.id && child.id.startsWith('map-'));
-                            const defaultOrigW = isMap ? 240 : 640;
-                            const defaultOrigH = isMap ? 150 : 360;
-                            const origW = parseFloat(iframe.getAttribute('data-original-width')) || defaultOrigW;
-                            const origH = parseFloat(iframe.getAttribute('data-original-height')) || defaultOrigH;
-                            iframe.setAttribute('data-original-width', origW.toString());
-                            iframe.setAttribute('data-original-height', origH.toString());
-                            iframe.setAttribute('width', origW.toString());
-                            iframe.setAttribute('height', origH.toString());
-                            iframe.style.setProperty('width', origW + 'px', 'important');
-                            iframe.style.setProperty('height', origH + 'px', 'important');
-                            iframe.style.setProperty('transform-origin', '0 0', 'important');
-                            iframe.style.setProperty('pointer-events', isMap ? 'none' : 'auto', 'important');
-                            iframe.style.setProperty('border', 'none', 'important');
-                            iframe.style.setProperty('display', 'block', 'important');
-
-                            if (origW > 0 && origH > 0 && imgW > 0 && imgH > 0) {
-                              const scaleX = imgW / origW;
-                              const scaleY = imgH / origH;
-                              iframe.style.setProperty('transform', `scale(${scaleX}, ${scaleY})`, 'important');
-                            }
+                            handleMapChildIframeResize({ child, imgW, imgH });
                           }
                           const video = child.querySelector('video');
                           if (video) {
@@ -9605,9 +8925,7 @@ const MainEditor = ({
                     }
                   });
 
-                  if (isInteractiveButton) {
-                    resizeInteractiveButton({ el, state });
-                  }
+                  handleInteractiveButtonResize({ el, state });
                 }
               }
             } else {
@@ -9834,7 +9152,7 @@ const MainEditor = ({
     window.__skipCanvasUpdateForPage = targetPageIndex;
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = targetSvg.outerHTML;
-    tempDiv.querySelectorAll('.slideshow-transition-clone').forEach(el => el.remove());
+    removeSlideshowTransitionClones(tempDiv);
     let finalHtml = tempDiv.innerHTML;
     finalHtml = finalHtml
       .replace(/<\s*br[^>]*>(?:<\/\s*br\s*>)?/gi, '<br/>')
@@ -12496,7 +11814,7 @@ const MainEditor = ({
             const isFreeFrame = curr.getAttribute('data-name') === 'Free Frame';
             const isShape = curr.getAttribute('data-type') === 'shape';
             const isIcon = curr.getAttribute('data-type') === 'icon';
-            const isTable = curr.getAttribute('data-type') === 'table-frame' || curr.getAttribute('data-type') === 'table' || (curr.id && curr.id.startsWith('table-')) || curr.classList?.contains('table-card-wrapper') || curr.tagName?.toLowerCase() === 'table';
+            const isTable = isTableGroup(curr);
             const isShield = curr.getAttribute('data-name') === 'Document Shield' || curr.getAttribute('data-type') === 'shield';
             if (isShield) {
               interactiveTarget = null;
@@ -13082,14 +12400,11 @@ const MainEditor = ({
     let textTarget = target;
 
     // Allow double clicking text inside grouped elements (like buttons) to edit the text directly
-    if (!isText && target.getAttribute('data-type') === 'button') {
-      const clickedTag = e.target.tagName?.toLowerCase();
-      if (['text', 'tspan', 'foreignobject'].includes(clickedTag)) {
+    if (!isText) {
+      const btnText = getButtonTextTargetForEditing(target, e.target);
+      if (btnText) {
         isText = true;
-        textTarget = clickedTag === 'tspan' ? e.target.closest('text') : (clickedTag === 'foreignobject' ? e.target : e.target.closest('text') || e.target);
-        if (textTarget && !textTarget.id) {
-          textTarget.id = `button-text-${Date.now()}`;
-        }
+        textTarget = btnText;
       }
     }
 
