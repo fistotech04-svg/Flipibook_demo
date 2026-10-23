@@ -6,7 +6,8 @@ import {
   Layout, ArrowUp, ArrowDown, ArrowUpToLine, ArrowDownToLine,
   Ban, Trash2, FilePlus, GripVertical,
   Folder, Type, Image as ImageIcon, Square, Circle, Triangle, Star, Minus,
-  Video, ImagePlay, Music,
+  Video, ImagePlay, Music, QrCode, MousePointerClick,
+  MapPin, SlidersHorizontal, Table2, Sparkles,
   ChevronRight, ChevronDown, Eye, EyeOff, Lock, Unlock,
   Scissors, Clipboard, ArrowUpRight
 } from 'lucide-react';
@@ -221,8 +222,8 @@ const LayerItem = ({
       return <ImagePlay size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
     }
 
-    // 3. Check Image
-    const isImageByName = typeLower === 'image' || nameLower.includes('image');
+    // 3. Check Image & Image Frame
+    const isImageByName = typeLower === 'image' || typeLower === 'image-frame' || nameLower.includes('image frame') || nameLower.includes('image-frame') || nameLower.includes('image');
     if (isImageByName) {
       return <ImageIcon size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
     }
@@ -231,6 +232,57 @@ const LayerItem = ({
     const isAudio = typeLower === 'audio-frame' || layer['data-interaction'] === 'audio' || nameLower.includes('audio');
     if (isAudio) {
       return <Music size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
+    }
+
+    // 5. Check QR Code
+    const isQRCode = typeLower === 'qrcode' || typeLower === 'qr-code' || layer['data-type'] === 'qrcode' || nameLower.includes('qr code') || nameLower.includes('qrcode');
+    if (isQRCode) {
+      return <QrCode size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
+    }
+
+    // 6. Check Button
+    const isButton = typeLower === 'button' || layer['data-type'] === 'button' || nameLower.includes('button');
+    if (isButton) {
+      return <MousePointerClick size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
+    }
+
+    // 7. Check Map
+    const isMap = typeLower === 'map' || layer['data-type'] === 'map' || nameLower === 'map' || nameLower.includes('map');
+    if (isMap) {
+      return <MapPin size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
+    }
+
+    // 8. Check Slideshow
+    const isSlideshow = typeLower === 'slideshow' || layer['data-type'] === 'slideshow' || nameLower.includes('slideshow');
+    if (isSlideshow) {
+      return <SlidersHorizontal size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
+    }
+
+    // 9. Check Table
+    const isTable = typeLower === 'table' || typeLower === 'table-frame' || layer['data-type'] === 'table' || layer['data-type'] === 'table-frame' || nameLower.includes('table');
+    if (isTable) {
+      return <Table2 size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
+    }
+
+    // 10. Check Decorator
+    const isDecorator = typeLower === 'decorator' || layer['data-type'] === 'decorator' || nameLower.includes('decorator');
+    if (isDecorator) {
+      return <Sparkles size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
+    }
+
+    // 11. Check Shape
+    const isShape = typeLower === 'shape' || layer['data-type'] === 'shape' || nameLower === 'shape' || nameLower.includes('shape');
+    if (isShape) {
+      if (nameLower.includes('circle') || nameLower.includes('ellipse')) {
+        return <Circle size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
+      }
+      if (nameLower.includes('star')) {
+        return <Star size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
+      }
+      if (nameLower.includes('triangle')) {
+        return <Triangle size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
+      }
+      return <Square size="0.85vw" className="text-gray-400 group-hover/layer:text-[#6366F1]" />;
     }
 
     switch (typeLower) {

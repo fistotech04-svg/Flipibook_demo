@@ -796,6 +796,15 @@ export const getElementCompoundTarget = (current) => {
     return buttonGroup;
   }
 
+  // QR Codes are single compound elements; drag/select the whole QR Code!
+  const qrGroup = current.closest('[data-type="qrcode"], [data-type="qr-code"], [id^="qrcode-"]');
+  if (qrGroup) {
+    if (!qrGroup.id) {
+      qrGroup.id = `qrcode-${Date.now()}`;
+    }
+    return qrGroup;
+  }
+
   // Typography elements (Motion Graphics & Kinetic) are single compound units; clicking/dragging any child selects the whole group!
   const typographyGroup = current.closest('g[data-type="text"][id*="typography-"], g[data-typography-type="motion-graphic"], g[data-typography-type="kinetic"]');
   if (typographyGroup) {
@@ -853,6 +862,15 @@ export const getElementCompoundTarget = (current) => {
       audioFrame.id = `audio-frame-${Date.now()}`;
     }
     return audioFrame;
+  }
+
+  // Element Shapes are single compound elements; drag the whole shape!
+  const shapeGroup = current.closest('[data-type="shape"], [id^="shape-"]');
+  if (shapeGroup) {
+    if (!shapeGroup.id) {
+      shapeGroup.id = `shape-${Date.now()}`;
+    }
+    return shapeGroup;
   }
 
   return null;

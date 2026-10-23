@@ -822,8 +822,10 @@ const RightSidebar = ({
           return props;
         }
 
-        const isQRCode = dataType === 'qrcode' || lowerId.includes('qrcode');
+        const qrParent = el.closest ? el.closest('[data-type="qrcode"], [id^="qrcode-"]') : null;
+        const isQRCode = dataType === 'qrcode' || lowerId.includes('qrcode') || !!qrParent;
         if (isQRCode) {
+          props.qrcodeId = qrParent ? qrParent.id : selectedLayerId;
           props.isQRCode = true;
           return props;
         }
@@ -1563,13 +1565,44 @@ const RightSidebar = ({
                       ) : selectedElementProps?.isQRCode ? (
                         <QRCodeProperties
                           selectedElement={(() => {
+                            const targetId = selectedElementProps?.qrcodeId || selectedLayerId;
                             const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
-                            return editorDoc.getElementById(selectedLayerId);
+                            return (targetId ? editorDoc.getElementById(targetId) : null) || (targetId ? document.getElementById(targetId) : null);
                           })()}
+                          selectedLayerId={selectedElementProps?.qrcodeId || selectedLayerId}
+                          activePageIndex={activePageIndex}
+                          updateElementAttribute={updateElementAttribute}
+                          selectedElementProps={selectedElementProps}
                           onUpdate={(newHtml) => {
                             window.__skipCanvasUpdateForPage = activePageIndex;
-                            if (typeof newHtml === 'string') {
-                              updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', newHtml);
+                            const targetId = selectedElementProps?.qrcodeId || selectedLayerId;
+                            if (typeof newHtml === 'string' && newHtml.includes('<svg')) {
+                              updateElementAttribute(activePageIndex, targetId, '__dom_sync__', newHtml);
+                            } else {
+                              const svgRoot = (() => {
+                                const editorDoc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                                const el = (targetId ? editorDoc.getElementById(targetId) : null) || (targetId ? document.getElementById(targetId) : null);
+                                if (!el) return null;
+                                const container = el.closest('.page-svg-container');
+                                if (container) {
+                                  const canvasContent = container.querySelector('[id^="canvas-content-"]');
+                                  return canvasContent ? canvasContent.querySelector('svg') : container.querySelector('svg');
+                                }
+                                let node = el;
+                                let lastSvg = null;
+                                while (node) {
+                                  if (node.tagName?.toLowerCase() === 'svg') lastSvg = node;
+                                  node = node.parentElement;
+                                }
+                                return lastSvg;
+                              })();
+                              if (svgRoot) {
+                                const cloneSvg = svgRoot.cloneNode(true);
+                                cloneSvg.querySelectorAll('[data-highlight-id], .frame-boundary, #ghost-layer, .selection-overlay-layer').forEach(e => e.remove());
+                                const serializer = new XMLSerializer();
+                                const html = serializer.serializeToString(cloneSvg);
+                                updateElementAttribute(activePageIndex, targetId, '__dom_sync__', html);
+                              }
                             }
                           }}
                         />
@@ -1843,6 +1876,37 @@ const RightSidebar = ({
                           selectedLayerId={selectedLayerId}
                           activePageIndex={activePageIndex}
                           updateElementAttribute={updateElementAttribute}
+                          selectedElementProps={selectedElementProps}
+                          onUpdate={(newHtml) => {
+                            window.__skipCanvasUpdateForPage = activePageIndex;
+                            if (typeof newHtml === 'string') {
+                              updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', newHtml);
+                            } else {
+                              const svgRoot = (() => {
+                                const el = document.getElementById(selectedLayerId);
+                                if (!el) return null;
+                                const container = el.closest('.page-svg-container');
+                                if (container) return container.querySelector('svg');
+
+                                let node = el;
+                                let lastSvg = null;
+                                while (node) {
+                                  if (node.tagName?.toLowerCase() === 'svg') lastSvg = node;
+                                  node = node.parentElement;
+                                }
+                                return lastSvg;
+                              })();
+                              if (svgRoot) {
+                                const cloneSvg = svgRoot.cloneNode(true);
+                                cloneSvg.querySelectorAll('[data-highlight-id], .frame-boundary').forEach(el => el.remove());
+                                const serializer = new XMLSerializer();
+                                const html = serializer.serializeToString(cloneSvg);
+                                updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', html);
+                              } else {
+                                updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', null);
+                              }
+                            }
+                          }}
                         />
                       ) : selectedElementProps?.isElementShape ? (
                         <ElementShapesProperties

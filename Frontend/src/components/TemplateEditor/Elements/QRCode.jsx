@@ -34,7 +34,7 @@ const MiniQRMatrix = ({ x = 12, y = 12, size = 36 }) => {
 };
 
 // Mini Frame Vector Thumbnails matching user design exactly
-const FrameThumbnail = ({ frameId }) => {
+export const FrameThumbnail = ({ frameId }) => {
   switch (frameId) {
     case 'frame-bottom-bar':
       return (
@@ -130,8 +130,8 @@ const QRCode = ({ isFullView }) => {
       transform = 'transform="translate(80, 123.5)"';
     }
     return `
-      <g id="qrcode-${uniqueId}" data-type="qrcode" cursor="pointer" data-qr-url="${defaultUrl}" data-qr-frame="${frameId}" data-qr-text="${defaultText}" data-qr-logo-size="22" data-qr-logo-bg="true" data-qr-logo="" ${transform}>
-        <image x="0" y="0" width="${width}" height="${height}" href="${imgHref}" preserveAspectRatio="none" />
+      <g id="qrcode-${uniqueId}" data-type="qrcode" cursor="pointer" data-qr-url="${defaultUrl}" data-qr-frame="${frameId}" data-qr-text="${defaultText}" data-qr-logo-size="22" data-qr-logo-bg="true" data-qr-logo="" data-qr-text-color="#FFFFFF" data-qr-frame-bg="#FFFFFF" data-qr-arrow-color="#000000" data-qr-font-family="Poppins" data-qr-font-size="24" data-qr-font-weight="Semi Bold" ${transform}>
+        <image x="0" y="0" width="${width}" height="${height}" href="${imgHref}" xlink:href="${imgHref}" preserveAspectRatio="none" />
         <rect x="0" y="0" width="${width}" height="${height}" fill="transparent" />
       </g>
     `;
@@ -143,15 +143,21 @@ const QRCode = ({ isFullView }) => {
       const rendered = await renderQRWithFrame({
         url: 'https://example.com',
         frame: frame.id,
-        text: frame.defaultText
+        text: frame.defaultText,
+        textColor: '#FFFFFF',
+        frameBgColor: '#FFFFFF',
+        arrowColor: '#000000',
+        fontFamily: 'Poppins',
+        fontSize: 24,
+        fontWeight: 'Semi Bold'
       });
       if (rendered && rendered.dataUrl) {
         const uniqueId = Date.now();
         const width = 50;
         const height = Math.round(width * (rendered.totalHeight / rendered.totalWidth));
         content = `
-          <g id="qrcode-${uniqueId}" data-type="qrcode" cursor="pointer" data-qr-url="https://example.com" data-qr-frame="${frame.id}" data-qr-text="${frame.defaultText}" data-qr-logo-size="22" data-qr-logo-bg="true" data-qr-logo="" transform="translate(80, 123.5)">
-            <image x="0" y="0" width="${width}" height="${height}" href="${rendered.dataUrl}" preserveAspectRatio="none" />
+          <g id="qrcode-${uniqueId}" data-type="qrcode" cursor="pointer" data-qr-url="https://example.com" data-qr-frame="${frame.id}" data-qr-text="${frame.defaultText}" data-qr-logo-size="22" data-qr-logo-bg="true" data-qr-logo="" data-qr-text-color="#FFFFFF" data-qr-frame-bg="#FFFFFF" data-qr-arrow-color="#000000" data-qr-font-family="Poppins" data-qr-font-size="24" data-qr-font-weight="Semi Bold" transform="translate(80, 123.5)">
+            <image x="0" y="0" width="${width}" height="${height}" href="${rendered.dataUrl}" xlink:href="${rendered.dataUrl}" preserveAspectRatio="none" />
             <rect x="0" y="0" width="${width}" height="${height}" fill="transparent" />
           </g>
         `;
