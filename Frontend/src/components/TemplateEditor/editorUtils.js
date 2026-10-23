@@ -344,21 +344,81 @@ export const parseLayersFromSVG = (element) => {
         locked: child.getAttribute('data-locked') === 'true'
       };
 
-      const isEmbedGroup = child.getAttribute('data-type') === 'embed-frame' || child.querySelector('[data-type="embed-frame"]') !== null;
+      const isPageRoot = child.getAttribute('data-type') === 'frame' || 
+                         child.getAttribute('data-name')?.startsWith('Page ') ||
+                         child.getAttribute('data-name')?.startsWith('Slide ') ||
+                         child.getAttribute('data-name')?.startsWith('PDF Page ');
+
+      const isEmbedGroup = !isPageRoot && (child.getAttribute('data-type') === 'embed-frame' || child.querySelector('[data-type="embed-frame"]') !== null);
       
       const lowerDataName = (child.getAttribute('data-name') || id || '').toLowerCase();
       const lowerId = (id || '').toLowerCase();
-      const isAudioFrame = child.getAttribute('data-type') === 'audio-frame' || 
+      const isAudioFrame = !isPageRoot && (
+                           child.getAttribute('data-type') === 'audio-frame' || 
                            child.getAttribute('data-type') === 'audio' ||
-                           child.querySelector('[data-type="audio-frame"]') !== null || 
                            child.getAttribute('data-interaction') === 'audio' ||
-                           lowerDataName.includes('audio') || 
-                           lowerId.includes('audio');
+                           (lowerId.startsWith('audio-') && !lowerId.startsWith('page'))
+      );
 
-      const isGroup = child.getAttribute('data-is-image-group') === 'true' ||
+      const isButton = !isPageRoot && (
+                       child.getAttribute('data-type') === 'button' || 
+                       lowerId.startsWith('button-')
+      );
+
+      const isQRCode = !isPageRoot && (
+                       child.getAttribute('data-type') === 'qrcode' || 
+                       child.getAttribute('data-type') === 'qr-code' || 
+                       lowerId.startsWith('qrcode-')
+      );
+
+      const isMap = !isPageRoot && (
+                    child.getAttribute('data-type') === 'map' || 
+                    lowerId.startsWith('map-')
+      );
+
+      const isSlideshow = !isPageRoot && (
+                          child.getAttribute('data-type') === 'slideshow' || 
+                          child.getAttribute('data-is-slideshow') === 'true' || 
+                          lowerId.startsWith('slideshow-')
+      );
+
+      const isImageFrame = !isPageRoot && (
+                           child.getAttribute('data-type') === 'image-frame' || 
+                           lowerId.startsWith('image-frame-') || 
+                           lowerId.startsWith('imageframe-')
+      );
+
+      const isShape = !isPageRoot && (
+                      child.getAttribute('data-type') === 'shape' || 
+                      child.getAttribute('data-shape-type') === 'shape' || 
+                      child.getAttribute('data-is-element-shape') === 'true' || 
+                      lowerId.startsWith('shape-')
+      );
+
+      const isTable = !isPageRoot && (
+                      child.getAttribute('data-type') === 'table' || 
+                      child.getAttribute('data-type') === 'table-frame' || 
+                      lowerId.startsWith('table-')
+      );
+
+      const isDecorator = !isPageRoot && (
+                          child.getAttribute('data-type') === 'decorator' || 
+                          lowerId.startsWith('decorator-')
+      );
+
+      const isTypography = !isPageRoot && (
+                           child.getAttribute('data-typography-type') === 'motion-graphic' ||
+                           child.getAttribute('data-typography-type') === 'kinetic' ||
+                           (lowerId.startsWith('typography-') && child.getAttribute('data-type') === 'text')
+      );
+
+      const isGroup = !isPageRoot && (
+        child.getAttribute('data-is-image-group') === 'true' ||
         child.getAttribute('data-is-video-group') === 'true' ||
         child.getAttribute('data-is-gif-group') === 'true' ||
-        isEmbedGroup || isAudioFrame;
+        isEmbedGroup || isAudioFrame || isButton || isQRCode ||
+        isMap || isSlideshow || isImageFrame || isShape || isTable || isDecorator || isTypography
+      );
 
       const isPdfVector = child.getAttribute('data-type') === 'pdf-vector-layer';
 
@@ -392,8 +452,53 @@ export const parseLayersFromSVG = (element) => {
           coreName = 'Embed Frame';
           coreType = 'embed-frame';
         } else if (isAudioFrame) {
-          coreName = 'Audio';
+          const customName = child.getAttribute('data-name');
+          coreName = customName && !customName.startsWith('audio-') ? customName.replace(/^tpl-[a-z0-9]{4}-/, '') : 'Audio';
           coreType = 'audio-frame';
+        } else if (isButton) {
+          const customName = child.getAttribute('data-name');
+          coreName = customName && !customName.startsWith('button-') ? customName.replace(/^tpl-[a-z0-9]{4}-/, '') : 'Button';
+          coreType = 'button';
+        } else if (isQRCode) {
+          const customName = child.getAttribute('data-name');
+          coreName = customName && !customName.startsWith('qrcode-') ? customName.replace(/^tpl-[a-z0-9]{4}-/, '') : 'QR Code';
+          coreType = 'qrcode';
+        } else if (isMap) {
+          const customName = child.getAttribute('data-name');
+          coreName = customName && !customName.startsWith('map-') ? customName.replace(/^tpl-[a-z0-9]{4}-/, '') : 'Map';
+          coreType = 'map';
+        } else if (isSlideshow) {
+          const customName = child.getAttribute('data-name');
+          coreName = customName && !customName.startsWith('slideshow-') ? customName.replace(/^tpl-[a-z0-9]{4}-/, '') : 'Slideshow';
+          coreType = 'slideshow';
+        } else if (isImageFrame) {
+          const customName = child.getAttribute('data-name');
+          coreName = customName && !customName.startsWith('image-frame-') && !customName.startsWith('imageframe-') ? customName.replace(/^tpl-[a-z0-9]{4}-/, '') : 'Image Frame';
+          coreType = 'image-frame';
+        } else if (isShape) {
+          const customName = child.getAttribute('data-name');
+          if (customName && !customName.startsWith('shape-')) {
+            coreName = customName.replace(/^tpl-[a-z0-9]{4}-/, '');
+          } else {
+            const hasCircle = child.querySelector('circle, ellipse') || child.getAttribute('data-shape-type') === 'ellipse';
+            const hasStar = child.getAttribute('data-shape-type') === 'star' || child.querySelector('[data-shape-type="star"]');
+            const hasTriangle = child.querySelector('polygon[data-count="3"]') || child.getAttribute('data-count') === '3';
+            const hasRect = child.querySelector('rect') || child.getAttribute('data-shape-type') === 'rectangle';
+            coreName = hasCircle ? 'Circle' : (hasStar ? 'Star' : (hasTriangle ? 'Triangle' : (hasRect ? 'Rectangle' : 'Shape')));
+          }
+          coreType = 'shape';
+        } else if (isTable) {
+          const customName = child.getAttribute('data-name');
+          coreName = customName && !customName.startsWith('table-') ? customName.replace(/^tpl-[a-z0-9]{4}-/, '') : 'Table';
+          coreType = 'table';
+        } else if (isDecorator) {
+          const customName = child.getAttribute('data-name');
+          coreName = customName && !customName.startsWith('decorator-') ? customName.replace(/^tpl-[a-z0-9]{4}-/, '') : 'Decorator';
+          coreType = 'decorator';
+        } else if (isTypography) {
+          const customName = child.getAttribute('data-name');
+          coreName = customName && !customName.startsWith('typography-') ? customName.replace(/^tpl-[a-z0-9]{4}-/, '') : 'Typography';
+          coreType = 'text';
         } else if (isText) {
           const customName = child.getAttribute('data-name');
           coreName = customName ? customName.replace(/^tpl-[a-z0-9]{4}-/, '') : 'Text';

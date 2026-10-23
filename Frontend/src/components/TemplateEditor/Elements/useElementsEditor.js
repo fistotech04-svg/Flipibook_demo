@@ -574,6 +574,177 @@ export const isAudioGroup = (el) => {
 };
 
 /**
+ * Identifies if an element is an Animated Decorator (e.g. Starburst).
+ */
+export const isDecoratorGroup = (el) => {
+  if (!el || typeof el.getAttribute !== 'function') return false;
+  return el.getAttribute('data-type') === 'decorator' || (Boolean(el.id) && el.id.startsWith('decorator-'));
+};
+
+/**
+ * Identifies if an element is a Typography element (Kinetic or Motion Graphic).
+ */
+export const isTypographyGroup = (el) => {
+  if (!el || typeof el.getAttribute !== 'function') return false;
+  return Boolean(
+    el.getAttribute('data-typography-type') ||
+    (el.id && el.id.startsWith('typography-')) ||
+    el.querySelector?.('.kinetic-container, .motion-click-boundary')
+  );
+};
+
+/**
+ * Identifies if an element is a Table element.
+ */
+export const isTableGroup = (el) => {
+  if (!el || typeof el.getAttribute !== 'function') return false;
+  return el.getAttribute('data-type') === 'table-frame' ||
+    el.getAttribute('data-type') === 'table' ||
+    (Boolean(el.id) && el.id.startsWith('table-'));
+};
+
+/**
+ * Calculates custom visual bounding box for Elements (Slideshows, Kinetic & Motion Typography, Buttons, Decorators, Maps, Tables).
+ * Returns { x, y, width, height } or null if not an Element with custom bounds.
+ */
+export const getElementVisualBBox = (el) => {
+  if (!el) return null;
+
+  const ssBBox = getSlideshowBBox(el);
+  if (ssBBox) return ssBBox;
+
+  // ── TYPOGRAPHY BOUNDING BOX (Kinetic & Motion Graphic) ──
+  if (isTypographyGroup(el)) {
+    const motionBoundary = el.querySelector?.('.motion-click-boundary');
+    if (motionBoundary) {
+      const mw = parseFloat(motionBoundary.getAttribute('width')) || 0;
+      const mh = parseFloat(motionBoundary.getAttribute('height')) || 0;
+      const mx = parseFloat(motionBoundary.getAttribute('x') || '0');
+      const my = parseFloat(motionBoundary.getAttribute('y') || '0');
+      if (mw > 0 && mh > 0) {
+        return { x: mx, y: my, width: mw, height: mh };
+      }
+    }
+    const kineticContainer = el.querySelector?.('.kinetic-container');
+    const fo = el.querySelector?.('foreignObject');
+    if (kineticContainer && fo) {
+      const words = Array.from(kineticContainer.querySelectorAll('.word'));
+      const textLines = words.map(w => (w.textContent || '').trim()).filter(Boolean);
+      const fs = parseFloat(el.getAttribute('data-font-size')) || parseFloat(kineticContainer.style.fontSize) || 34;
+      const pad = parseFloat(el.getAttribute('data-bg-padding')) || parseFloat(kineticContainer.style.padding) || 12;
+      const maxLen = Math.max(...textLines.map(l => l.length), 1);
+      const snugW = Math.round(maxLen * (fs * 0.55) + (pad * 2));
+      const snugH = Math.round(textLines.length * (fs * 1.08) + (pad * 2));
+      const fox = parseFloat(fo.getAttribute('x') || '0');
+      const foy = parseFloat(fo.getAttribute('y') || '0');
+      return { x: fox, y: foy, width: Math.max(30, snugW), height: Math.max(20, snugH) };
+    }
+    const bgRect = el.querySelector?.('rect.typography-bg');
+    if (bgRect) {
+      const rw = parseFloat(bgRect.getAttribute('width')) || 0;
+      const rh = parseFloat(bgRect.getAttribute('height')) || 0;
+      const rx = parseFloat(bgRect.getAttribute('x') || '0');
+      const ry = parseFloat(bgRect.getAttribute('y') || '0');
+      if (rw > 0 && rh > 0) {
+        return { x: rx, y: ry, width: rw, height: rh };
+      }
+    }
+  }
+
+  // ── INTERACTIVE BUTTON BOUNDING BOX ──
+  const isHotspot = el.getAttribute?.('data-is-hotspot') === 'true';
+  const isInteractiveButton = (isHotspot || el.getAttribute?.('data-type') === 'button') &&
+    el.querySelector && el.querySelector('rect') !== null &&
+    (el.querySelector('text') !== null || el.querySelector('[data-type="text"]') !== null);
+  if (isInteractiveButton) {
+    const rc = el.querySelector('rect');
+    if (rc) {
+      const rw = parseFloat(rc.getAttribute('width')) || 0;
+      const rh = parseFloat(rc.getAttribute('height')) || 0;
+      const rx = parseFloat(rc.getAttribute('x') || '0');
+      const ry = parseFloat(rc.getAttribute('y') || '0');
+      if (rw > 0 && rh > 0) {
+        return { x: rx, y: ry, width: rw, height: rh };
+      }
+    }
+    return { x: 0, y: 0, width: 80, height: 32 };
+  }
+
+  // ── NON-BUTTON HOTSPOT PRESET BOUNDING BOX ──
+  if (isHotspot && !isInteractiveButton) {
+    const imgChild = el.querySelector('image, svg, rect');
+    if (imgChild) {
+      const w = parseFloat(imgChild.getAttribute('width') || imgChild.viewBox?.baseVal?.width) || 0;
+      const h = parseFloat(imgChild.getAttribute('height') || imgChild.viewBox?.baseVal?.height) || 0;
+      const x = parseFloat(imgChild.getAttribute('x') || '0');
+      const y = parseFloat(imgChild.getAttribute('y') || '0');
+      if (w > 0 && h > 0) {
+        return { x, y, width: w, height: h };
+      }
+    }
+    return { x: 0, y: 0, width: 48, height: 48 };
+  }
+
+  // ── ANIMATED DECORATOR BOUNDING BOX ──
+  if (isDecoratorGroup(el)) {
+    const fo = el.querySelector('foreignObject') || el.querySelector('rect');
+    if (fo) {
+      const rw = parseFloat(fo.getAttribute('width')) || 0;
+      const rh = parseFloat(fo.getAttribute('height')) || 0;
+      const rx = parseFloat(fo.getAttribute('x') || '0');
+      const ry = parseFloat(fo.getAttribute('y') || '0');
+      if (rw > 0 && rh > 0) {
+        return { x: rx, y: ry, width: rw, height: rh };
+      }
+    }
+  }
+
+  // ── MAP BOUNDING BOX ──
+  const isMap = el.getAttribute?.('data-type') === 'map' || (typeof el.id === 'string' && el.id.startsWith('map-'));
+  if (isMap) {
+    const fo = el.querySelector('foreignObject') || el.querySelector('rect');
+    if (fo) {
+      const rw = parseFloat(fo.getAttribute('width')) || 0;
+      const rh = parseFloat(fo.getAttribute('height')) || 0;
+      const rx = parseFloat(fo.getAttribute('x') || '0');
+      const ry = parseFloat(fo.getAttribute('y') || '0');
+      if (rw > 0 && rh > 0) {
+        return { x: rx, y: ry, width: rw, height: rh };
+      }
+    }
+  }
+
+  // ── TABLE BOUNDING BOX ──
+  if (isTableGroup(el)) {
+    const fo = el.querySelector('foreignObject') || el.querySelector('rect');
+    if (fo) {
+      const rw = parseFloat(fo.getAttribute('width')) || 0;
+      const rh = parseFloat(fo.getAttribute('height')) || 0;
+      const rx = parseFloat(fo.getAttribute('x') || '0');
+      const ry = parseFloat(fo.getAttribute('y') || '0');
+      if (rw > 0 && rh > 0) {
+        return { x: rx, y: ry, width: rw, height: rh };
+      }
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Intercepts media drop onto an Element Shape and fills it with an SVG pattern.
+ * Returns true if handled, false otherwise.
+ */
+export const handleElementShapeDropFill = (options) => {
+  if (options && options.shapeEl && isElementShape(options.shapeEl)) {
+    fillElementShapeWithPattern(options);
+    return true;
+  }
+  return false;
+};
+
+
+/**
  * Resolves compound Elements (Buttons, Slideshows, Embed frames, Image frames, Audio frames)
  * so clicking inside them drags or selects the compound parent unit.
  */
@@ -623,6 +794,15 @@ export const getElementCompoundTarget = (current) => {
       buttonGroup.id = `button-${Date.now()}`;
     }
     return buttonGroup;
+  }
+
+  // QR Codes are single compound elements; drag/select the whole QR Code!
+  const qrGroup = current.closest('[data-type="qrcode"], [data-type="qr-code"], [id^="qrcode-"]');
+  if (qrGroup) {
+    if (!qrGroup.id) {
+      qrGroup.id = `qrcode-${Date.now()}`;
+    }
+    return qrGroup;
   }
 
   // Typography elements (Motion Graphics & Kinetic) are single compound units; clicking/dragging any child selects the whole group!
@@ -682,6 +862,15 @@ export const getElementCompoundTarget = (current) => {
       audioFrame.id = `audio-frame-${Date.now()}`;
     }
     return audioFrame;
+  }
+
+  // Element Shapes are single compound elements; drag the whole shape!
+  const shapeGroup = current.closest('[data-type="shape"], [id^="shape-"]');
+  if (shapeGroup) {
+    if (!shapeGroup.id) {
+      shapeGroup.id = `shape-${Date.now()}`;
+    }
+    return shapeGroup;
   }
 
   return null;
@@ -978,6 +1167,153 @@ export const resizeSlideshowGroup = ({
     const highlightType = (currentFrameIdRef?.current && el.id !== currentFrameIdRef.current) ? 'child-selected' : 'selected';
     drawOverlayHighlight(el, highlightType);
   }
+};
+
+/**
+ * Handles specialized bounding and overlay updates when resizing a Table element.
+ */
+export const resizeTableGroup = ({ el, state, bbox, scaleX, scaleY, drawOverlayHighlight }) => {
+  if (!el || !state?.localAnchor || !bbox) return;
+
+  const newLocalX = state.localAnchor.x + (bbox.x - state.localAnchor.x) * scaleX;
+  const newLocalY = state.localAnchor.y + (bbox.y - state.localAnchor.y) * scaleY;
+  const newLocalRight = state.localAnchor.x + ((bbox.x + bbox.width) - state.localAnchor.x) * scaleX;
+  const newLocalBottom = state.localAnchor.y + ((bbox.y + bbox.height) - state.localAnchor.y) * scaleY;
+
+  const finalX = Math.min(newLocalX, newLocalRight);
+  const finalY = Math.min(newLocalY, newLocalBottom);
+  const finalWidth = Math.max(20, Math.abs(newLocalRight - newLocalX));
+  const finalHeight = Math.max(15, Math.abs(newLocalBottom - newLocalY));
+
+  const fo = el.querySelector('foreignObject');
+  const overlay = el.querySelector('rect.svg-table-overlay') || el.querySelector('rect');
+
+  const safeW = Math.round(finalWidth * 100) / 100;
+  const safeH = Math.round(finalHeight * 100) / 100;
+  const safeX = Math.round(finalX * 100) / 100;
+  const safeY = Math.round(finalY * 100) / 100;
+
+  if (fo) {
+    fo.setAttribute('x', safeX);
+    fo.setAttribute('y', safeY);
+    fo.setAttribute('width', safeW);
+    fo.setAttribute('height', safeH);
+  }
+  if (overlay) {
+    overlay.setAttribute('x', safeX);
+    overlay.setAttribute('y', safeY);
+    overlay.setAttribute('width', safeW);
+    overlay.setAttribute('height', safeH);
+  }
+
+  el.setAttribute('data-width', safeW);
+  el.setAttribute('data-height', safeH);
+
+  if (typeof drawOverlayHighlight === 'function') {
+    drawOverlayHighlight(el, 'selected');
+  }
+};
+
+/**
+ * Intercepts group resizing for custom Elements (Decorator, Typography, Slideshow, Audio, Hotspot).
+ * Returns true if the element was recognized and handled (so child loops should be skipped).
+ * Returns false if it should fall through to standard child transformation.
+ */
+export const handleElementGroupResize = ({
+  el,
+  state,
+  matrix,
+  scaleX,
+  scaleY,
+  worldAnchor,
+  matrixToTransform,
+  drawOverlayHighlight,
+  currentFrameIdRef,
+  finalX,
+  finalY,
+  finalWidth,
+  finalHeight
+}) => {
+  if (!el) return false;
+
+  const isHotspot = el.getAttribute?.('data-is-hotspot') === 'true';
+  const isInteractiveBtn = (isHotspot || el.getAttribute?.('data-type') === 'button') &&
+    state?.childrenData?.some(c => c.child.tagName.toLowerCase() === 'rect') &&
+    state?.childrenData?.some(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute?.('data-type') === 'text');
+  const isAudio = isAudioGroup(el);
+  const isSlideshow = isSlideshowGroup(el);
+  const isDecorator = isDecoratorGroup(el);
+  const isTypography = isTypographyGroup(el);
+
+  // ── DECORATOR & TYPOGRAPHY: update outer transform, NOT children ───────
+  if (isDecorator || isTypography) {
+    try {
+      const scaleMatrix = new DOMMatrix()
+        .translate(worldAnchor.x, worldAnchor.y)
+        .scale(scaleX, scaleY)
+        .translate(-worldAnchor.x, -worldAnchor.y);
+      const nextMatrix = scaleMatrix.multiply(matrix);
+      if (typeof matrixToTransform === 'function') {
+        el.setAttribute('transform', matrixToTransform(nextMatrix));
+      }
+      if (typeof drawOverlayHighlight === 'function') {
+        drawOverlayHighlight(el, 'selected');
+      }
+    } catch (err) {
+      console.debug('Failed to scale decorator/typography outer transform:', err);
+    }
+    return true;
+  }
+
+  // ── SLIDESHOW COMPONENT ──
+  if (isSlideshow) {
+    resizeSlideshowGroup({
+      el,
+      worldAnchor,
+      scaleX,
+      scaleY,
+      matrix,
+      matrixToTransform,
+      drawOverlayHighlight,
+      currentFrameIdRef
+    });
+    return true; // preserve internal relative frame coordinates and pattern fills
+  }
+
+  // ── AUDIO & HOTSPOT NON-BUTTON ──
+  if ((isHotspot && !isInteractiveBtn) || isAudio) {
+    resizeAudioGroup({
+      el,
+      state,
+      matrix,
+      finalX,
+      finalY,
+      finalWidth,
+      finalHeight,
+      drawOverlayHighlight,
+      currentFrameIdRef
+    });
+    return true; // skip children modification
+  }
+
+  return false;
+};
+
+/**
+ * Handles proportional adjustment of an interactive button after its child rect/text are scaled.
+ */
+export const handleInteractiveButtonResize = ({ el, state }) => {
+  if (!el || !state) return false;
+  const isHotspot = el.getAttribute?.('data-is-hotspot') === 'true';
+  const isBtn = (isHotspot || el.getAttribute?.('data-type') === 'button') &&
+    state?.childrenData?.some(c => c.child.tagName.toLowerCase() === 'rect') &&
+    state?.childrenData?.some(c => c.child.tagName.toLowerCase() === 'text' || c.child.getAttribute?.('data-type') === 'text');
+
+  if (isBtn) {
+    resizeInteractiveButton({ el, state });
+    return true;
+  }
+  return false;
 };
 
 /**
@@ -1448,7 +1784,6 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
                 el.setAttribute('data-active-index', next.toString());
                 el._lastSlideTime = Date.now();
 
-                const evt = new CustomEvent('force-slideshow-advance', { detail: { el, nextIndex: next } });
                 window.dispatchEvent(evt);
               });
               overlay.appendChild(btn);
@@ -1742,6 +2077,504 @@ export const useSlideshowManager = ({ getVisualBBox } = {}) => {
 };
 
 /**
+ * Resizes a Map element (foreignObject, inner stage, and iframe scaling).
+ */
+export const handleMapResize = ({ el, adjustedWidth, adjustedHeight, adjustedX, adjustedY }) => {
+  if (!el) return false;
+  const isMap = el.closest?.('[data-type="map"]') || el.getAttribute?.('data-type') === 'map' || (typeof el.id === 'string' && el.id.startsWith('map-'));
+  if (!isMap) return false;
+
+  const iframe = el.querySelector?.('iframe');
+  if (!iframe) return false;
+
+  let stage = el.querySelector('.map-stage');
+  const baseW = 320;
+  const scale = adjustedWidth < baseW ? (adjustedWidth / baseW) : 1;
+  const innerW = adjustedWidth < baseW ? baseW : adjustedWidth;
+  const innerH = Math.round(adjustedHeight / scale);
+
+  if (stage) {
+    stage.style.setProperty('width', innerW + 'px', 'important');
+    stage.style.setProperty('height', innerH + 'px', 'important');
+    stage.style.setProperty('transform', `scale(${scale})`, 'important');
+    stage.style.setProperty('transform-origin', '0 0', 'important');
+  } else {
+    const rootContainer = el.querySelector('.map-root-container') || el.querySelector('div');
+    if (rootContainer) {
+      stage = document.createElement('div');
+      stage.className = 'map-stage';
+      stage.style.cssText = `position: absolute; top: 0; left: 0; width: ${innerW}px; height: ${innerH}px; transform: scale(${scale}); transform-origin: 0 0; overflow: hidden;`;
+      const existingChildren = Array.from(rootContainer.children);
+      if (iframe.parentElement === rootContainer) {
+        stage.appendChild(iframe);
+      }
+      const overlayWrapper = document.createElement('div');
+      overlayWrapper.className = 'map-overlay-wrapper';
+      overlayWrapper.style.cssText = 'position: absolute; inset: 0; pointer-events: none;';
+      existingChildren.forEach(child => {
+        if (child !== iframe) {
+          overlayWrapper.appendChild(child);
+        }
+      });
+      stage.appendChild(overlayWrapper);
+      rootContainer.appendChild(stage);
+    }
+  }
+
+  iframe.setAttribute('width', innerW.toString());
+  iframe.setAttribute('height', innerH.toString());
+  iframe.style.setProperty('width', innerW + 'px', 'important');
+  iframe.style.setProperty('height', innerH + 'px', 'important');
+  iframe.style.setProperty('transform', 'none', 'important');
+  iframe.style.setProperty('pointer-events', 'none', 'important');
+  iframe.style.setProperty('border', 'none', 'important');
+  iframe.style.setProperty('display', 'block', 'important');
+
+  const parentMap = el.closest('[data-type="map"]');
+  if (parentMap) {
+    const rect = parentMap.querySelector('rect');
+    if (rect) {
+      rect.setAttribute('x', adjustedX);
+      rect.setAttribute('y', adjustedY);
+      rect.setAttribute('width', adjustedWidth);
+      rect.setAttribute('height', adjustedHeight);
+    }
+  }
+  return true;
+};
+
+/**
+ * Scales an iframe child within a map group during group resize.
+ */
+export const handleMapChildIframeResize = ({ child, imgW, imgH }) => {
+  if (!child) return false;
+  const iframe = child.querySelector?.('iframe');
+  if (!iframe) return false;
+
+  const isMap = child.closest?.('[data-type="map"]') || child.getAttribute?.('data-type') === 'map' || (typeof child.id === 'string' && child.id.startsWith('map-'));
+  const defaultOrigW = isMap ? 240 : 640;
+  const defaultOrigH = isMap ? 150 : 360;
+  const origW = parseFloat(iframe.getAttribute('data-original-width')) || defaultOrigW;
+  const origH = parseFloat(iframe.getAttribute('data-original-height')) || defaultOrigH;
+  iframe.setAttribute('data-original-width', origW.toString());
+  iframe.setAttribute('data-original-height', origH.toString());
+  iframe.setAttribute('width', origW.toString());
+  iframe.setAttribute('height', origH.toString());
+  iframe.style.setProperty('width', origW + 'px', 'important');
+  iframe.style.setProperty('height', origH + 'px', 'important');
+  iframe.style.setProperty('transform-origin', '0 0', 'important');
+  iframe.style.setProperty('pointer-events', isMap ? 'none' : 'auto', 'important');
+  iframe.style.setProperty('border', 'none', 'important');
+  iframe.style.setProperty('display', 'block', 'important');
+
+  if (origW > 0 && origH > 0 && imgW > 0 && imgH > 0) {
+    const scaleX = imgW / origW;
+    const scaleY = imgH / origH;
+    iframe.style.setProperty('transform', `scale(${scaleX}, ${scaleY})`, 'important');
+  }
+  return true;
+};
+
+/**
+ * Resolves the target text child when double-clicking an interactive button to enter text edit mode.
+ */
+export const getButtonTextTargetForEditing = (target, eventTarget) => {
+  if (!target || target.getAttribute?.('data-type') !== 'button') return null;
+  const clickedTag = eventTarget?.tagName?.toLowerCase();
+  if (['text', 'tspan', 'foreignobject'].includes(clickedTag)) {
+    const textTarget = clickedTag === 'tspan'
+      ? eventTarget.closest('text')
+      : (clickedTag === 'foreignobject' ? eventTarget : eventTarget.closest('text') || eventTarget);
+    if (textTarget && !textTarget.id) {
+      textTarget.id = `button-text-${Date.now()}`;
+    }
+    return textTarget;
+  }
+  return null;
+};
+
+/**
+ * Removes temporary slideshow transition clones from a DOM container before saving/exporting SVG.
+ */
+export const removeSlideshowTransitionClones = (container) => {
+  if (!container || typeof container.querySelectorAll !== 'function') return;
+  container.querySelectorAll('.slideshow-transition-clone').forEach(el => el.remove());
+};
+
+/**
+ * Global CSS styles for Map and Table element rendering.
+ */
+export const ELEMENTS_GLOBAL_STYLES = `
+  /* Map Element Overrides & Container Responsiveness */
+  [data-type="map"] foreignObject {
+    overflow: hidden !important;
+    border-radius: 0px !important;
+  }
+  [data-type="map"] foreignObject > div.map-root-container,
+  [data-type="map"] foreignObject > div:first-child {
+    border-radius: 0px !important;
+    width: 100% !important;
+    height: 100% !important;
+    white-space: normal !important;
+    overflow: hidden !important;
+    line-height: normal !important;
+    position: relative !important;
+    container-type: size !important;
+  }
+  [data-type="map"] foreignObject div,
+  [data-type="map"] foreignObject span,
+  [data-type="map"] foreignObject a,
+  [data-type="map"] foreignObject p {
+    white-space: normal !important;
+    word-wrap: normal !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+  }
+  [data-type="map"] foreignObject .map-stage {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    transform-origin: 0 0 !important;
+    overflow: hidden !important;
+  }
+  [data-type="map"] foreignObject .map-overlay-wrapper {
+    position: absolute !important;
+    inset: 0 !important;
+    pointer-events: none !important;
+  }
+  [data-type="map"] foreignObject iframe {
+    pointer-events: none !important;
+    border: none !important;
+    display: block !important;
+  }
+  .page-svg-container [data-type="map"] foreignObject svg,
+  [data-type="map"] foreignObject svg,
+  [data-type="map"] foreignObject svg.svg-icon-override {
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    display: inline-block !important;
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  [data-type="map"] foreignObject .map-card-overlay {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    pointer-events: auto !important;
+    box-sizing: border-box !important;
+  }
+  [data-type="map"] foreignObject .map-card-overlay * {
+    line-height: normal;
+    box-sizing: border-box;
+  }
+  [data-type="map"] foreignObject .map-nowrap,
+  [data-type="map"] foreignObject [data-nowrap="true"] {
+    white-space: nowrap !important;
+  }
+
+  /* Fluid map responsive rules */
+  [data-type="map"] foreignObject .map-top-badge {
+    max-width: 88% !important;
+  }
+  [data-type="map"] foreignObject .map-top-badge .map-badge-title,
+  [data-type="map"] foreignObject .map-top-badge .map-badge-subtitle {
+    max-width: clamp(90px, 45cqw, 160px) !important;
+  }
+  [data-type="map"] foreignObject .map-card-actions {
+    max-height: 52% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-end !important;
+  }
+  [data-type="map"] foreignObject .map-actions-row {
+    display: flex !important;
+    gap: clamp(2px, 1.5cqw, 5px) !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  [data-type="map"] foreignObject .map-action-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: clamp(2px, 1cqw, 4px) !important;
+    padding: clamp(3px, 1.2cqh, 5px) clamp(2px, 1cqw, 5px) !important;
+    border-radius: clamp(4px, 1.5cqw, 6px) !important;
+    font-size: clamp(7.5px, 2.7cqw, 9.5px) !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    min-width: 0 !important;
+  }
+  [data-type="map"] foreignObject .map-btn-text {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: inherit !important;
+  }
+
+  /* Container Queries for compact map elements */
+  @container (max-height: 190px) {
+    [data-type="map"] foreignObject .map-drag-pill {
+      display: none !important;
+    }
+    [data-type="map"] foreignObject .map-biz-category {
+      display: none !important;
+    }
+    [data-type="map"] foreignObject .map-top-badge .map-badge-subtitle {
+      display: none !important;
+    }
+    [data-type="map"] foreignObject .map-top-badge {
+      padding: 2px 6px 2px 3px !important;
+      top: 4px !important;
+    }
+    [data-type="map"] foreignObject .map-biz-row {
+      margin-bottom: 2px !important;
+      gap: 4px !important;
+    }
+    [data-type="map"] foreignObject .map-biz-img {
+      width: 26px !important;
+      height: 26px !important;
+    }
+    [data-type="map"] foreignObject .map-card-actions {
+      padding: 4px 6px 5px !important;
+    }
+  }
+
+  @container (max-height: 140px) {
+    [data-type="map"] foreignObject .map-top-badge {
+      display: none !important;
+    }
+    [data-type="map"] foreignObject .map-biz-meta {
+      display: none !important;
+    }
+    [data-type="map"] foreignObject .map-biz-img {
+      width: 20px !important;
+      height: 20px !important;
+    }
+    [data-type="map"] foreignObject .map-card-actions {
+      padding: 3px 5px 3px !important;
+    }
+  }
+
+  @container (max-width: 230px) {
+    [data-type="map"] foreignObject .map-actions-row {
+      gap: 2px !important;
+    }
+    [data-type="map"] foreignObject .map-action-btn {
+      padding: 3px 2px !important;
+      font-size: 7.5px !important;
+    }
+    [data-type="map"] foreignObject .map-action-btn svg {
+      width: 8px !important;
+      height: 8px !important;
+      min-width: 8px !important;
+      max-width: 8px !important;
+      min-height: 8px !important;
+      max-height: 8px !important;
+    }
+  }
+
+  @container (max-width: 175px) {
+    [data-type="map"] foreignObject .map-action-btn-secondary:last-child {
+      display: none !important;
+    }
+    [data-type="map"] foreignObject .map-action-btn-primary {
+      flex: 1.2 !important;
+    }
+    [data-type="map"] foreignObject .map-action-btn-secondary {
+      flex: 1 !important;
+    }
+  }
+
+  /* Table Frame ForeignObject Overrides */
+  [data-type="table-frame"] foreignObject,
+  [data-type="table"] foreignObject,
+  [id^="table-"] foreignObject {
+    overflow: visible !important;
+  }
+
+  [data-type="table-frame"] foreignObject > div,
+  [data-type="table"] foreignObject > div,
+  [id^="table-"] foreignObject > div,
+  foreignObject > div.table-card-wrapper,
+  foreignObject > div.table-container {
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    white-space: normal !important;
+    line-height: normal !important;
+    overflow: hidden !important;
+    pointer-events: auto !important;
+  }
+
+  /* Scrollable Table support */
+  [data-type="table-frame"][data-scrollable="true"] foreignObject > div,
+  [data-type="table"][data-scrollable="true"] foreignObject > div,
+  [id^="table-"][data-scrollable="true"] foreignObject > div,
+  foreignObject[data-scrollable="true"] > div.table-card-wrapper,
+  foreignObject[data-scrollable="true"] > div.table-container,
+  div.table-card-wrapper.table-scrollable,
+  div.table-container.table-scrollable,
+  div.table-card-wrapper[data-scrollable="true"],
+  div.table-container[data-scrollable="true"] {
+    overflow: auto !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    pointer-events: auto !important;
+  }
+
+  [data-type="table-frame"] table,
+  [data-type="table"] table,
+  [id^="table-"] table,
+  .table-card-wrapper table {
+    width: max-content !important;
+    min-width: auto !important;
+    max-width: none !important;
+    height: max-content !important;
+    min-height: auto !important;
+    flex: none !important;
+    table-layout: auto !important;
+    border-collapse: collapse !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    white-space: normal !important;
+    transform: none !important;
+    will-change: auto !important;
+  }
+
+  [data-type="table-frame"][data-scrollable="true"] table,
+  [data-type="table"][data-scrollable="true"] table,
+  [id^="table-"][data-scrollable="true"] table,
+  .table-card-wrapper.table-scrollable table,
+  .table-container.table-scrollable table,
+  .table-card-wrapper[data-scrollable="true"] table,
+  .table-container[data-scrollable="true"] table {
+    width: max-content !important;
+    min-width: auto !important;
+    max-width: none !important;
+    height: max-content !important;
+    min-height: auto !important;
+    flex: none !important;
+    table-layout: auto !important;
+  }
+
+  div.table-card-wrapper::-webkit-scrollbar,
+  div.table-container::-webkit-scrollbar,
+  [data-type="table-frame"] foreignObject > div::-webkit-scrollbar,
+  [data-type="table"] foreignObject > div::-webkit-scrollbar,
+  [id^="table-"] foreignObject > div::-webkit-scrollbar,
+  [data-type="table-frame"] *::-webkit-scrollbar,
+  [data-type="table"] *::-webkit-scrollbar,
+  [id^="table-"] *::-webkit-scrollbar {
+    width: 4px !important;
+    height: 4px !important;
+    background: transparent !important;
+  }
+
+  div.table-card-wrapper::-webkit-scrollbar-track,
+  div.table-container::-webkit-scrollbar-track,
+  [data-type="table-frame"] foreignObject > div::-webkit-scrollbar-track,
+  [data-type="table"] foreignObject > div::-webkit-scrollbar-track,
+  [id^="table-"] foreignObject > div::-webkit-scrollbar-track,
+  [data-type="table-frame"] *::-webkit-scrollbar-track,
+  [data-type="table"] *::-webkit-scrollbar-track,
+  [id^="table-"] *::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05) !important;
+    border-radius: 4px !important;
+    border: none !important;
+  }
+
+  div.table-card-wrapper::-webkit-scrollbar-thumb,
+  div.table-container::-webkit-scrollbar-thumb,
+  [data-type="table-frame"] foreignObject > div::-webkit-scrollbar-thumb,
+  [data-type="table"] foreignObject > div::-webkit-scrollbar-thumb,
+  [id^="table-"] foreignObject > div::-webkit-scrollbar-thumb,
+  [data-type="table-frame"] *::-webkit-scrollbar-thumb,
+  [data-type="table"] *::-webkit-scrollbar-thumb,
+  [id^="table-"] *::-webkit-scrollbar-thumb {
+    background: #94a3b8 !important;
+    border-radius: 4px !important;
+    border: none !important;
+  }
+
+  div.table-card-wrapper::-webkit-scrollbar-thumb:hover,
+  div.table-container::-webkit-scrollbar-thumb:hover,
+  [data-type="table-frame"] foreignObject > div::-webkit-scrollbar-thumb:hover,
+  [data-type="table"] foreignObject > div::-webkit-scrollbar-thumb:hover,
+  [id^="table-"] foreignObject > div::-webkit-scrollbar-thumb:hover,
+  [data-type="table-frame"] *::-webkit-scrollbar-thumb:hover,
+  [data-type="table"] *::-webkit-scrollbar-thumb:hover,
+  [id^="table-"] *::-webkit-scrollbar-thumb:hover {
+    background: #64748b !important;
+  }
+
+  [data-type="table-frame"] tbody,
+  [data-type="table"] tbody,
+  [id^="table-"] tbody,
+  .table-card-wrapper tbody {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+    will-change: auto !important;
+  }
+
+  [data-type="table-frame"] tr,
+  [data-type="table"] tr,
+  [id^="table-"] tr,
+  .table-card-wrapper tr {
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+    will-change: auto !important;
+  }
+
+  [data-type="table-frame"] td,
+  [data-type="table"] td,
+  [id^="table-"] td,
+  .table-card-wrapper td {
+    transform: none !important;
+    will-change: auto !important;
+    box-sizing: border-box !important;
+  }
+
+  [data-type="table-frame"][data-scrollable="true"] td,
+  [data-type="table"][data-scrollable="true"] td,
+  [id^="table-"][data-scrollable="true"] td,
+  .table-card-wrapper.table-scrollable td,
+  .table-container.table-scrollable td,
+  .table-card-wrapper[data-scrollable="true"] td,
+  .table-container[data-scrollable="true"] td {
+    min-width: 65px !important;
+    box-sizing: border-box !important;
+  }
+`;
+
+/**
+ * Injects global CSS styles for Elements into document.head once.
+ */
+export const injectElementsGlobalStyles = () => {
+  if (typeof document === 'undefined') return;
+  const styleId = 'elements-global-styles';
+  if (!document.getElementById(styleId)) {
+    const styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    styleEl.textContent = ELEMENTS_GLOBAL_STYLES;
+    document.head.appendChild(styleEl);
+  }
+};
+
+/**
  * Hook to register window event listeners that execute adding Elements into MainEditor,
  * and seamlessly attaches Slideshow managers.
  */
@@ -1758,6 +2591,11 @@ export const useElementsEditor = ({
   drawOverlayHighlight,
   getVisualBBox
 }) => {
+  // Inject Elements global CSS styles (Maps & Tables)
+  useEffect(() => {
+    injectElementsGlobalStyles();
+  }, []);
+
   // Mount the global slideshow subsystem
   useSlideshowManager({ getVisualBBox });
 
