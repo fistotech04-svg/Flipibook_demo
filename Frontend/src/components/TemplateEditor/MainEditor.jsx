@@ -2341,9 +2341,12 @@ const MainEditor = ({
             }
 
             iframe.setAttribute('width', innerW.toString());
-            iframe.setAttribute('height', innerH.toString());
+            iframe.setAttribute('height', (innerH + 56).toString());
+            iframe.style.setProperty('position', 'absolute', 'important');
+            iframe.style.setProperty('top', '-56px', 'important');
+            iframe.style.setProperty('left', '0', 'important');
             iframe.style.setProperty('width', innerW + 'px', 'important');
-            iframe.style.setProperty('height', innerH + 'px', 'important');
+            iframe.style.setProperty('height', (innerH + 56) + 'px', 'important');
             iframe.style.setProperty('transform', 'none', 'important');
             iframe.style.setProperty('pointer-events', 'none', 'important');
             iframe.style.setProperty('border', 'none', 'important');
@@ -5554,6 +5557,12 @@ const MainEditor = ({
       } else if (e.key === 'P' && e.shiftKey) {
         setActiveMainTool('pen');
         setSelectedPenTool('pencil');
+      } else if (e.key.toLowerCase() === 'm' && (e.ctrlKey || e.metaKey) && e.altKey) {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('trigger-mask'));
+      } else if (e.key.toLowerCase() === 'e' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('trigger-flatten'));
       } else if (e.key.toLowerCase() === 'g' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
 
@@ -5831,6 +5840,316 @@ const MainEditor = ({
     };
     window.addEventListener('keydown', handleKeyDown);
 
+    const handleTriggerMask = () => {
+      const activeContainer = document.querySelector(`.page-svg-container[data-page-index="${activePageIndex}"]`);
+      const svg = activeContainer?.querySelector('svg');
+      if (!svg) return;
+
+      const ids = multiSelectedIdsRef.current.size > 0
+        ? Array.from(multiSelectedIdsRef.current)
+        : (selectedLayerIdRef.current ? [selectedLayerIdRef.current] : []);
+      if (ids.length === 0) return;
+
+      const elements = ids.map(id => svg.querySelector(`[id="${id}"]`)).filter(Boolean);
+      if (elements.length === 0) return;
+
+      // Check if selected element is already part of a mask group to toggle/unmask
+      const existingMaskGroup = elements.find(el => el.getAttribute('data-type') === 'mask-group' || el.closest('[data-type="mask-group"]'));
+      if (existingMaskGroup) {
+        const mg = existingMaskGroup.getAttribute('data-type') === 'mask-group' ? existingMaskGroup : existingMaskGroup.closest('[data-type="mask-group"]');
+        if (mg && mg.parentNode) {
+          const parent = mg.parentNode;
+          const maskUid = mg.getAttribute('data-mask-id') || mg.id;
+          const clipDef = svg.querySelector(`clipPath[id="clip-${maskUid}"]`);
+          if (clipDef) clipDef.remove();
+
+          const unmaskedIds = [];
+          const children = Array.from(mg.children);
+          children.forEach(child => {
+            if (child.getAttribute('data-name') === 'Mask Content' || child.hasAttribute('clip-path')) {
+              Array.from(child.children).forEach(nestedChild => {
+                parent.insertBefore(nestedChild, mg);
+                if (nestedChild.id) unmaskedIds.push(nestedChild.id);
+              });
+            } else {
+              parent.insertBefore(child, mg);
+              if (child.id) unmaskedIds.push(child.id);
+            }
+          });
+          parent.removeChild(mg);
+
+          if (updatePageHtml) updatePageHtml(activePageIndex, svg.outerHTML);
+          if (unmaskedIds.length > 0) {
+            if (setSelectedLayerId) setSelectedLayerId(unmaskedIds[0]);
+            if (setMultiSelectedIds) setMultiSelectedIds(new Set(unmaskedIds));
+          }
+          return;
+        }
+      }
+
+      // 2. Multi-selection or single-selection mask creation
+      let maskEl = null;
+      let targetEls = [];
+
+      if (elements.length >= 2) {
+        elements.sort((a, b) => {
+          const pos = a.compareDocumentPosition(b);
+          return pos & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+        });
+        maskEl = elements[0];
+        targetEls = elements.slice(1);
+      } else if (elements.length === 1) {
+        const el = elements[0];
+        const isShape = el.getAttribute('data-is-element-shape') === 'true' ||
+                        el.getAttribute('data-shape-type') ||
+                        el.querySelector('[data-is-element-shape="true"]') !== null ||
+                        ['path', 'rect', 'circle', 'ellipse', 'polygon', 'g'].includes(el.tagName.toLowerCase());
+
+        if (isShape) {
+          const shapeTarget = el.getAttribute('data-is-element-shape') === 'true'
+            ? el
+            : (el.querySelector('[data-is-element-shape="true"]') || el.querySelector('path, polygon, rect, circle, ellipse') || el);
+
+          const isMasked = shapeTarget.getAttribute('data-mask-enabled') === 'true' ||
+                          el.getAttribute('data-mask-enabled') === 'true' ||
+                          (shapeTarget.getAttribute('fill') && shapeTarget.getAttribute('fill').includes('url(#pattern-')) ||
+                          shapeTarget.hasAttribute('data-masked-image-url');
+
+          if (isMasked) {
+            // Unmask
+            shapeTarget.removeAttribute('data-mask-enabled');
+            el.removeAttribute('data-mask-enabled');
+            const patternMatch = (shapeTarget.getAttribute('fill') || '').match(/url\(['"]?#([^)'"]+)['"]?\)/);
+            if (patternMatch && patternMatch[1]) {
+              const defs = svg.querySelector('defs');
+              const pat = defs ? defs.querySelector(`pattern[id="${patternMatch[1]}"]`) : null;
+              if (pat) pat.remove();
+            }
+            const origFill = shapeTarget.getAttribute('data-original-fill') || '#3194FC';
+            shapeTarget.setAttribute('fill', origFill);
+            shapeTarget.removeAttribute('data-pattern-id');
+            shapeTarget.removeAttribute('data-masked-image-url');
+            shapeTarget.removeAttribute('data-slot-image-name');
+            shapeTarget.removeAttribute('data-slot-image-meta');
+            shapeTarget.removeAttribute('data-slot-original-url');
+            shapeTarget.removeAttribute('data-slot-crop-data');
+            shapeTarget.removeAttribute('data-slot-fix-type');
+            shapeTarget.removeAttribute('data-slot-opacity');
+            shapeTarget.removeAttribute('data-slot-filters');
+            el.removeAttribute('data-slot-image-name');
+            el.removeAttribute('data-slot-image-meta');
+            el.removeAttribute('data-slot-original-url');
+            el.removeAttribute('data-slot-crop-data');
+            el.removeAttribute('data-slot-fix-type');
+            el.removeAttribute('data-slot-opacity');
+            el.removeAttribute('data-slot-filters');
+
+            if (updatePageHtml) updatePageHtml(activePageIndex, svg.outerHTML);
+            window.dispatchEvent(new CustomEvent('shape-mask-toggled', { detail: { layerId: el.id, enabled: false } }));
+            return;
+          } else {
+            // Mask mode enabled
+            shapeTarget.setAttribute('data-mask-enabled', 'true');
+            el.setAttribute('data-mask-enabled', 'true');
+            if (!shapeTarget.hasAttribute('data-original-fill')) {
+              shapeTarget.setAttribute('data-original-fill', shapeTarget.getAttribute('fill') || '#3194FC');
+            }
+
+            if (updatePageHtml) updatePageHtml(activePageIndex, svg.outerHTML);
+            if (typeof setActiveMainTool === 'function') {
+              setActiveMainTool('select');
+            }
+            window.dispatchEvent(new CustomEvent('shape-mask-toggled', { detail: { layerId: el.id, enabled: true } }));
+            return;
+          }
+        }
+
+        maskEl = elements[0];
+        const parent = maskEl.parentNode;
+        if (parent && parent !== svg) {
+          const siblings = Array.from(parent.children).filter(el => el.id && el.id !== maskEl.id && el.tagName.toLowerCase() !== 'defs');
+          if (siblings.length > 0) {
+            targetEls = siblings;
+          }
+        }
+      }
+
+      if (!maskEl || targetEls.length === 0) return;
+
+      const maskUid = 'mask-' + Date.now();
+      let defs = svg.querySelector('defs');
+      if (!defs) {
+        defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        svg.insertBefore(defs, svg.firstChild);
+      }
+
+      const clipPath = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
+      clipPath.id = `clip-${maskUid}`;
+      
+      const maskClone = maskEl.cloneNode(true);
+      maskClone.removeAttribute('id');
+      clipPath.appendChild(maskClone);
+      defs.appendChild(clipPath);
+
+      const parent = maskEl.parentNode;
+      const maskGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      maskGroup.id = maskUid;
+      maskGroup.setAttribute('data-name', 'Mask Group');
+      maskGroup.setAttribute('data-type', 'mask-group');
+      maskGroup.setAttribute('data-mask-id', maskUid);
+
+      parent.insertBefore(maskGroup, maskEl);
+      maskGroup.appendChild(maskEl);
+
+      const contentGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      contentGroup.setAttribute('clip-path', `url(#clip-${maskUid})`);
+      contentGroup.setAttribute('data-name', 'Mask Content');
+      targetEls.forEach(el => {
+        contentGroup.appendChild(el);
+      });
+      maskGroup.appendChild(contentGroup);
+
+      if (updatePageHtml) updatePageHtml(activePageIndex, svg.outerHTML);
+      if (setSelectedLayerId) setSelectedLayerId(maskGroup.id);
+      if (setMultiSelectedIds) setMultiSelectedIds(new Set([maskGroup.id]));
+    };
+
+    const handleTriggerFlatten = () => {
+      const activeContainer = document.querySelector(`.page-svg-container[data-page-index="${activePageIndex}"]`);
+      const svg = activeContainer?.querySelector('svg');
+      if (!svg) return;
+
+      const ids = multiSelectedIdsRef.current.size > 0
+        ? Array.from(multiSelectedIdsRef.current)
+        : (selectedLayerIdRef.current ? [selectedLayerIdRef.current] : []);
+      if (ids.length === 0) return;
+
+      const elements = ids.map(id => svg.querySelector(`[id="${id}"]`)).filter(Boolean);
+      if (elements.length === 0) return;
+
+      if (paperScopeRef.current) {
+        paperScopeRef.current.activate();
+      }
+
+      const extractPathD = (el) => {
+        const tag = el.tagName.toLowerCase();
+        if (tag === 'path') {
+          return el.getAttribute('d');
+        } else if (tag === 'rect') {
+          const x = parseFloat(el.getAttribute('x') || '0');
+          const y = parseFloat(el.getAttribute('y') || '0');
+          const w = parseFloat(el.getAttribute('width') || '0');
+          const h = parseFloat(el.getAttribute('height') || '0');
+          const rx = parseFloat(el.getAttribute('rx') || '0');
+          if (rx > 0) {
+            return `M${x + rx},${y} h${w - 2 * rx} a${rx},${rx} 0 0 1 ${rx},${rx} v${h - 2 * rx} a${rx},${rx} 0 0 1 -${rx},${rx} h-${w - 2 * rx} a${rx},${rx} 0 0 1 -${rx},-${rx} v-${h - 2 * rx} a${rx},${rx} 0 0 1 ${rx},-${rx} z`;
+          }
+          return `M${x},${y} h${w} v${h} h-${w} z`;
+        } else if (tag === 'circle') {
+          const cx = parseFloat(el.getAttribute('cx') || '0');
+          const cy = parseFloat(el.getAttribute('cy') || '0');
+          const r = parseFloat(el.getAttribute('r') || '0');
+          return `M${cx - r},${cy} a${r},${r} 0 1,0 ${2 * r},0 a${r},${r} 0 1,0 -${2 * r},0`;
+        } else if (tag === 'ellipse') {
+          const cx = parseFloat(el.getAttribute('cx') || '0');
+          const cy = parseFloat(el.getAttribute('cy') || '0');
+          const rx = parseFloat(el.getAttribute('rx') || '0');
+          const ry = parseFloat(el.getAttribute('ry') || '0');
+          return `M${cx - rx},${cy} a${rx},${ry} 0 1,0 ${2 * rx},0 a${rx},${ry} 0 1,0 -${2 * rx},0`;
+        } else if (tag === 'line') {
+          const x1 = el.getAttribute('x1') || '0';
+          const y1 = el.getAttribute('y1') || '0';
+          const x2 = el.getAttribute('x2') || '0';
+          const y2 = el.getAttribute('y2') || '0';
+          return `M${x1},${y1} L${x2},${y2}`;
+        }
+        return null;
+      };
+
+      const collectShapes = (node) => {
+        let list = [];
+        if (node.tagName.toLowerCase() === 'g') {
+          Array.from(node.children).forEach(child => {
+            list = list.concat(collectShapes(child));
+          });
+        } else {
+          list.push(node);
+        }
+        return list;
+      };
+
+      const allShapes = [];
+      elements.forEach(el => {
+        allShapes.push(...collectShapes(el));
+      });
+
+      if (allShapes.length === 0) return;
+
+      const validPaths = [];
+      let baseFill = null;
+      let baseStroke = null;
+      let baseStrokeWidth = null;
+
+      allShapes.forEach(shape => {
+        const d = extractPathD(shape);
+        if (d) {
+          if (!baseFill && shape.hasAttribute('fill')) baseFill = shape.getAttribute('fill');
+          if (!baseStroke && shape.hasAttribute('stroke')) baseStroke = shape.getAttribute('stroke');
+          if (!baseStrokeWidth && shape.hasAttribute('stroke-width')) baseStrokeWidth = shape.getAttribute('stroke-width');
+          validPaths.push({ el: shape, d });
+        }
+      });
+
+      if (validPaths.length === 0) return;
+
+      let combinedD = '';
+      if (paperScopeRef.current && validPaths.length >= 2) {
+        try {
+          let united = null;
+          for (const item of validPaths) {
+            const p = new paperScopeRef.current.Path(item.d);
+            if (!united) {
+              united = p;
+            } else {
+              united = united.unite(p);
+            }
+          }
+          if (united && united.pathData) {
+            combinedD = united.pathData;
+          }
+        } catch (err) {
+          console.warn('Paper.js union fallback to compound path:', err);
+        }
+      }
+
+      if (!combinedD) {
+        combinedD = validPaths.map(p => p.d).join(' ');
+      }
+
+      const lastEl = elements[elements.length - 1];
+      const parent = lastEl.parentNode;
+
+      const flatPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      flatPath.id = 'flattened-' + Date.now();
+      flatPath.setAttribute('data-name', 'Flattened Vector');
+      flatPath.setAttribute('data-type', 'shape');
+      flatPath.setAttribute('d', combinedD);
+      if (baseFill && baseFill !== 'none') flatPath.setAttribute('fill', baseFill);
+      else flatPath.setAttribute('fill', '#3194FC');
+      if (baseStroke && baseStroke !== 'none') flatPath.setAttribute('stroke', baseStroke);
+      if (baseStrokeWidth) flatPath.setAttribute('stroke-width', baseStrokeWidth);
+
+      parent.insertBefore(flatPath, lastEl.nextSibling);
+
+      elements.forEach(el => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      });
+
+      if (updatePageHtml) updatePageHtml(activePageIndex, svg.outerHTML);
+      if (setSelectedLayerId) setSelectedLayerId(flatPath.id);
+      if (setMultiSelectedIds) setMultiSelectedIds(new Set([flatPath.id]));
+    };
+
     const handleTriggerGroup = () => {
       handleKeyDown({ key: 'g', ctrlKey: true, preventDefault: () => { } });
     };
@@ -5839,11 +6158,15 @@ const MainEditor = ({
     };
     window.addEventListener('trigger-group', handleTriggerGroup);
     window.addEventListener('trigger-ungroup', handleTriggerUngroup);
+    window.addEventListener('trigger-mask', handleTriggerMask);
+    window.addEventListener('trigger-flatten', handleTriggerFlatten);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('trigger-group', handleTriggerGroup);
       window.removeEventListener('trigger-ungroup', handleTriggerUngroup);
+      window.removeEventListener('trigger-mask', handleTriggerMask);
+      window.removeEventListener('trigger-flatten', handleTriggerFlatten);
     };
   }, [setSelectedLayerId, setMultiSelectedIds, setCurrentFrameId, activePageIndex, updatePageHtml, setActiveMainTool, setSelectedSelectTool, activeTopTool]);
 
@@ -8380,7 +8703,8 @@ const MainEditor = ({
                 }
               } else if (isShape && !isGroup && !isHotspotIconGroup) {
                 const isRectPath = el.tagName?.toLowerCase() === 'path' && el.getAttribute('data-shape-type') === 'rectangle';
-                if (el.tagName?.toLowerCase() === 'rect' || isRectPath || el.tagName?.toLowerCase() === 'image') {
+                const isDiamondPath = el.tagName?.toLowerCase() === 'path' && el.getAttribute('data-shape-type') === 'diamond';
+                if (el.tagName?.toLowerCase() === 'rect' || isRectPath || isDiamondPath || el.tagName?.toLowerCase() === 'image') {
                   el.setAttribute('x', finalX);
                   el.setAttribute('y', finalY);
                   el.setAttribute('width', finalWidth);
@@ -8395,6 +8719,44 @@ const MainEditor = ({
                     const br = Math.min(parseR(el.getAttribute('data-br'), defR), maxR);
                     const d = `M ${finalX + tl},${finalY} L ${finalX + finalWidth - tr},${finalY} A ${tr},${tr} 0 0 1 ${finalX + finalWidth},${finalY + tr} L ${finalX + finalWidth},${finalY + finalHeight - br} A ${br},${br} 0 0 1 ${finalX + finalWidth - br},${finalY + finalHeight} L ${finalX + bl},${finalY + finalHeight} A ${bl},${bl} 0 0 1 ${finalX},${finalY + finalHeight - bl} L ${finalX},${finalY + tl} A ${tl},${tl} 0 0 1 ${finalX + tl},${finalY} Z`.replace(/\s+/g, ' ').trim();
                     el.setAttribute('d', d);
+                  } else if (isDiamondPath) {
+                    const defR = parseFloat(el.getAttribute('rx') || 0);
+                    const parseR = (v, d) => (v !== null && v !== '') ? (isNaN(parseFloat(v)) ? 0 : parseFloat(v)) : d;
+                    const tl = parseR(el.getAttribute('data-tl'), defR);
+                    const tr = parseR(el.getAttribute('data-tr'), defR);
+                    const bl = parseR(el.getAttribute('data-bl'), defR);
+                    const br = parseR(el.getAttribute('data-br'), defR);
+                    const cx = finalX + finalWidth / 2;
+                    const cy = finalY + finalHeight / 2;
+                    const pts = [
+                      { x: cx, y: finalY, r: tl },
+                      { x: finalX + finalWidth, y: cy, r: tr },
+                      { x: cx, y: finalY + finalHeight, r: br },
+                      { x: finalX, y: cy, r: bl }
+                    ];
+                    const cornerPoints = pts.map((curr, i) => {
+                      const prev = pts[(i + pts.length - 1) % pts.length];
+                      const next = pts[(i + 1) % pts.length];
+                      const d1 = { x: curr.x - prev.x, y: curr.y - prev.y };
+                      const d2 = { x: next.x - curr.x, y: next.y - curr.y };
+                      const l1 = Math.hypot(d1.x, d1.y) || 1;
+                      const l2 = Math.hypot(d2.x, d2.y) || 1;
+                      const limit = Math.max(0, Math.min(curr.r, l1 / 2, l2 / 2));
+                      return {
+                        limit,
+                        q: { x: curr.x, y: curr.y },
+                        p1: { x: curr.x - (d1.x / l1) * limit, y: curr.y - (d1.y / l1) * limit },
+                        p2: { x: curr.x + (d2.x / l2) * limit, y: curr.y + (d2.y / l2) * limit }
+                      };
+                    });
+                    let pathData = '';
+                    cornerPoints.forEach((cp, i) => {
+                      if (i === 0) pathData += `M ${cp.p1.x.toFixed(2)} ${cp.p1.y.toFixed(2)}`;
+                      else pathData += ` L ${cp.p1.x.toFixed(2)} ${cp.p1.y.toFixed(2)}`;
+                      if (cp.limit > 0) pathData += ` Q ${cp.q.x.toFixed(2)} ${cp.q.y.toFixed(2)}, ${cp.p2.x.toFixed(2)} ${cp.p2.y.toFixed(2)}`;
+                    });
+                    pathData += ' Z';
+                    el.setAttribute('d', pathData);
                   }
                 } else if (el.tagName?.toLowerCase() === 'ellipse' || el.tagName?.toLowerCase() === 'circle') {
                   el.setAttribute('cx', finalX + finalWidth / 2);
@@ -8512,6 +8874,44 @@ const MainEditor = ({
                           const br = Math.min(parseR(child.getAttribute('data-br'), defR), maxR);
                           const d = `M ${local.x + tl},${local.y} L ${local.x + local.width - tr},${local.y} A ${tr},${tr} 0 0 1 ${local.x + local.width},${local.y + tr} L ${local.x + local.width},${local.y + local.height - br} A ${br},${br} 0 0 1 ${local.x + local.width - br},${local.y + local.height} L ${local.x + bl},${local.y + local.height} A ${bl},${bl} 0 0 1 ${local.x},${local.y + local.height - bl} L ${local.x},${local.y + tl} A ${tl},${tl} 0 0 1 ${local.x + tl},${local.y} Z`.replace(/\s+/g, ' ').trim();
                           child.setAttribute('d', d);
+                        } else if (child.tagName?.toLowerCase() === 'path' && child.getAttribute('data-shape-type') === 'diamond') {
+                          const defR = parseFloat(child.getAttribute('rx') || 0);
+                          const parseR = (v, d) => (v !== null && v !== '') ? (isNaN(parseFloat(v)) ? 0 : parseFloat(v)) : d;
+                          const tl = parseR(child.getAttribute('data-tl'), defR);
+                          const tr = parseR(child.getAttribute('data-tr'), defR);
+                          const bl = parseR(child.getAttribute('data-bl'), defR);
+                          const br = parseR(child.getAttribute('data-br'), defR);
+                          const cx = local.x + local.width / 2;
+                          const cy = local.y + local.height / 2;
+                          const pts = [
+                            { x: cx, y: local.y, r: tl },
+                            { x: local.x + local.width, y: cy, r: tr },
+                            { x: cx, y: local.y + local.height, r: br },
+                            { x: local.x, y: cy, r: bl }
+                          ];
+                          const cornerPoints = pts.map((curr, i) => {
+                            const prev = pts[(i + pts.length - 1) % pts.length];
+                            const next = pts[(i + 1) % pts.length];
+                            const d1 = { x: curr.x - prev.x, y: curr.y - prev.y };
+                            const d2 = { x: next.x - curr.x, y: next.y - curr.y };
+                            const l1 = Math.hypot(d1.x, d1.y) || 1;
+                            const l2 = Math.hypot(d2.x, d2.y) || 1;
+                            const limit = Math.max(0, Math.min(curr.r, l1 / 2, l2 / 2));
+                            return {
+                              limit,
+                              q: { x: curr.x, y: curr.y },
+                              p1: { x: curr.x - (d1.x / l1) * limit, y: curr.y - (d1.y / l1) * limit },
+                              p2: { x: curr.x + (d2.x / l2) * limit, y: curr.y + (d2.y / l2) * limit }
+                            };
+                          });
+                          let pathData = '';
+                          cornerPoints.forEach((cp, i) => {
+                            if (i === 0) pathData += `M ${cp.p1.x.toFixed(2)} ${cp.p1.y.toFixed(2)}`;
+                            else pathData += ` L ${cp.p1.x.toFixed(2)} ${cp.p1.y.toFixed(2)}`;
+                            if (cp.limit > 0) pathData += ` Q ${cp.q.x.toFixed(2)} ${cp.q.y.toFixed(2)}, ${cp.p2.x.toFixed(2)} ${cp.p2.y.toFixed(2)}`;
+                          });
+                          pathData += ' Z';
+                          child.setAttribute('d', pathData);
                         }
 
                         if ((tag === 'image' || tag === 'video') && el.tagName === 'g') {

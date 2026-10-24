@@ -1,93 +1,41 @@
 import React from 'react';
+import { SHAPES_DATA } from './shapesData';
 
-const shapeModules = import.meta.glob('../../../assets/Elements/Shapes/*.svg', { eager: true, query: '?raw', import: 'default' });
-// Extract filename and svg content
-const shapes = Object.keys(shapeModules).map(path => {
-  const filename = path.split('/').pop().replace('.svg', '');
-  let svgContent = shapeModules[path];
-  
-  // Remove fill="none" on the <svg> root so that it doesn't block inheritance from the <g> wrapper
-  svgContent = svgContent.replace(/<svg[^>]*>/i, match => match.replace(/fill="none"/gi, 'fill="inherit"'));
-
-  // Replace fill and stroke colors with #FBDCD7, except when they are "none"
-  svgContent = svgContent.replace(/fill="(?!none|inherit)[^"]*"/gi, 'fill="#FBDCD7"');
-  svgContent = svgContent.replace(/stroke="(?!none|inherit)[^"]*"/gi, 'stroke="#EC5137"');
-  
-  // Extract dimensions for dynamic shapes
-  let cx = 50, cy = 50, rx = 50;
-  const viewBoxMatch = svgContent.match(/viewBox="0 0 ([0-9.]+) ([0-9.]+)"/i);
-  if (viewBoxMatch) {
-    const w = parseFloat(viewBoxMatch[1]);
-    const h = parseFloat(viewBoxMatch[2]);
-    cx = w / 2;
-    cy = h / 2;
-    rx = Math.min(w, h) / 2;
-  } else {
-    const widthMatch = svgContent.match(/width="([0-9.]+)"/i);
-    const heightMatch = svgContent.match(/height="([0-9.]+)"/i);
-    if (widthMatch && heightMatch) {
-      const w = parseFloat(widthMatch[1]);
-      const h = parseFloat(heightMatch[2]);
-      cx = w / 2;
-      cy = h / 2;
-      rx = Math.min(w, h) / 2;
-    }
-  }
-
-  // Inject shape properties for specific elements to make them fully editable in ShapeProperties.jsx
-  const lowerName = filename.toLowerCase();
-  const isStar = lowerName === 'star';
-  const isTriangle = lowerName === 'triangle';
-  const isPentagon = lowerName === 'pentagon';
-  const isHexagon = lowerName === 'hexagon';
-  const isPolygon = isTriangle || isPentagon || isHexagon;
-  const isRect = ['rectangle', 'square', 'rounded rectangle', 'pill', 'oval', 'minus'].includes(lowerName);
-  
-  if (isStar || isPolygon) {
-    const shapeType = isStar ? 'star' : 'polygon';
-    const count = isStar ? 5 : (isTriangle ? 3 : (isPentagon ? 5 : 6));
-    const extraAttrs = ` data-shape-type="${shapeType}" data-count="${count}" data-radius="0" data-cx="${cx}" data-cy="${cy}" data-rx="${rx}" data-is-element-shape="true"` + (isStar ? ' data-ratio="40"' : '');
-    svgContent = svgContent.replace(/<(path|polygon)/i, `<$1${extraAttrs}`);
-  } else if (isRect) {
-    svgContent = svgContent.replace(/<rect/i, `<rect data-shape-type="rectangle" data-is-element-shape="true"`);
-  } else {
-    const isCircle = lowerName === 'circle';
-    const isLine = lowerName.includes('line');
-    const shapeType = isCircle ? 'ellipse' : (isLine ? 'line' : 'vector-path');
-    svgContent = svgContent.replace(/<(path|circle|ellipse|line|polygon|polyline|rect)/i, `<$1 data-shape-type="${shapeType}" data-is-element-shape="true"`);
-  }
-  
-  return {
-    name: filename,
-    svgContent
-  };
-});
+const shapes = SHAPES_DATA;
 
 const Shapes = ({ isFullView }) => {
   const displayShapes = isFullView ? shapes : shapes.slice(0, 8); // 2 rows, 4 columns = 8
 
   const handleDragStart = (e, shape) => {
+    const editorHtml = shape.svgContent
+      .replace(/fill="(?!(?:none|inherit))[^"]*"/gi, 'fill="inherit"')
+      .replace(/stroke="(?!(?:none|inherit))[^"]*"/gi, 'stroke="inherit"');
+
     e.dataTransfer.setData('application/json', JSON.stringify({ 
       type: 'shape', 
       icon: { 
-        html: shape.svgContent.replace(/fill="#FBDCD7"/gi, 'fill="inherit"').replace(/stroke="#EC5137"/gi, 'stroke="inherit"'), 
+        html: editorHtml, 
         name: shape.name, 
-        fill: '#FBDCD7',
-        stroke: '#EC5137', 
-        strokeWidth: '1' 
+        fill: shape.fill,
+        stroke: shape.stroke, 
+        strokeWidth: shape.strokeWidth 
       } 
     }));
   };
 
   const handleClick = (shape) => {
+    const editorHtml = shape.svgContent
+      .replace(/fill="(?!(?:none|inherit))[^"]*"/gi, 'fill="inherit"')
+      .replace(/stroke="(?!(?:none|inherit))[^"]*"/gi, 'stroke="inherit"');
+
     window.dispatchEvent(new CustomEvent('add-icon-to-editor', {
       detail: {
         icon: { 
-          html: shape.svgContent.replace(/fill="#FBDCD7"/gi, 'fill="inherit"').replace(/stroke="#EC5137"/gi, 'stroke="inherit"'), 
+          html: editorHtml, 
           name: shape.name, 
-          fill: '#FBDCD7',
-          stroke: '#EC5137', 
-          strokeWidth: '1' 
+          fill: shape.fill,
+          stroke: shape.stroke, 
+          strokeWidth: shape.strokeWidth 
         },
         isShape: true
       }
@@ -99,14 +47,14 @@ const Shapes = ({ isFullView }) => {
       {displayShapes.map((shape, idx) => (
         <div 
           key={idx} 
-          className="aspect-square bg-gray-50 rounded-[0.4vw] border border-gray-100 flex items-center justify-center p-[0.5vw] cursor-pointer hover:border-gray-400 hover:shadow-sm transition-all group"
+          className="aspect-square bg-gray-50 rounded-[0.4vw] border border-gray-100 flex items-center justify-center p-[0.5vw] cursor-pointer hover:border-indigo-400 hover:shadow-md transition-all group"
           title={shape.name}
           draggable
           onDragStart={(e) => handleDragStart(e, shape)}
           onClick={() => handleClick(shape)}
         >
           <div 
-            className="w-full h-full flex items-center justify-center transition-opacity [&>svg]:w-full [&>svg]:h-full [&>svg]:object-contain [&>svg]:stroke-[#EC5137] [&>svg]:stroke-[1px]"
+            className="w-full h-full flex items-center justify-center transition-opacity [&>svg]:w-full [&>svg]:h-full [&>svg]:object-contain"
             dangerouslySetInnerHTML={{ __html: shape.svgContent }}
           />
         </div>

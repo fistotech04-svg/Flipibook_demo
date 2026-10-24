@@ -17,7 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   MoreVertical,
-  Replace,
+  ArrowRightLeft,
   Upload,
   X,
   Plus,
@@ -447,6 +447,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
 
   const [showSlideTextPopup, setShowSlideTextPopup] = useState(false);
   const [textTargetIndex, setTextTargetIndex] = useState(null);
+  const [openTextIndices, setOpenTextIndices] = useState({});
 
   const handleSaveAdjustedImage = useCallback(({
     croppedUrl,
@@ -2572,145 +2573,169 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
       {/* ── 2. Images List ── */}
       {slideshowImages.length > 0 && (
         <div className="space-y-[0.5vw]">
-          {slideshowImages.map((img, i) => (
-            <div
-              key={img.id || i}
-              onClick={() => {
-                setActiveSlideIndex(i);
-                performTransition(i, i > activeSlideIndex ? 'next' : 'prev');
-              }}
-              className={`flex flex-col p-[0.6vw] bg-white border rounded-[0.65vw] shadow-xs cursor-pointer transition-all ${
-                activeSlideIndex === i
-                  ? 'border-[#EC5137] ring-1 ring-[#EC5137]/30'
-                  : 'border-gray-100 hover:border-gray-300'
-              }`}
-            >
-              {/* Top Row: Drag Handle, Thumbnail, File Name & Dimensions, Actions */}
-              <div className="flex items-center justify-between">
-                {/* Drag Handle */}
-                <div className="text-gray-300 hover:text-gray-500 cursor-grab px-[0.1vw]">
-                  <GripVertical size="0.95vw" />
-                </div>
+          {slideshowImages.map((img, i) => {
+            const slideKey = img.id || i;
+            const isTextOpen = Boolean(openTextIndices[slideKey]);
+            const hasText = Boolean(img.heading || img.subtext);
 
-                {/* Thumbnail */}
-                <img
-                  src={img.url}
-                  alt={img.name || `Slide ${i + 1}`}
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%2280%22%20viewBox%3D%220%200%20100%2080%22%3E%3Crect%20fill%3D%22%23f3f4f6%22%20width%3D%22100%22%20height%3D%2280%22%2F%3E%3Ctext%20fill%3D%22%239ca3af%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%20dy%3D%223.5%22%3ENo%20Img%3C%2Ftext%3E%3C%2Fsvg%3E";
-                  }}
-                  style={{
-                    opacity: (img.opacity !== undefined ? img.opacity : 100) / 100,
-                    objectFit: img.fixType === 'Fit' ? 'contain' : img.fixType === 'Stretch' ? 'fill' : 'cover'
-                  }}
-                  className="w-[3.2vw] h-[2.2vw] rounded-[0.35vw] mx-[0.4vw] border border-gray-100 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setAdjustTargetIndex(i);
-                    setShowAdjustModal(true);
-                  }}
-                  title="Click to adjust image"
-                />
+            return (
+              <div
+                key={slideKey}
+                onClick={() => {
+                  setActiveSlideIndex(i);
+                  performTransition(i, i > activeSlideIndex ? 'next' : 'prev');
+                }}
+                className={`flex flex-col p-[0.6vw] bg-white border rounded-[0.65vw] shadow-xs cursor-pointer transition-all ${
+                  activeSlideIndex === i
+                    ? 'border-[#EC5137] ring-1 ring-[#EC5137]/30'
+                    : 'border-gray-100 hover:border-gray-300'
+                }`}
+              >
+                {/* Top Row: Drag Handle, Thumbnail, File Name & Dimensions, Actions */}
+                <div className="flex items-center justify-between">
 
-                <div className="flex-1" />
-
-                {/* Actions: Adjust Image, Edit Text, Replace & Delete */}
-                <div className="flex items-center gap-[0.3vw] shrink-0">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setAdjustTargetIndex(i);
-                      setShowAdjustModal(true);
-                    }}
-                    className="text-gray-400 hover:text-[#EC5137] transition-colors p-[0.2vw]"
-                    title="Adjust / Crop Image"
-                  >
-                    <Crop size="0.9vw" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveSlideIndex(i);
-                      setTextTargetIndex(i);
-                      initialSlideBackupRef.current = { ...slideshowImages[i] };
-                      setShowSlideTextPopup(true);
-                    }}
-                    className="text-gray-400 hover:text-[#EC5137] transition-colors p-[0.2vw]"
-                    title="Edit Slide Text & Typography"
-                  >
-                    <Type size="0.9vw" />
-                  </button>
-                  <button
-                    type="button"
+                  {/* Thumbnail with Replace button overlay */}
+                  <div
+                    className="relative w-[4vw] h-[3vw] rounded-[0.35vw] mx-[0.4vw] border border-gray-100 shrink-0 overflow-hidden group/thumb cursor-pointer shadow-2xs"
                     onClick={(e) => {
                       e.stopPropagation();
                       setReplaceTargetIndex(i);
                       replaceInputRef.current?.click();
                     }}
-                    className="text-gray-400 hover:text-gray-700 transition-colors p-[0.2vw]"
-                    title="Replace Image"
+                    title="Click to replace image"
                   >
-                    <Replace size="0.9vw" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteImage(i);
-                    }}
-                    className="text-red-500 hover:text-red-600 transition-colors p-[0.2vw]"
-                    title="Delete Image"
-                  >
-                    <Trash2 size="0.9vw" />
-                  </button>
-                </div>
-              </div>
+                    <img
+                      src={img.url}
+                      alt={img.name || `Slide ${i + 1}`}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%2280%22%20viewBox%3D%220%200%20100%2080%22%3E%3Crect%20fill%3D%22%23f3f4f6%22%20width%3D%22100%22%20height%3D%2280%22%2F%3E%3Ctext%20fill%3D%22%239ca3af%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%20dy%3D%223.5%22%3ENo%20Img%3C%2Ftext%3E%3C%2Fsvg%3E";
+                      }}
+                      style={{
+                        opacity: (img.opacity !== undefined ? img.opacity : 100) / 100,
+                        objectFit: img.fixType === 'Fit' ? 'contain' : img.fixType === 'Stretch' ? 'fill' : 'cover'
+                      }}
+                      className="w-full h-full object-cover transition-transform duration-200 group-hover/thumb:scale-105"
+                    />
 
-              {/* Bottom Section: Heading and Subheading Input Boxes */}
-              <div
-                className="mt-[0.45vw] pt-[0.4vw] border-t border-gray-100 flex flex-col gap-[0.3vw]"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center gap-[0.4vw]">
-                  <span className="text-[0.65vw] font-semibold text-gray-500 w-[4.5vw] shrink-0">Heading</span>
-                  <input
-                    type="text"
-                    value={img.heading !== undefined ? img.heading : ''}
-                    onChange={(e) => updateImageAtIndex(i, 'heading', e.target.value)}
-                    placeholder="Enter slide heading..."
-                    className="flex-1 h-[1.6vw] rounded-[0.3vw] border border-gray-200 px-[0.4vw] text-[0.7vw] font-medium text-gray-800 outline-none focus:border-blue-500 bg-gray-50/50 focus:bg-white shadow-2xs transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveSlideIndex(i);
-                      setTextTargetIndex(i);
-                      initialSlideBackupRef.current = { ...slideshowImages[i] };
-                      setShowSlideTextPopup(true);
-                    }}
-                    className="text-gray-400 hover:text-[#EC5137] transition-colors p-[0.15vw]"
-                    title="Edit Text & Typography Styling"
+                    {/* Replace Overlay Button over the image */}
+                    <div className="absolute inset-0 bg-black/45 opacity-0 group-hover/thumb:opacity-100 flex flex-col items-center justify-center text-white transition-all duration-200">
+                      <ArrowRightLeft size="0.85vw" strokeWidth={1.8} className="text-white mb-[0.1vw]" />
+                      <span className="text-[0.52vw] font-medium text-white tracking-wide">Replace</span>
+                    </div>
+                  </div>
+
+                  <div className="flex-1" />
+
+                  {/* Actions: Adjust Image, Edit Text, Replace & Delete */}
+                  <div className="flex items-center gap-[0.3vw] shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAdjustTargetIndex(i);
+                        setShowAdjustModal(true);
+                      }}
+                      className="text-gray-400 hover:text-[#EC5137] transition-colors p-[0.2vw]"
+                      title="Adjust / Crop Image"
+                    >
+                      <Crop size="0.9vw" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveSlideIndex(i);
+                        setOpenTextIndices(prev => ({
+                          ...prev,
+                          [slideKey]: !prev[slideKey]
+                        }));
+                      }}
+                      className={`transition-colors p-[0.2vw] rounded-[0.2vw] relative ${
+                        isTextOpen 
+                          ? 'text-[#EC5137] bg-[#EC5137]/10' 
+                          : hasText 
+                            ? 'text-[#EC5137] hover:bg-gray-100' 
+                            : 'text-gray-400 hover:text-[#EC5137]'
+                      }`}
+                      title={isTextOpen ? "Hide Slide Heading & Subheading" : "Show Slide Heading & Subheading"}
+                    >
+                      <Type size="0.9vw" />
+                      {hasText && !isTextOpen && (
+                        <span className="absolute top-[0.1vw] right-[0.1vw] w-[0.25vw] h-[0.25vw] bg-[#EC5137] rounded-full" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setReplaceTargetIndex(i);
+                        replaceInputRef.current?.click();
+                      }}
+                      className="text-gray-400 hover:text-gray-700 transition-colors p-[0.2vw]"
+                      title="Replace Image"
+                    >
+                      <ArrowRightLeft size="0.9vw" strokeWidth={1.8} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteImage(i);
+                      }}
+                      className="text-red-500 hover:text-red-600 transition-colors p-[0.2vw]"
+                      title="Delete Image"
+                    >
+                      <Trash2 size="0.9vw" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bottom Section: Heading and Subheading Input Boxes (Shown when T icon is clicked) */}
+                {isTextOpen && (
+                  <div
+                    className="mt-[0.45vw] pt-[0.4vw] border-t border-gray-100 flex flex-col gap-[0.3vw]"
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <Type size="0.75vw" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-[0.4vw]">
-                  <span className="text-[0.65vw] font-semibold text-gray-500 w-[4.5vw] shrink-0">Subheading</span>
-                  <input
-                    type="text"
-                    value={img.subtext !== undefined ? img.subtext : ''}
-                    onChange={(e) => updateImageAtIndex(i, 'subtext', e.target.value)}
-                    placeholder="Enter slide subheading..."
-                    className="flex-1 h-[1.6vw] rounded-[0.3vw] border border-gray-200 px-[0.4vw] text-[0.7vw] text-gray-700 outline-none focus:border-blue-500 bg-gray-50/50 focus:bg-white shadow-2xs transition-all"
-                  />
-                </div>
+                    <div className="flex items-center gap-[0.4vw]">
+                      <span className="text-[0.65vw] font-semibold text-gray-500 w-[4.5vw] shrink-0">Heading</span>
+                      <input
+                        type="text"
+                        value={img.heading !== undefined ? img.heading : ''}
+                        onChange={(e) => updateImageAtIndex(i, 'heading', e.target.value)}
+                        placeholder="Enter slide heading..."
+                        className="flex-1 h-[1.6vw] rounded-[0.3vw] border border-gray-200 px-[0.4vw] text-[0.7vw] font-medium text-gray-800 outline-none focus:border-blue-500 bg-gray-50/50 focus:bg-white shadow-2xs transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveSlideIndex(i);
+                          setTextTargetIndex(i);
+                          initialSlideBackupRef.current = { ...slideshowImages[i] };
+                          setShowSlideTextPopup(true);
+                        }}
+                        className="text-gray-400 hover:text-[#EC5137] transition-colors p-[0.15vw]"
+                        title="Edit Text & Typography Styling"
+                      >
+                        <Type size="0.75vw" />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-[0.4vw]">
+                      <span className="text-[0.65vw] font-semibold text-gray-500 w-[4.5vw] shrink-0">Subheading</span>
+                      <input
+                        type="text"
+                        value={img.subtext !== undefined ? img.subtext : ''}
+                        onChange={(e) => updateImageAtIndex(i, 'subtext', e.target.value)}
+                        placeholder="Enter slide subheading..."
+                        className="flex-1 h-[1.6vw] rounded-[0.3vw] border border-gray-200 px-[0.4vw] text-[0.7vw] text-gray-700 outline-none focus:border-blue-500 bg-gray-50/50 focus:bg-white shadow-2xs transition-all"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

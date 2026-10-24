@@ -17,6 +17,20 @@ import AlertModal from '../AlertModal';
 import { Icon as FileReplaceIcon, Icon } from '@iconify/react';
 import pageCacheManager from './PageCacheManager';
 import { parseLayersFromSVG } from './editorUtils';
+import {
+  MaskIcon,
+  FlattenIcon,
+  CopyIcon,
+  PasteIcon,
+  CutIcon,
+  DuplicateIcon,
+  GroupIcon,
+  UngroupIcon,
+  MoveUpIcon,
+  MoveDownIcon,
+  MoveToFirstIcon,
+  MoveToLastIcon
+} from './Elements/EditorIcons';
 
 // Memoized isolated vector SVG preview container with CSS containment
 const MemoizedPagePreview = React.memo(({ pageId, pageHtml, isHidden }) => {
@@ -853,9 +867,9 @@ const Layer = ({
             transition={{ duration: 0.15, ease: "easeOut" }}
             style={(() => {
               // Safely clamp the menu within the viewport
-              // Menu width is roughly 10vw, height is estimated higher to accommodate new options
-              const menuWidth = window.innerWidth * 0.11;
-              const menuHeight = 450;
+              // Safely clamp the menu within the viewport
+              const menuWidth = window.innerWidth * 0.12;
+              const menuHeight = 520;
               return {
                 position: 'fixed',
                 left: `${Math.min(activeLayerMenu.x, window.innerWidth - menuWidth)}px`,
@@ -877,14 +891,12 @@ const Layer = ({
               const rootGroupLayer = (realLayers.length === 1 && (realLayers[0].name === page?.name || realLayers[0].name?.startsWith('Page '))) ? realLayers[0] : null;
               
               const isPageBackground = activeLayerMenu.isOverlay || 
+                                       activeLayerMenu.layerId === 'outside-background' ||
                                        (page && activeLayerMenu.layerId === page.id) || 
                                        clickedLayerName === 'Free Frame' || clickedLayerName?.toLowerCase().startsWith('hotspot-') ||
                                        (rootGroupLayer && activeLayerMenu.layerId === rootGroupLayer.id);
 
-              const isRootLayer = isPageBackground ||
-                (page && page.layers && page.layers.some(l => l.id === activeLayerMenu.layerId));
-
-              if (isRootLayer) {
+              if (isPageBackground) {
                 let pageLayerIds = [];
                 if (rootGroupLayer) {
                   pageLayerIds = (rootGroupLayer.children || []).filter(c => c.name !== 'Free Frame' && !c.name?.toLowerCase().startsWith('hotspot-')).map(l => l.id);
@@ -892,8 +904,8 @@ const Layer = ({
                   pageLayerIds = realLayers.map(l => l.id);
                 }
                 
-                const cutCopyTargets = isPageBackground ? pageLayerIds : targetIds;
-                const disableCutCopy = isPageBackground && cutCopyTargets.length === 0;
+                const cutCopyTargets = pageLayerIds;
+                const disableCutCopy = cutCopyTargets.length === 0;
 
                 return (
                   <>
@@ -905,7 +917,7 @@ const Layer = ({
                       }}
                       className={`flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors ${disableCutCopy ? 'text-gray-400 cursor-not-allowed grayscale-[0.5] opacity-60' : 'text-gray-700 hover:bg-gray-50 cursor-pointer'}`}
                     >
-                      <Scissors size="0.9vw" /> Cut
+                      <CutIcon size="0.95vw" /> Cut
                     </button>
                     <button
                       disabled={disableCutCopy}
@@ -913,9 +925,9 @@ const Layer = ({
                         copyLayer(activePageIndex, cutCopyTargets);
                         setActiveLayerMenu(null);
                       }}
-                      className={`flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors ${disableCutCopy ? 'text-gray-400 cursor-not-allowed grayscale-[0.5] opacity-60' : 'text-gray-700 hover:bg-gray-50 cursor-pointer'}`}
+                      className={`flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors ${disableCutCopy ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer'}`}
                     >
-                      <Copy size="0.9vw" /> Copy
+                      <CopyIcon size="0.95vw" /> Copy
                     </button>
                     <button
                       disabled={!clipboard || (Array.isArray(clipboard) && clipboard.length === 0)}
@@ -923,73 +935,58 @@ const Layer = ({
                         pasteLayer(activePageIndex);
                         setActiveLayerMenu(null);
                       }}
-                      className={`flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors ${(!clipboard || (Array.isArray(clipboard) && clipboard.length === 0))
-                        ? 'text-gray-400 cursor-not-allowed grayscale-[0.5] opacity-60'
-                        : 'text-gray-700 hover:bg-gray-50 cursor-pointer'
+                      className={`flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors ${(!clipboard || (Array.isArray(clipboard) && clipboard.length === 0))
+                        ? 'text-gray-400 cursor-not-allowed opacity-50'
+                        : 'text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer'
                         }`}
                     >
-                      <Clipboard size="0.9vw" /> Paste
+                      <PasteIcon size="0.95vw" /> Paste
                     </button>
-                    {!isPageBackground && (
+
+                    <div className="h-px bg-gray-100 my-[0.2vw]"></div>
+                    {!isPdfProject && (
                       <button
-                        onClick={() => {
-                          if (duplicateLayer) duplicateLayer(activePageIndex, cutCopyTargets);
-                          setActiveLayerMenu(null);
-                        }}
-                        className={`flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-gray-700 hover:bg-gray-50 cursor-pointer`}
+                        onClick={() => { insertPageAfter && insertPageAfter(activePageIndex); setActiveLayerMenu(null); }}
+                        className="flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer"
                       >
-                        <Copy size="0.9vw" /> Duplicate
+                        <Plus size="0.95vw" /> Add Page
                       </button>
                     )}
-
-                    {isPageBackground && (
-                      <>
-                        <div className="h-px bg-gray-100 my-[0.2vw]"></div>
-                        {!isPdfProject && (
-                          <button
-                            onClick={() => { insertPageAfter && insertPageAfter(activePageIndex); setActiveLayerMenu(null); }}
-                            className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-gray-700 hover:bg-gray-50 cursor-pointer"
-                          >
-                            <Plus size="0.9vw" /> Add Page
-                          </button>
-                        )}
-                        <button
-                          onClick={() => { onAddFile && onAddFile(activePageIndex); setActiveLayerMenu(null); }}
-                          className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-gray-700 hover:bg-gray-50 cursor-pointer"
-                        >
-                          <FilePlus size="0.9vw" /> Add File
-                        </button>
-                        <button
-                          onClick={() => { duplicatePage && duplicatePage(activePageIndex); setActiveLayerMenu(null); }}
-                          className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-gray-700 hover:bg-gray-50 cursor-pointer"
-                        >
-                          <Copy size="0.9vw" /> Duplicate
-                        </button>
-                        {!isPdfProject && (
-                          <button
-                            onClick={() => { onOpenTemplateModal && onOpenTemplateModal(activePageIndex); setActiveLayerMenu(null); }}
-                            className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-gray-700 hover:bg-gray-50 cursor-pointer"
-                          >
-                            <Layout size="0.9vw" /> Template
-                          </button>
-                        )}
-                        <div className="h-px bg-gray-100 my-[0.2vw]"></div>
-                        {!isPdfProject && (
-                          <button
-                            onClick={() => { clearPage && clearPage(activePageIndex); setActiveLayerMenu(null); }}
-                            className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-gray-700 hover:bg-gray-50 cursor-pointer"
-                          >
-                            <Ban size="0.9vw" /> Clear
-                          </button>
-                        )}
-                        <button
-                          onClick={() => { deletePage && deletePage(activePageIndex); setActiveLayerMenu(null); }}
-                          className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-red-500 hover:bg-red-50 cursor-pointer"
-                        >
-                          <Trash2 size="0.9vw" /> Delete
-                        </button>
-                      </>
+                    <button
+                      onClick={() => { onAddFile && onAddFile(activePageIndex); setActiveLayerMenu(null); }}
+                      className="flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer"
+                    >
+                      <FilePlus size="0.95vw" /> Add File
+                    </button>
+                    <button
+                      onClick={() => { duplicatePage && duplicatePage(activePageIndex); setActiveLayerMenu(null); }}
+                      className="flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer"
+                    >
+                      <DuplicateIcon size="0.95vw" /> Duplicate
+                    </button>
+                    {!isPdfProject && (
+                      <button
+                        onClick={() => { onOpenTemplateModal && onOpenTemplateModal(activePageIndex); setActiveLayerMenu(null); }}
+                        className="flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer"
+                      >
+                        <Layout size="0.95vw" /> Template
+                      </button>
                     )}
+                    <div className="h-px bg-gray-100 my-[0.2vw]"></div>
+                    {!isPdfProject && (
+                      <button
+                        onClick={() => { clearPage && clearPage(activePageIndex); setActiveLayerMenu(null); }}
+                        className="flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer"
+                      >
+                        <Ban size="0.95vw" /> Clear
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { deletePage && deletePage(activePageIndex); setActiveLayerMenu(null); }}
+                      className="flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-red-500 hover:bg-red-50 cursor-pointer"
+                    >
+                      <Trash2 size="0.95vw" /> Delete
+                    </button>
                   </>
                 );
               }
@@ -1005,20 +1002,63 @@ const Layer = ({
 
               return (
                 <>
-                  {multiSelectedIds.size <= 1 && (
-                    <>
-                      <button
-                        onClick={() => {
-                          window.dispatchEvent(new CustomEvent('trigger-rename-layer', { detail: { layerId: activeLayerMenu.layerId } }));
-                          setActiveLayerMenu(null);
-                        }}
-                        className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium text-gray-700 hover:bg-gray-50 rounded-[0.4vw] text-left cursor-pointer"
-                      >
-                        <Edit2 size="0.9vw" /> Rename
-                      </button>
-                    </>
-                  )}
-                  
+                  {/* 1. Copy */}
+                  <button
+                    onClick={() => {
+                      copyLayer(activePageIndex, targetIds);
+                      setActiveLayerMenu(null);
+                    }}
+                    className="flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer"
+                  >
+                    <CopyIcon size="0.95vw" />
+                    <span>Copy</span>
+                  </button>
+
+                  {/* 2. Paste */}
+                  <button
+                    disabled={!clipboard || (Array.isArray(clipboard) && clipboard.length === 0)}
+                    onClick={() => {
+                      pasteLayer(activePageIndex);
+                      setActiveLayerMenu(null);
+                    }}
+                    className={`flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors ${
+                      (!clipboard || (Array.isArray(clipboard) && clipboard.length === 0))
+                        ? 'text-gray-400 cursor-not-allowed opacity-50'
+                        : 'text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer'
+                    }`}
+                  >
+                    <PasteIcon size="0.95vw" />
+                    <span>Paste</span>
+                  </button>
+
+                  {/* 3. Cut */}
+                  <button
+                    onClick={() => {
+                      cutLayer(activePageIndex, targetIds);
+                      setActiveLayerMenu(null);
+                    }}
+                    className="flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer"
+                  >
+                    <CutIcon size="0.95vw" />
+                    <span>Cut</span>
+                  </button>
+
+                  {/* 4. Duplicate */}
+                  <button
+                    onClick={() => {
+                      if (duplicateLayer) duplicateLayer(activePageIndex, targetIds);
+                      setActiveLayerMenu(null);
+                    }}
+                    className="flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer"
+                  >
+                    <DuplicateIcon size="0.95vw" />
+                    <span>Duplicate</span>
+                  </button>
+
+                  {/* Divider */}
+                  <div className="h-px bg-gray-100 my-[0.2vw]" />
+
+                  {/* 5. Group */}
                   <button
                     onClick={() => {
                       if (!canGroup) return;
@@ -1026,13 +1066,15 @@ const Layer = ({
                       setActiveLayerMenu(null);
                     }}
                     disabled={!canGroup}
-                    className={`flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left ${
-                      !canGroup ? 'text-gray-400 cursor-not-allowed opacity-60' : 'text-gray-700 hover:bg-gray-50 cursor-pointer'
+                    className={`flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors ${
+                      !canGroup ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer'
                     }`}
                   >
-                    <Icon icon="mdi-light:group" className="w-[0.9vw] h-[0.9vw] min-w-[0.9vw] min-h-[0.9vw]" />
-                    Group
+                    <GroupIcon size="0.95vw" />
+                    <span>Group</span>
                   </button>
+
+                  {/* 6. Ungroup */}
                   <button
                     onClick={() => {
                       if (!canUngroup) return;
@@ -1040,106 +1082,116 @@ const Layer = ({
                       setActiveLayerMenu(null);
                     }}
                     disabled={!canUngroup}
-                    className={`flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left ${
-                      !canUngroup ? 'text-gray-400 cursor-not-allowed opacity-60' : 'text-gray-700 hover:bg-gray-50 cursor-pointer'
+                    className={`flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors ${
+                      !canUngroup ? 'text-gray-400 cursor-not-allowed opacity-50' : 'text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer'
                     }`}
                   >
-                    <Icon icon="mdi-light:ungroup" className="w-[0.9vw] h-[0.9vw] min-w-[0.9vw] min-h-[0.9vw]" />
-                    Ungroup
+                    <UngroupIcon size="0.95vw" />
+                    <span>Ungroup</span>
                   </button>
 
-                  <div className="h-px bg-gray-100 my-[0.2vw]"></div>
+                  {/* 7. Use as Mask */}
+                  {(() => {
+                    const doc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                    const el = doc.getElementById(activeLayerMenu?.layerId);
+                    const isMaskActive = el && (
+                      el.getAttribute('data-type') === 'mask-group' ||
+                      el.closest('[data-type="mask-group"]') !== null ||
+                      el.getAttribute('data-mask-enabled') === 'true' ||
+                      (el.getAttribute('fill') && el.getAttribute('fill').includes('url(#pattern-')) ||
+                      el.querySelector('[data-mask-enabled="true"]') !== null ||
+                      el.querySelector('[fill*="url(#pattern-"]') !== null
+                    );
+                    return (
+                      <button
+                        onClick={() => {
+                          window.dispatchEvent(new CustomEvent('trigger-mask'));
+                          setActiveLayerMenu(null);
+                        }}
+                        className="flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer"
+                      >
+                        <MaskIcon size="0.95vw" />
+                        <span>{isMaskActive ? 'Unmask' : 'Use as Mask'}</span>
+                      </button>
+                    );
+                  })()}
 
+                  {/* 8. Flatten */}
+                  <button
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent('trigger-flatten'));
+                      setActiveLayerMenu(null);
+                    }}
+                    className="flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer"
+                  >
+                    <FlattenIcon size="0.95vw" />
+                    <span>Flatten</span>
+                  </button>
+
+                  {/* Divider */}
+                  <div className="h-px bg-gray-100 my-[0.2vw]" />
+
+                  {/* 9. Move Up */}
                   <button
                     onClick={() => {
                       moveLayerForward(activePageIndex, targetIds);
                       setActiveLayerMenu(null);
                     }}
-                    className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium text-gray-700 hover:bg-gray-50 rounded-[0.4vw] text-left cursor-pointer"
+                    className="flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer"
                   >
-                    <ArrowUp size="0.9vw" /> Move Front
+                    <MoveUpIcon size="0.95vw" />
+                    <span>Move Up</span>
                   </button>
+
+                  {/* 10. Move down */}
                   <button
                     onClick={() => {
                       moveLayerBackward(activePageIndex, targetIds);
                       setActiveLayerMenu(null);
                     }}
-                    className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium text-gray-700 hover:bg-gray-50 rounded-[0.4vw] text-left cursor-pointer"
+                    className="flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer"
                   >
-                    <ArrowDown size="0.9vw" /> Move Back
+                    <MoveDownIcon size="0.95vw" />
+                    <span>Move down</span>
                   </button>
+
+                  {/* 11. Move to First */}
                   <button
                     onClick={() => {
                       bringLayerToFront(activePageIndex, targetIds);
                       setActiveLayerMenu(null);
                     }}
-                    className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium text-gray-700 hover:bg-gray-50 rounded-[0.4vw] text-left cursor-pointer"
+                    className="flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer"
                   >
-                    <ArrowUpToLine size="0.9vw" /> Bring to front
+                    <MoveToFirstIcon size="0.95vw" />
+                    <span>Move to First</span>
                   </button>
+
+                  {/* 12. Move to Last */}
                   <button
                     onClick={() => {
                       sendLayerToBack(activePageIndex, targetIds);
                       setActiveLayerMenu(null);
                     }}
-                    className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium text-gray-700 hover:bg-gray-50 rounded-[0.4vw] text-left cursor-pointer"
+                    className="flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-[#374151] hover:bg-[#F3F4F6] hover:text-black cursor-pointer"
                   >
-                    <ArrowDownToLine size="0.9vw" /> Send to back
+                    <MoveToLastIcon size="0.95vw" />
+                    <span>Move to Last</span>
                   </button>
 
-                  <div className="h-px bg-gray-100 my-[0.2vw]"></div>
+                  {/* Divider */}
+                  <div className="h-px bg-gray-100 my-[0.2vw]" />
 
-                  <button
-                    onClick={() => {
-                      cutLayer(activePageIndex, targetIds);
-                      setActiveLayerMenu(null);
-                    }}
-                    className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium text-gray-700 hover:bg-gray-50 rounded-[0.4vw] text-left cursor-pointer"
-                  >
-                    <Scissors size="0.9vw" /> Cut
-                  </button>
-                  <button
-                    onClick={() => {
-                      copyLayer(activePageIndex, targetIds);
-                      setActiveLayerMenu(null);
-                    }}
-                    className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium text-gray-700 hover:bg-gray-50 rounded-[0.4vw] text-left cursor-pointer"
-                  >
-                    <Copy size="0.9vw" /> Copy
-                  </button>
-                  <button
-                    disabled={!clipboard || (Array.isArray(clipboard) && clipboard.length === 0)}
-                    onClick={() => {
-                      pasteLayer(activePageIndex);
-                      setActiveLayerMenu(null);
-                    }}
-                    className={`flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors ${(!clipboard || (Array.isArray(clipboard) && clipboard.length === 0))
-                      ? 'text-gray-400 cursor-not-allowed grayscale-[0.5] opacity-60'
-                      : 'text-gray-700 hover:bg-gray-50 cursor-pointer'
-                      }`}
-                  >
-                    <Clipboard size="0.9vw" /> Paste
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (duplicateLayer) duplicateLayer(activePageIndex, targetIds);
-                      setActiveLayerMenu(null);
-                    }}
-                    className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium text-gray-700 hover:bg-gray-50 rounded-[0.4vw] text-left cursor-pointer"
-                  >
-                    <Copy size="0.9vw" /> Duplicate
-                  </button>
-
-                  <div className="h-px bg-gray-100 my-[0.2vw]"></div>
-
+                  {/* 13. Delete */}
                   <button
                     onClick={() => {
                       deleteLayer(activePageIndex, targetIds);
                       setActiveLayerMenu(null);
                     }}
-                    className="flex items-center gap-[0.6vw] px-[0.6vw] py-[0.4vw] text-[0.75vw] font-medium text-red-500 hover:bg-red-50 rounded-[0.4vw] text-left cursor-pointer"
+                    className="flex items-center gap-[0.7vw] px-[0.7vw] py-[0.4vw] text-[0.75vw] font-medium rounded-[0.4vw] text-left transition-colors text-red-500 hover:bg-red-50 cursor-pointer"
                   >
-                    <Trash2 size="0.9vw" /> Delete
+                    <Trash2 size="0.95vw" className="text-red-500" />
+                    <span>Delete</span>
                   </button>
                 </>
               );

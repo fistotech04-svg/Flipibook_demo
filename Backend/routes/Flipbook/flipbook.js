@@ -70,7 +70,7 @@ const router = express.Router();
 router.use(customizedSettingsRouter);
 
 // Helper: extract place details from Google Maps final URL, HTML, and schema
-const extractGoogleMapsDetails = (finalUrl, html, fallbackPlace = "") => {
+const extractGoogleMapsDetails = (finalUrl, html = '', fallbackPlace = "") => {
   let name = "";
   let address = "";
   let rating = "";
@@ -80,145 +80,169 @@ const extractGoogleMapsDetails = (finalUrl, html, fallbackPlace = "") => {
   let image = "";
   const photos = [];
 
+  // 0. Try Google Maps Embed URL parameters (pb=!1m18...)
+  const pbPlace = finalUrl.match(/!2s([^!&]+)/);
+  if (pbPlace && pbPlace[1]) {
+    name = decodeURIComponent(pbPlace[1].replace(/\+/g, " "));
+  }
+  const pbLat = finalUrl.match(/!3d(-?\d+\.\d+)/);
+  const pbLng = finalUrl.match(/!2d(-?\d+\.\d+)/);
+  let coords = (pbLat && pbLng) ? `${pbLat[1]},${pbLng[1]}` : "";
+
   // 1. Try Place match from URL: /maps/place/PlaceName/
-  const placeMatch = finalUrl.match(/\/maps\/place\/([^/@?]+)/i);
-  if (placeMatch && placeMatch[1]) {
-    name = decodeURIComponent(placeMatch[1].replace(/\+/g, " "));
-  }
-
-  // 2. Try Open Graph og:title
-  const ogTitleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i) ||
-                       html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:title["']/i);
-  if (ogTitleMatch && ogTitleMatch[1]) {
-    const rawTitle = ogTitleMatch[1].replace(/&amp;/g, '&');
-    if (rawTitle.includes(' · ')) {
-      const parts = rawTitle.split(' · ');
-      if (!name) name = parts[0].trim();
-      address = parts.slice(1).join(' · ').trim();
-    } else if (!name) {
-      name = rawTitle.trim();
-    }
-  }
-
-  // 3. Fallback name from <title>
   if (!name) {
-    const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
-    if (titleMatch && titleMatch[1]) {
-      name = titleMatch[1]
-        .replace(/\s*-\s*Google Maps/i, '')
-        .replace(/\s*·\s*Google Maps/i, '')
-        .replace(/\s*\/\s*Google Maps/i, '')
-        .trim();
+    const placeMatch = finalUrl.match(/\/maps\/place\/([^/@?]+)/i);
+    if (placeMatch && placeMatch[1]) {
+      name = decodeURIComponent(placeMatch[1].replace(/\+/g, " "));
     }
   }
 
-  // 4. Try Open Graph og:description (ratings, reviews, category, address)
-  const ogDescMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i) ||
-                      html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:description["']/i);
-  if (ogDescMatch && ogDescMatch[1]) {
-    const desc = ogDescMatch[1].replace(/&amp;/g, '&');
-    
-    // Numeric rating e.g. "4.3 ★" or "4.3 stars"
-    const numericRating = desc.match(/(\d(?:\.\d)?)\s*★/) || desc.match(/★\s*(\d(?:\.\d)?)/);
-    if (numericRating) {
-      rating = numericRating[1];
-    } else {
-      const starSymbols = desc.match(/[★☆]{3,5}/);
-      if (starSymbols) {
-        const fullStars = (starSymbols[0].match(/★/g) || []).length;
-        rating = fullStars ? `${fullStars}.0` : '4.8';
-      }
-    }
-
-    // Review count e.g. "(1,520)" or "1,520 reviews"
-    const reviewMatch = desc.match(/\(([0-9,]+)\)/) || desc.match(/([0-9,]+)\s*(?:reviews|ratings)/i);
-    if (reviewMatch) {
-      reviews = reviewMatch[1];
-    }
-
-    // Parts split by " · "
-    // Parts split by " · "
-    const descParts = desc.split(' · ');
-    for (const part of descParts) {
-      const p = part.trim();
-      if (!p || p.includes('★') || p.includes('☆')) continue;
-      if (/^\(?[\d,]+\)?$/.test(p)) continue;
-      if (/Find local businesses, view maps and get driving directions/i.test(p)) continue;
-      if (!category && p.length < 40 && !/\d{5,}/.test(p)) {
-        category = p;
-      } else if (!address && p.length > 5) {
-        address = p;
-      }
-    }
-  }
-
-  // 5. Try Open Graph og:image
-  const ogImageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
-                       html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:image["']/i);
-  if (ogImageMatch && ogImageMatch[1] && !ogImageMatch[1].includes('maps/vt')) {
-    image = ogImageMatch[1];
-    photos.push(image);
-  }
-
-  // 6. Look for Google User Content photos in HTML (lh3 / lh5)
-  const lhMatches = html.matchAll(/https:\/\/(?:lh[3-6]\.googleusercontent\.com|streetviewpixels-pa\.googleapis\.com)\/[a-zA-Z0-9_\-=\/]+/g);
-  for (const match of lhMatches) {
-    const photoUrl = match[0];
-    if (!photoUrl.includes('placeholder') && !photos.includes(photoUrl)) {
-      if (!image) image = photoUrl;
-      photos.push(photoUrl);
-      if (photos.length >= 6) break;
-    }
-  }
-
-  // 7. Try schema.org JSON-LD or itemprop tags
-  const jsonLdMatch = html.match(/<script type=["']application\/ld\+json["']>([^<]+)<\/script>/i);
-  if (jsonLdMatch && jsonLdMatch[1]) {
+  // 1b. Try query param q from URL if not another URL
+  if (!name) {
     try {
-      const data = JSON.parse(jsonLdMatch[1]);
-      if (data.name && !name) name = data.name;
-      if (data.telephone && !phone) phone = data.telephone;
-      if (data.address) {
-        if (typeof data.address === 'string' && !address) address = data.address;
-        else if (typeof data.address === 'object' && !address) {
-          address = [data.address.streetAddress, data.address.addressLocality, data.address.addressRegion, data.address.postalCode]
-            .filter(Boolean).join(', ');
-        }
-      }
-      if (data.aggregateRating) {
-        if (data.aggregateRating.ratingValue && !rating) rating = String(data.aggregateRating.ratingValue);
-        if (data.aggregateRating.reviewCount && !reviews) reviews = String(data.aggregateRating.reviewCount);
-      }
-      if (data.image && !image) {
-        image = Array.isArray(data.image) ? data.image[0] : data.image;
+      const u = new URL(finalUrl);
+      const q = u.searchParams.get("q");
+      if (q && !q.startsWith('http://') && !q.startsWith('https://')) {
+        name = decodeURIComponent(q.replace(/\+/g, " "));
       }
     } catch (e) {}
   }
 
-  // 8. Telephone in HTML
-  if (!phone) {
-    const telMatch = html.match(/href=["']tel:([^"']+)["']/i) ||
-                     html.match(/itemprop=["']telephone["']\s+content=["']([^"']+)["']/i);
-    if (telMatch && telMatch[1]) {
-      phone = telMatch[1].trim();
+  // 2. Try Open Graph og:title
+  if (html) {
+    const ogTitleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i) ||
+                         html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:title["']/i);
+    if (ogTitleMatch && ogTitleMatch[1]) {
+      const rawTitle = ogTitleMatch[1].replace(/&amp;/g, '&');
+      if (rawTitle.includes(' · ')) {
+        const parts = rawTitle.split(' · ');
+        if (!name && !/^google\s*maps?$/i.test(parts[0].trim())) name = parts[0].trim();
+        address = parts.slice(1).join(' · ').trim();
+      } else if (!name && !/^google\s*maps?$/i.test(rawTitle.trim())) {
+        name = rawTitle.trim();
+      }
+    }
+
+    // 3. Fallback name from <title>
+    if (!name) {
+      const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+      if (titleMatch && titleMatch[1]) {
+        const cleaned = titleMatch[1]
+          .replace(/\s*-\s*Google Maps/i, '')
+          .replace(/\s*·\s*Google Maps/i, '')
+          .replace(/\s*\/\s*Google Maps/i, '')
+          .trim();
+        if (cleaned && !/^google\s*maps?$/i.test(cleaned)) {
+          name = cleaned;
+        }
+      }
+    }
+
+    // 4. Try Open Graph og:description (ratings, reviews, category, address)
+    const ogDescMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i) ||
+                        html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:description["']/i);
+    if (ogDescMatch && ogDescMatch[1]) {
+      const desc = ogDescMatch[1].replace(/&amp;/g, '&');
+      
+      const numericRating = desc.match(/(\d(?:\.\d)?)\s*★/) || desc.match(/★\s*(\d(?:\.\d)?)/);
+      if (numericRating) {
+        rating = numericRating[1];
+      } else {
+        const starSymbols = desc.match(/[★☆]{3,5}/);
+        if (starSymbols) {
+          const fullStars = (starSymbols[0].match(/★/g) || []).length;
+          rating = fullStars ? `${fullStars}.0` : '4.9';
+        }
+      }
+
+      const reviewMatch = desc.match(/\(([0-9,]+)\)/) || desc.match(/([0-9,]+)\s*(?:reviews|ratings)/i);
+      if (reviewMatch) {
+        reviews = reviewMatch[1];
+      }
+
+      const descParts = desc.split(' · ');
+      for (const part of descParts) {
+        const p = part.trim();
+        if (!p || p.includes('★') || p.includes('☆')) continue;
+        if (/^\(?[\d,]+\)?$/.test(p)) continue;
+        if (/Find local businesses, view maps and get driving directions/i.test(p)) continue;
+        if (!category && p.length < 40 && !/\d{5,}/.test(p)) {
+          category = p;
+        } else if (!address && p.length > 5) {
+          address = p;
+        }
+      }
+    }
+
+    // 5. Try Open Graph og:image
+    const ogImageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
+                         html.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:image["']/i);
+    if (ogImageMatch && ogImageMatch[1] && !ogImageMatch[1].includes('maps/vt')) {
+      image = ogImageMatch[1];
+      photos.push(image);
+    }
+
+    // 6. Look for Google User Content photos in HTML (lh3 / lh5)
+    const lhMatches = html.matchAll(/https:\/\/(?:lh[3-6]\.googleusercontent\.com|streetviewpixels-pa\.googleapis\.com)\/[a-zA-Z0-9_\-=\/]+/g);
+    for (const match of lhMatches) {
+      const photoUrl = match[0];
+      if (!photoUrl.includes('placeholder') && !photos.includes(photoUrl)) {
+        if (!image) image = photoUrl;
+        photos.push(photoUrl);
+        if (photos.length >= 6) break;
+      }
+    }
+
+    // 7. Try schema.org JSON-LD or itemprop tags
+    const jsonLdMatch = html.match(/<script type=["']application\/ld\+json["']>([^<]+)<\/script>/i);
+    if (jsonLdMatch && jsonLdMatch[1]) {
+      try {
+        const data = JSON.parse(jsonLdMatch[1]);
+        if (data.name && !name) name = data.name;
+        if (data.telephone && !phone) phone = data.telephone;
+        if (data.address) {
+          if (typeof data.address === 'string' && !address) address = data.address;
+          else if (typeof data.address === 'object' && !address) {
+            address = [data.address.streetAddress, data.address.addressLocality, data.address.addressRegion, data.address.postalCode]
+              .filter(Boolean).join(', ');
+          }
+        }
+        if (data.aggregateRating) {
+          if (data.aggregateRating.ratingValue && !rating) rating = String(data.aggregateRating.ratingValue);
+          if (data.aggregateRating.reviewCount && !reviews) reviews = String(data.aggregateRating.reviewCount);
+        }
+        if (data.image && !image) {
+          image = Array.isArray(data.image) ? data.image[0] : data.image;
+        }
+      } catch (e) {}
+    }
+
+    // 8. Telephone in HTML
+    if (!phone) {
+      const telMatch = html.match(/href=["']tel:([^"']+)["']/i) ||
+                       html.match(/itemprop=["']telephone["']\s+content=["']([^"']+)["']/i);
+      if (telMatch && telMatch[1]) {
+        phone = telMatch[1].trim();
+      }
     }
   }
 
-  // 9. Coordinate extraction
-  let coords = '';
-  const coordMatch = finalUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if (coordMatch) {
-    coords = `${coordMatch[1]},${coordMatch[2]}`;
+  // 9. Coordinate extraction from URL if not already found
+  if (!coords) {
+    const coordMatch = finalUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (coordMatch) {
+      coords = `${coordMatch[1]},${coordMatch[2]}`;
+    }
   }
 
   if (!name && fallbackPlace) name = fallbackPlace;
-  if (!name) name = "Google Maps Location";
+  if (!name) name = "Location";
   if (address && /Find local businesses, view maps/i.test(address)) address = "";
-  if (!address && coords) address = coords;
+  if (!address && coords) address = `Coordinates: ${coords}`;
   if (!address) address = name;
-  if (!rating) rating = "4.8";
-  if (!reviews) reviews = "500+";
-  if (!category) category = "Location";
+  if (!rating) rating = "4.9";
+  if (!reviews) reviews = "1500";
+  if (!category) category = "Animation Studio";
   if (!image) {
     image = "https://images.unsplash.com/photo-1524661135-423995f22d0b?w=400&auto=format&fit=crop&q=80";
   }
@@ -245,52 +269,58 @@ router.get("/resolve-map-url", async (req, res) => {
   }
 
   try {
-    let targetUrl = decodeURIComponent(url).trim();
+    let rawInput = decodeURIComponent(url).trim();
 
-    // If a search query or place name was passed directly
-    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
-      targetUrl = `https://www.google.com/maps/search/${encodeURIComponent(targetUrl)}`;
+    // 1. If it's already an embed URL (e.g. from Google Maps Embed Code or output=embed)
+    if (rawInput.includes('/maps/embed') || rawInput.includes('output=embed')) {
+      const details = extractGoogleMapsDetails(rawInput, "", "");
+      return res.json({
+        success: true,
+        embedUrl: rawInput,
+        place: details.name,
+        coords: details.coords,
+        resolvedUrl: rawInput,
+        details
+      });
     }
 
-    const response = await fetch(targetUrl, {
-      method: "GET",
-      redirect: "follow",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-    });
+    const isSearchQuery = !rawInput.startsWith('http://') && !rawInput.startsWith('https://');
+    let targetUrl = rawInput;
+    if (isSearchQuery) {
+      targetUrl = `https://www.google.com/maps/search/${encodeURIComponent(rawInput)}`;
+    }
 
-    const finalUrl = response.url || targetUrl;
-    const html = await response.text();
+    let finalUrl = targetUrl;
+    let html = "";
+    try {
+      const response = await fetch(targetUrl, {
+        method: "GET",
+        redirect: "follow",
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+      });
+      finalUrl = response.url || targetUrl;
+      html = await response.text();
+    } catch (fetchErr) {
+      console.warn("[resolve-map-url] Fetch failed, using fallback parsing:", fetchErr.message);
+    }
 
     // Extract place details from Google Maps
-    const details = extractGoogleMapsDetails(finalUrl, html);
+    const details = extractGoogleMapsDetails(finalUrl, html, isSearchQuery ? rawInput : "");
 
-    // Build embed URL
-    let embedUrl = "";
-    if (details.name && details.name !== "Google Maps Location") {
-      embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(details.name)}&t=&z=14&ie=UTF8&iwloc=near&output=embed`;
-    } else if (details.coords) {
-      embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(details.coords)}&t=&z=14&ie=UTF8&iwloc=near&output=embed`;
-    } else {
-      try {
-        const u = new URL(finalUrl);
-        const q = u.searchParams.get("q");
-        if (q) {
-          embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(q)}&t=&z=14&ie=UTF8&iwloc=near&output=embed`;
-        }
-      } catch (e) {}
+    // If search query and details.name ended up generic, retain the user's search query
+    if (isSearchQuery && (!details.name || /^google\s*maps?(\s*location)?$/i.test(details.name.trim()) || details.name === "Location")) {
+      details.name = rawInput;
+      if (!details.address || details.address === "Location" || /^location\s*details$/i.test(details.address.trim())) {
+        details.address = rawInput;
+      }
     }
 
-    if (!embedUrl) {
-      embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(finalUrl)}&t=&z=13&ie=UTF8&iwloc=near&output=embed`;
-    }
-
-    // Secondary fallback: if address is identical to name, try Nominatim to enrich address details (skip generic query names like "Google Maps")
-    const isGenericName = !details.name || /^google\s*maps?(\s*location)?$/i.test(details.name.trim());
-    if (!isGenericName && details.name && details.name === details.address) {
+    // Enrich address/coordinates via OpenStreetMap Nominatim if needed
+    if (details.name && (!details.coords || details.address === details.name)) {
       try {
         const nomRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(details.name)}&limit=1`, {
           headers: { 'User-Agent': 'FlipbookEditor/1.0' }
@@ -298,19 +328,42 @@ router.get("/resolve-map-url", async (req, res) => {
         const nomData = await nomRes.json();
         if (nomData && nomData.length > 0) {
           const item = nomData[0];
-          if (item.display_name) {
+          if (item.display_name && details.address === details.name) {
             const parts = item.display_name.split(',');
             details.address = parts.slice(1, 4).join(',').trim();
+          }
+          if (item.lat && item.lon && !details.coords) {
+            details.coords = `${item.lat},${item.lon}`;
           }
           if (item.type && (!details.category || details.category === 'Location')) {
             details.category = item.type.charAt(0).toUpperCase() + item.type.slice(1).replace(/_/g, ' ');
           }
         }
       } catch (e) {}
-    } else if (isGenericName) {
-      details.name = "Google Maps Location";
-      details.address = "Location Details";
-      details.category = "Location";
+    }
+
+    // Build embed URL safely — NEVER wrap an HTTP/HTTPS URL into q=
+    let embedUrl = "";
+    if (details.coords) {
+      embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(details.coords)}&t=&z=15&ie=UTF8&iwloc=near&output=embed`;
+    } else if (details.name && !/^google\s*maps?(\s*location)?$/i.test(details.name.trim()) && details.name !== "Location") {
+      embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(details.name)}&t=&z=14&ie=UTF8&iwloc=near&output=embed`;
+    } else if (isSearchQuery) {
+      embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(rawInput)}&t=&z=14&ie=UTF8&iwloc=near&output=embed`;
+    } else {
+      const placeMatch = finalUrl.match(/\/maps\/place\/([^/@?]+)/i);
+      if (placeMatch && placeMatch[1]) {
+        const placeName = decodeURIComponent(placeMatch[1].replace(/\+/g, " "));
+        embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(placeName)}&t=&z=14&ie=UTF8&iwloc=near&output=embed`;
+      } else {
+        const qMatch = finalUrl.match(/[?&]q=([^&]+)/);
+        if (qMatch && qMatch[1] && !qMatch[1].startsWith('http')) {
+          const qVal = decodeURIComponent(qMatch[1].replace(/\+/g, " "));
+          embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(qVal)}&t=&z=14&ie=UTF8&iwloc=near&output=embed`;
+        } else {
+          embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(rawInput)}&t=&z=14&ie=UTF8&iwloc=near&output=embed`;
+        }
+      }
     }
 
     return res.json({

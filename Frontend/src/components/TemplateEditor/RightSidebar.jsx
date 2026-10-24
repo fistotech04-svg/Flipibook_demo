@@ -759,10 +759,24 @@ const RightSidebar = ({
           if (innerShape) {
             props.innerTagName = innerShape.tagName.toLowerCase();
             Array.from(innerShape.attributes).forEach(attr => {
-              if (['data-shape-type', 'data-count', 'data-ratio', 'data-radius', 'data-cx', 'data-cy', 'data-rx', 'rx'].includes(attr.name)) {
+              if (['data-shape-type', 'data-shape-id', 'data-count', 'data-ratio', 'data-radius', 'data-cx', 'data-cy', 'data-rx', 'rx', 'data-tl', 'data-tr', 'data-bl', 'data-br', 'data-corner-linked'].includes(attr.name)) {
                 props[attr.name] = attr.value;
               }
             });
+            const innerD = innerShape.getAttribute('d') || '';
+            const isInnerDiamond = props['data-shape-type'] === 'diamond' ||
+              props['data-shape-id'] === 'rounded-diamond' ||
+              (innerD && (innerD.includes('50 12') || innerD.includes('50 88') || innerD.includes('85 43') || innerD.includes('15 57')));
+            if (isInnerDiamond) {
+              props['data-shape-type'] = 'diamond';
+              if (props['data-tl'] === undefined) {
+                props['data-tl'] = '17';
+                props['data-tr'] = '17';
+                props['data-bl'] = '17';
+                props['data-br'] = '17';
+                props.rx = '17';
+              }
+            }
           }
         }
 

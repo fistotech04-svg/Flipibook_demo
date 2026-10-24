@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Icon } from '@iconify/react';
 import { createPortal } from 'react-dom';
 import { handleScrubHelper } from '../Color';
@@ -6,7 +6,9 @@ import Color from '../Color';
 import CornerRadius from '../CornerRadius';
 import Adjustment from '../Adjustment';
 import Effect from '../Effect';
-import { ChevronLeft, ChevronRight, Upload } from 'lucide-react';
+import ShapeAppearanceControls from './ShapeAppearanceControls';
+import ImageAdjustModal from './ImageAdjustModal';
+import { ChevronLeft, ChevronRight, Upload, Plus, GripVertical, SquarePen, Trash2, ArrowRightLeft } from 'lucide-react';
 const PropertySlider = ({ label, value, onChange, min = 0, max = 100, disabled = false }) => {
   const [localVal, setLocalVal] = useState(value);
   const isFocused = useRef(false);
@@ -109,10 +111,80 @@ const ElementShapesProperties = ({
 
   // --- IMAGE MASKING STATE ---
   const [slotImage, setSlotImage] = useState(null);
-  const [slotRotation, setSlotRotation] = useState(0);
+  const [slotOriginalImage, setSlotOriginalImage] = useState(null);
+  const [slotImageName, setSlotImageName] = useState('Image Name .jpg');
+  const [slotImageMeta, setSlotImageMeta] = useState('1920 X 1080 • 24MB');
   const [framePadding, setFramePadding] = useState(0);
+  const [isMaskEnabled, setIsMaskEnabled] = useState(false);
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [slotCropData, setSlotCropData] = useState(null);
+  const [slotFixType, setSlotFixType] = useState('Fill All');
+  const [slotOpacity, setSlotOpacity] = useState(100);
+  const [slotFilters, setSlotFilters] = useState(null);
+  const [shapeAspectRatio, setShapeAspectRatio] = useState(1);
   const fileInputRef = useRef(null);
   const adjustStateRef = useRef({ isAdjusting: false, slotId: null, isPanning: false, startX: 0, startY: 0, matrix: null, rotateStr: '', imgNode: null, bbox: null, startMatrix: null, path: null });
+
+  const [isNodeEditActive, setIsNodeEditActive] = useState(false);
+  const [activeNodeType, setActiveNodeType] = useState(null);
+  const [selectedNodeCount, setSelectedNodeCount] = useState(1);
+  const [canJoinNodes, setCanJoinNodes] = useState(false);
+  const [isLineSelected, setIsLineSelected] = useState(false);
+
+  useEffect(() => {
+    const handleNodeSelected = (e) => {
+      if (e.detail?.nodeType) {
+        setActiveNodeType(e.detail.nodeType);
+      }
+      const count = e.detail?.selectedCount !== undefined ? e.detail.selectedCount : e.detail?.count;
+      if (count !== undefined) {
+        setSelectedNodeCount(count);
+      }
+      if (e.detail?.canJoin !== undefined) {
+        setCanJoinNodes(Boolean(e.detail.canJoin) && count === 2);
+      } else {
+        setCanJoinNodes(count === 2);
+      }
+      if (e.detail?.isLineSelected !== undefined) {
+        setIsLineSelected(Boolean(e.detail.isLineSelected));
+      } else {
+        setIsLineSelected(false);
+      }
+    };
+    const handleNodeEditChange = (e) => {
+      setIsNodeEditActive(Boolean(e.detail?.active));
+      if (e.detail?.active) {
+        setSelectedNodeCount(1);
+        setCanJoinNodes(false);
+        setIsLineSelected(false);
+        setActiveNodeType(null);
+      }
+    };
+    window.addEventListener('node-selected', handleNodeSelected);
+    window.addEventListener('node-edit-mode-changed', handleNodeEditChange);
+    return () => {
+      window.removeEventListener('node-selected', handleNodeSelected);
+      window.removeEventListener('node-edit-mode-changed', handleNodeEditChange);
+    };
+  }, []);
+
+  // Listen for mask toggle events dispatched from TopToolbar, Context Menu, or shortcuts
+  useEffect(() => {
+    const handleShapeMaskToggled = (e) => {
+      if (!e.detail || e.detail.layerId === selectedLayerId) {
+        const enabled = Boolean(e.detail?.enabled);
+        setIsMaskEnabled(enabled);
+        if (!enabled) {
+          setSlotImage(null);
+          setSlotOriginalImage(null);
+          setSlotCropData(null);
+          setSlotFilters(null);
+        }
+      }
+    };
+    window.addEventListener('shape-mask-toggled', handleShapeMaskToggled);
+    return () => window.removeEventListener('shape-mask-toggled', handleShapeMaskToggled);
+  }, [selectedLayerId]);
 
   useEffect(() => {
     const doc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
@@ -120,6 +192,10 @@ const ElementShapesProperties = ({
     if (!selectedElement) return;
 
     setFramePadding(parseFloat(selectedElement.getAttribute('data-frame-padding')) || 0);
+
+    const hasMaskEnabledAttr = selectedElement.getAttribute('data-mask-enabled') === 'true' ||
+      selectedElement.querySelector('[data-mask-enabled="true"]') !== null;
+    setIsMaskEnabled(hasMaskEnabledAttr);
 
     let svgRoot = selectedElement;
     while (svgRoot && svgRoot.tagName?.toLowerCase() !== 'svg') {
@@ -342,6 +418,9 @@ const ElementShapesProperties = ({
       listeners.length = 0;
       
       for (const shapeEl of shapes) {
+        if (shapeEl.getAttribute('data-mask-enabled') === 'true') {
+          setIsMaskEnabled(true);
+        }
         const fill = shapeEl.getAttribute('fill');
         if (fill && fill.includes('url(')) {
           const match = fill.match(/url\(['"]?#([^)'"]+)['"]?\)/);
@@ -353,21 +432,41 @@ const ElementShapesProperties = ({
               if (imgNode) {
                 const newHref = imgNode.getAttribute('href') || imgNode.getAttribute('xlink:href');
                 setSlotImage(prev => prev !== newHref ? newHref : prev);
+                setIsMaskEnabled(true);
+
+                const savedName = shapeEl.getAttribute('data-slot-image-name') || selectedElement.getAttribute('data-slot-image-name');
+                if (savedName) setSlotImageName(savedName);
+
+                const savedMeta = shapeEl.getAttribute('data-slot-image-meta') || selectedElement.getAttribute('data-slot-image-meta');
+                if (savedMeta) setSlotImageMeta(savedMeta);
+
+                const savedOrig = shapeEl.getAttribute('data-slot-original-url') || selectedElement.getAttribute('data-slot-original-url');
+                if (savedOrig) setSlotOriginalImage(savedOrig);
+                else setSlotOriginalImage(newHref);
+
+                const savedCrop = shapeEl.getAttribute('data-slot-crop-data') || selectedElement.getAttribute('data-slot-crop-data');
+                if (savedCrop) {
+                  try { setSlotCropData(JSON.parse(savedCrop)); } catch (e) {}
+                }
+
+                const savedFix = shapeEl.getAttribute('data-slot-fix-type') || selectedElement.getAttribute('data-slot-fix-type');
+                if (savedFix) setSlotFixType(savedFix);
+
+                const savedOp = shapeEl.getAttribute('data-slot-opacity') || selectedElement.getAttribute('data-slot-opacity');
+                if (savedOp !== null && savedOp !== undefined) setSlotOpacity(parseFloat(savedOp));
+
+                const savedFilters = shapeEl.getAttribute('data-slot-filters') || selectedElement.getAttribute('data-slot-filters');
+                if (savedFilters) {
+                  try { setSlotFilters(JSON.parse(savedFilters)); } catch (e) {}
+                }
+
+                try {
+                  const b = shapeEl.getBBox();
+                  if (b.width && b.height) {
+                    setShapeAspectRatio(b.width / b.height);
+                  }
+                } catch (e) {}
                 
-                const pt = pattern.getAttribute('patternTransform');
-                let rot = 0;
-                if (pt) {
-                    const matchRot = pt.match(/rotate\(([-0-9.]+)/);
-                    if (matchRot) rot = parseFloat(matchRot[1]);
-                }
-                if (rot === 0) {
-                    const tf = imgNode.getAttribute('transform');
-                    if (tf) {
-                        const matchRot = tf.match(/rotate\(([-0-9.]+)/);
-                        if (matchRot) rot = parseFloat(matchRot[1]);
-                    }
-                }
-                setSlotRotation(prev => prev !== rot ? rot : prev);
                 foundImage = true;
 
                 const handleDoubleClick = (e) => {
@@ -433,7 +532,9 @@ const ElementShapesProperties = ({
       
       if (!foundImage) {
         setSlotImage(null);
-        setSlotRotation(0);
+        const hasMaskAttr = selectedElement.getAttribute('data-mask-enabled') === 'true' ||
+          selectedElement.querySelector('[data-mask-enabled="true"]') !== null;
+        setIsMaskEnabled(hasMaskAttr);
       }
     };
 
@@ -448,7 +549,7 @@ const ElementShapesProperties = ({
         childList: true, 
         subtree: true, 
         attributes: true, 
-        attributeFilter: ['fill', 'href', 'xlink:href', 'transform', 'patternTransform'] 
+        attributeFilter: ['fill', 'href', 'xlink:href', 'transform', 'patternTransform', 'data-mask-enabled'] 
       });
     }
 
@@ -466,7 +567,139 @@ const ElementShapesProperties = ({
     };
   }, [selectedLayerId, activePageIndex, selectedElementProps?.fill]);
 
-  const applyImageMask = (dataUrl) => {
+  const handleRemoveMask = () => {
+    const doc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+    const selectedElement = doc.getElementById(selectedLayerId);
+    if (!selectedElement) return;
+
+    let shapeEl = selectedElement.querySelector('path, polygon, rect, circle, ellipse');
+    if (!shapeEl && ['path', 'polygon', 'rect', 'circle', 'ellipse'].includes(selectedElement.tagName?.toLowerCase())) {
+      shapeEl = selectedElement;
+    }
+
+    let svgRoot = selectedElement;
+    while (svgRoot && svgRoot.tagName?.toLowerCase() !== 'svg') {
+      svgRoot = svgRoot.parentElement;
+    }
+
+    if (shapeEl) {
+      shapeEl.removeAttribute('data-mask-enabled');
+      const patternMatch = (shapeEl.getAttribute('fill') || '').match(/url\(['"]?#([^)'"]+)['"]?\)/);
+      if (patternMatch && patternMatch[1]) {
+        const pat = (svgRoot || selectedElement).querySelector(`pattern[id="${patternMatch[1]}"]`);
+        if (pat) pat.remove();
+      }
+      const origFill = shapeEl.getAttribute('data-original-fill') || '#3194FC';
+      shapeEl.setAttribute('fill', origFill);
+      shapeEl.removeAttribute('data-pattern-id');
+      shapeEl.removeAttribute('data-masked-image-url');
+      shapeEl.removeAttribute('data-slot-image-name');
+      shapeEl.removeAttribute('data-slot-image-meta');
+      shapeEl.removeAttribute('data-slot-original-url');
+      shapeEl.removeAttribute('data-slot-crop-data');
+      shapeEl.removeAttribute('data-slot-fix-type');
+      shapeEl.removeAttribute('data-slot-opacity');
+      shapeEl.removeAttribute('data-slot-filters');
+    }
+
+    selectedElement.removeAttribute('data-mask-enabled');
+    selectedElement.removeAttribute('data-slot-image-name');
+    selectedElement.removeAttribute('data-slot-image-meta');
+    selectedElement.removeAttribute('data-slot-original-url');
+    selectedElement.removeAttribute('data-slot-crop-data');
+    selectedElement.removeAttribute('data-slot-fix-type');
+    selectedElement.removeAttribute('data-slot-opacity');
+    selectedElement.removeAttribute('data-slot-filters');
+    setSlotImage(null);
+    setSlotOriginalImage(null);
+    setSlotCropData(null);
+    setSlotFixType('Fill All');
+    setSlotOpacity(100);
+    setSlotFilters(null);
+    setShowAdjustModal(false);
+    setIsMaskEnabled(false);
+
+    window.__skipCanvasUpdateForPage = activePageIndex;
+    if (svgRoot) {
+      const cloneSvg = svgRoot.cloneNode(true);
+      cloneSvg.querySelectorAll('[data-highlight-id], #ghost-layer').forEach(el => el.remove());
+      const serializer = new XMLSerializer();
+      const html = serializer.serializeToString(cloneSvg);
+      updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', html);
+    }
+    window.dispatchEvent(new CustomEvent('shape-mask-toggled', { detail: { layerId: selectedLayerId, enabled: false } }));
+  };
+
+  const handleDeleteImage = () => {
+    const doc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+    const selectedElement = doc.getElementById(selectedLayerId);
+    if (!selectedElement) return;
+
+    let shapeEl = selectedElement.querySelector('path, polygon, rect, circle, ellipse');
+    if (!shapeEl && ['path', 'polygon', 'rect', 'circle', 'ellipse'].includes(selectedElement.tagName?.toLowerCase())) {
+      shapeEl = selectedElement;
+    }
+
+    let svgRoot = selectedElement;
+    while (svgRoot && svgRoot.tagName?.toLowerCase() !== 'svg') {
+      svgRoot = svgRoot.parentElement;
+    }
+
+    if (shapeEl) {
+      const patternMatch = (shapeEl.getAttribute('fill') || '').match(/url\(['"]?#([^)'"]+)['"]?\)/);
+      if (patternMatch && patternMatch[1]) {
+        const pat = (svgRoot || selectedElement).querySelector(`pattern[id="${patternMatch[1]}"]`);
+        if (pat) pat.remove();
+      }
+      const origFill = shapeEl.getAttribute('data-original-fill') || '#3194FC';
+      shapeEl.setAttribute('fill', origFill);
+      shapeEl.removeAttribute('data-pattern-id');
+      shapeEl.removeAttribute('data-masked-image-url');
+      shapeEl.removeAttribute('data-slot-image-name');
+      shapeEl.removeAttribute('data-slot-image-meta');
+      shapeEl.removeAttribute('data-slot-original-url');
+      shapeEl.removeAttribute('data-slot-crop-data');
+      shapeEl.removeAttribute('data-slot-fix-type');
+      shapeEl.removeAttribute('data-slot-opacity');
+      shapeEl.removeAttribute('data-slot-filters');
+    }
+
+    selectedElement.removeAttribute('data-slot-image-name');
+    selectedElement.removeAttribute('data-slot-image-meta');
+    selectedElement.removeAttribute('data-slot-original-url');
+    selectedElement.removeAttribute('data-slot-crop-data');
+    selectedElement.removeAttribute('data-slot-fix-type');
+    selectedElement.removeAttribute('data-slot-opacity');
+    selectedElement.removeAttribute('data-slot-filters');
+    setSlotImage(null);
+    setSlotOriginalImage(null);
+    setSlotCropData(null);
+    setSlotFixType('Fill All');
+    setSlotOpacity(100);
+    setSlotFilters(null);
+    setShowAdjustModal(false);
+    // Keep isMaskEnabled = true so the "+ Add Images" before-upload box is displayed!
+
+    window.__skipCanvasUpdateForPage = activePageIndex;
+    if (svgRoot) {
+      const cloneSvg = svgRoot.cloneNode(true);
+      cloneSvg.querySelectorAll('[data-highlight-id], #ghost-layer').forEach(el => el.remove());
+      const serializer = new XMLSerializer();
+      const html = serializer.serializeToString(cloneSvg);
+      updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', html);
+    }
+  };
+
+  const applyImageMask = useCallback((
+    dataUrl,
+    name = null,
+    sizeStr = null,
+    originalDataUrl = null,
+    cropData = null,
+    fixType = 'Fill All',
+    opacity = 100,
+    filters = null
+  ) => {
     const doc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
     const selectedElement = doc.getElementById(selectedLayerId);
     if (!selectedElement) return;
@@ -476,6 +709,13 @@ const ElementShapesProperties = ({
         shapeEl = selectedElement;
     }
     if (!shapeEl) return;
+
+    shapeEl.setAttribute('data-mask-enabled', 'true');
+    selectedElement.setAttribute('data-mask-enabled', 'true');
+    if (!shapeEl.hasAttribute('data-original-fill')) {
+      shapeEl.setAttribute('data-original-fill', shapeEl.getAttribute('fill') || '#3194FC');
+    }
+    setIsMaskEnabled(true);
 
     let defs = selectedElement.querySelector('defs');
     if (!defs) {
@@ -495,17 +735,38 @@ const ElementShapesProperties = ({
     }
 
     shapeEl.setAttribute('fill', `url(#${patternId})`);
-    
-    // Attempt to update Color state directly if it uses handleSetBackgroundColor pattern
-    // (the updateElementAttribute will handle syncing, but let's do the immediate attribute update)
-    if (shapeEl.tagName !== selectedElement.tagName) {
-       // if we are wrapping
-    }
 
     const img = new window.Image();
     img.onload = () => {
       const imgW = img.width;
       const imgH = img.height;
+
+      const dims = `${img.naturalWidth || imgW} X ${img.naturalHeight || imgH}`;
+      const meta = `${dims} • ${sizeStr || '24MB'}`;
+      if (name) setSlotImageName(name);
+      setSlotImageMeta(meta);
+
+      const origToSave = originalDataUrl || dataUrl;
+      setSlotOriginalImage(origToSave);
+
+      if (shapeEl) {
+        if (name) shapeEl.setAttribute('data-slot-image-name', name);
+        shapeEl.setAttribute('data-slot-image-meta', meta);
+        shapeEl.setAttribute('data-slot-original-url', origToSave);
+        if (cropData) shapeEl.setAttribute('data-slot-crop-data', JSON.stringify(cropData));
+        if (fixType) shapeEl.setAttribute('data-slot-fix-type', fixType);
+        if (opacity !== undefined) shapeEl.setAttribute('data-slot-opacity', opacity.toString());
+        if (filters) shapeEl.setAttribute('data-slot-filters', JSON.stringify(filters));
+      }
+      if (selectedElement) {
+        if (name) selectedElement.setAttribute('data-slot-image-name', name);
+        selectedElement.setAttribute('data-slot-image-meta', meta);
+        selectedElement.setAttribute('data-slot-original-url', origToSave);
+        if (cropData) selectedElement.setAttribute('data-slot-crop-data', JSON.stringify(cropData));
+        if (fixType) selectedElement.setAttribute('data-slot-fix-type', fixType);
+        if (opacity !== undefined) selectedElement.setAttribute('data-slot-opacity', opacity.toString());
+        if (filters) selectedElement.setAttribute('data-slot-filters', JSON.stringify(filters));
+      }
 
       let bbox = { width: 100, height: 100, x: 0, y: 0 };
       try {
@@ -516,9 +777,27 @@ const ElementShapesProperties = ({
       const slotW = bbox.width;
       const slotH = bbox.height;
 
-      const scale = Math.max(slotW / imgW, slotH / imgH);
-      const finalW = imgW * scale;
-      const finalH = imgH * scale;
+      if (slotW && slotH) {
+        setShapeAspectRatio(slotW / slotH);
+      }
+
+      let scaleX, scaleY;
+      if (fixType === 'Fit') {
+        const fitScale = Math.min(slotW / imgW, slotH / imgH);
+        scaleX = fitScale;
+        scaleY = fitScale;
+      } else if (fixType === 'Stretch') {
+        scaleX = slotW / imgW;
+        scaleY = slotH / imgH;
+      } else {
+        // 'Fill All' (cover)
+        const coverScale = Math.max(slotW / imgW, slotH / imgH);
+        scaleX = coverScale;
+        scaleY = coverScale;
+      }
+
+      const finalW = imgW * scaleX;
+      const finalH = imgH * scaleY;
 
       const tx_user = (slotW - finalW) / 2;
       const ty_user = (slotH - finalH) / 2;
@@ -540,7 +819,8 @@ const ElementShapesProperties = ({
       const rMatch = existingTf.match(/rotate\([^)]+\)/);
       if (rMatch) rotateStr = rMatch[0] + ' ';
       
-      imageNode.setAttribute('transform', `${rotateStr}matrix(${scale} 0 0 ${scale} ${bbox.x + tx_user} ${bbox.y + ty_user})`);
+      imageNode.setAttribute('transform', `${rotateStr}matrix(${scaleX} 0 0 ${scaleY} ${bbox.x + tx_user} ${bbox.y + ty_user})`);
+      imageNode.setAttribute('opacity', ((opacity !== undefined ? opacity : 100) / 100).toString());
 
       imageNode.setAttribute('href', dataUrl);
       imageNode.setAttribute('xlink:href', dataUrl);
@@ -566,7 +846,7 @@ const ElementShapesProperties = ({
       }
     };
     img.src = dataUrl;
-  };
+  }, [selectedLayerId, activePageIndex, updateElementAttribute]);
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
@@ -578,14 +858,54 @@ const ElementShapesProperties = ({
       return;
     }
 
+    const name = file.name || 'Image Name .jpg';
+    setSlotImageName(name);
+
+    const sizeStr = file.size > 1024 * 1024
+      ? `${(file.size / (1024 * 1024)).toFixed(1)}MB`
+      : `${Math.round(file.size / 1024)}KB`;
+
     const reader = new FileReader();
     reader.onload = async (event) => {
       const dataUrl = event.target.result;
-      applyImageMask(dataUrl);
+      setSlotOriginalImage(dataUrl);
+      setSlotCropData(null);
+      setSlotFilters(null);
+      setSlotOpacity(100);
+      setSlotFixType('Fill All');
+      applyImageMask(dataUrl, name, sizeStr, dataUrl, null, 'Fill All', 100, null);
     };
     reader.readAsDataURL(file);
     e.target.value = '';
   };
+
+  const handleSaveAdjustedImage = useCallback(({
+    croppedUrl,
+    originalUrl,
+    cropData,
+    fixType,
+    opacity: adjustedOpacity,
+    filters
+  }) => {
+    setSlotCropData(cropData);
+    setSlotFixType(fixType || 'Fill All');
+    setSlotOpacity(adjustedOpacity !== undefined ? adjustedOpacity : 100);
+    setSlotFilters(filters);
+    const orig = originalUrl || slotOriginalImage || slotImage;
+    if (orig) setSlotOriginalImage(orig);
+
+    applyImageMask(
+      croppedUrl,
+      slotImageName,
+      slotImageMeta,
+      orig,
+      cropData,
+      fixType || 'Fill All',
+      adjustedOpacity !== undefined ? adjustedOpacity : 100,
+      filters
+    );
+    setShowAdjustModal(false);
+  }, [slotImageName, slotImageMeta, slotOriginalImage, slotImage, applyImageMask]);
 
   const updateFramePadding = (newPadding) => {
     const doc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
@@ -678,74 +998,6 @@ const ElementShapesProperties = ({
     }
   };
 
-  const updateRotation = (angle) => {
-    const doc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
-    const selectedElement = doc.getElementById(selectedLayerId);
-    if (!selectedElement) return;
-
-    let shapeEl = selectedElement.querySelector('path, polygon, rect, circle, ellipse');
-    if (!shapeEl && ['path', 'polygon', 'rect', 'circle', 'ellipse'].includes(selectedElement.tagName?.toLowerCase())) {
-        shapeEl = selectedElement;
-    }
-    if (!shapeEl) return;
-
-    const patternId = `pattern-${selectedLayerId}`;
-    let pattern = selectedElement.querySelector(`pattern[id="${patternId}"]`);
-    if (!pattern) pattern = doc.getElementById(patternId);
-
-    if (pattern) {
-      setSlotRotation(angle);
-      let bbox = { x: 0, y: 0, width: 100, height: 100 };
-      try { bbox = shapeEl.getBBox(); } catch(e) {}
-      const cx = bbox.x + bbox.width / 2;
-      const cy = bbox.y + bbox.height / 2;
-      
-      let matrixStr = '';
-      const imgNode = pattern.querySelector('image, img');
-      if (imgNode) {
-          let tf = imgNode.getAttribute('transform') || '';
-          let m = [1, 0, 0, 1, 0, 0];
-          const mMatch = tf.match(/matrix\(([^)]+)\)/);
-          if (mMatch) {
-              m = mMatch[1].split(/[ ,]+/).map(parseFloat);
-          }
-          
-          const pcu = pattern.getAttribute('patternContentUnits');
-          if (pcu !== 'userSpaceOnUse') {
-              m[0] = m[0] * bbox.width;
-              m[2] = m[2] * bbox.width;
-              m[1] = m[1] * bbox.height;
-              m[3] = m[3] * bbox.height;
-              m[4] = bbox.x + m[4] * bbox.width;
-              m[5] = bbox.y + m[5] * bbox.height;
-              pattern.setAttribute('patternContentUnits', 'userSpaceOnUse');
-              pattern.removeAttribute('patternTransform');
-          }
-          
-          matrixStr = `matrix(${m.join(' ')})`;
-          
-          if (angle !== 0) {
-              imgNode.setAttribute('transform', `rotate(${angle}, ${cx}, ${cy}) ${matrixStr}`.trim());
-          } else {
-              imgNode.setAttribute('transform', matrixStr);
-          }
-      }
-
-      window.__skipCanvasUpdateForPage = activePageIndex;
-      let svgRoot = selectedElement;
-      while (svgRoot && svgRoot.tagName?.toLowerCase() !== 'svg') {
-        svgRoot = svgRoot.parentElement;
-      }
-      if (svgRoot) {
-        const cloneSvg = svgRoot.cloneNode(true);
-        cloneSvg.querySelectorAll('[data-highlight-id], #ghost-layer').forEach(el => el.remove());
-        const serializer = new XMLSerializer();
-        const html = serializer.serializeToString(cloneSvg);
-        updateElementAttribute(activePageIndex, selectedLayerId, '__dom_sync__', html);
-      }
-    }
-  };
-
   const colorsOnPage = React.useMemo(() => {
     const doc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
     const elements = doc.querySelectorAll('[data-fill-color], [data-stroke-color]');
@@ -762,6 +1014,39 @@ const ElementShapesProperties = ({
   }, [selectedElementProps, activePageIndex]);
 
   const shapeType = selectedElementProps['data-shape-type'] || selectedElementProps.innerTagName || selectedElementProps.tagName?.toLowerCase();
+
+  const isDiamond = shapeType === 'diamond' ||
+    selectedElementProps['data-shape-id'] === 'rounded-diamond' ||
+    (selectedElementProps.d && (selectedElementProps.d.includes('50 12') || selectedElementProps.d.includes('50 88') || selectedElementProps.d.includes('85 43') || selectedElementProps.d.includes('15 57')));
+
+  const isRectangularShape = Boolean(
+    !['polygon', 'star', 'circle', 'ellipse', 'line'].includes(shapeType) &&
+    (
+      shapeType === 'rect' ||
+      shapeType === 'rectangle' ||
+      shapeType === 'square' ||
+      shapeType === 'shape' ||
+      shapeType === 'diamond' ||
+      isDiamond ||
+      selectedElementProps?.['data-type'] === 'shape' ||
+      selectedElementProps?.isElementShape ||
+      selectedElementProps?.innerTagName === 'rect' ||
+      selectedElementProps?.tagName?.toLowerCase() === 'rect' ||
+      (() => {
+        try {
+          const doc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+          const el = doc.getElementById(selectedLayerId);
+          if (!el) return false;
+          const inner = el.querySelector('rect, [data-shape-type="rectangle"], [data-shape-type="diamond"], [data-shape-type="shape"]') || (['rect', 'g'].includes(el.tagName?.toLowerCase()) ? el : null);
+          return Boolean(inner);
+        } catch (e) {
+          return false;
+        }
+      })()
+    )
+  );
+
+  const shouldHideCornerRadius = hideCornerRadius || !isRectangularShape;
 
   if (!selectedElementProps) return null;
 
@@ -903,6 +1188,69 @@ const ElementShapesProperties = ({
     updates['rx'] = maxR.toString();
     updates['ry'] = maxR.toString();
 
+    try {
+      const doc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+      const el = doc.getElementById(selectedLayerId);
+      if (el) {
+        let target = el;
+        if (el.tagName.toLowerCase() === 'g') {
+          const inner = el.querySelector('path, polygon, rect, circle, ellipse, line');
+          if (inner) target = inner;
+        }
+        const sType = target.getAttribute('data-shape-type') || (target.tagName.toLowerCase() === 'rect' ? 'rectangle' : null);
+        const pD = target.getAttribute('d') || '';
+        const isDia = sType === 'diamond' || target.getAttribute('data-shape-id') === 'rounded-diamond' || (pD && (pD.includes('50 12') || pD.includes('50 88') || pD.includes('85 43') || pD.includes('15 57')));
+
+        if (isDia) {
+          target.setAttribute('data-shape-type', 'diamond');
+          let x = parseFloat(target.getAttribute('x') || 0);
+          let y = parseFloat(target.getAttribute('y') || 0);
+          let w = parseFloat(target.getAttribute('width') || 0);
+          let h = parseFloat(target.getAttribute('height') || 0);
+          if (!w || !h) {
+            try {
+              const bbox = target.getBBox();
+              if (bbox && bbox.width > 0 && bbox.height > 0) {
+                x = bbox.x; y = bbox.y; w = bbox.width; h = bbox.height;
+              }
+            } catch (e) {}
+          }
+          if (!w || !h) { x = 10; y = 10; w = 80; h = 80; }
+          const cx = x + w / 2;
+          const cy = y + h / 2;
+          const pts = [
+            { x: cx, y, r: next.tl || 0 },
+            { x: x + w, y: cy, r: next.tr || 0 },
+            { x: cx, y: y + h, r: next.br || 0 },
+            { x, y: cy, r: next.bl || 0 }
+          ];
+          const cornerPoints = pts.map((curr, i) => {
+            const prev = pts[(i + pts.length - 1) % pts.length];
+            const nextPt = pts[(i + 1) % pts.length];
+            const d1 = { x: curr.x - prev.x, y: curr.y - prev.y };
+            const d2 = { x: nextPt.x - curr.x, y: nextPt.y - curr.y };
+            const l1 = Math.hypot(d1.x, d1.y) || 1;
+            const l2 = Math.hypot(d2.x, d2.y) || 1;
+            const limit = Math.max(0, Math.min(curr.r, l1 / 2, l2 / 2));
+            return {
+              limit,
+              q: { x: curr.x, y: curr.y },
+              p1: { x: curr.x - (d1.x / l1) * limit, y: curr.y - (d1.y / l1) * limit },
+              p2: { x: curr.x + (d2.x / l2) * limit, y: curr.y + (d2.y / l2) * limit }
+            };
+          });
+          let pathData = '';
+          cornerPoints.forEach((cp, i) => {
+            if (i === 0) pathData += `M ${cp.p1.x.toFixed(2)} ${cp.p1.y.toFixed(2)}`;
+            else pathData += ` L ${cp.p1.x.toFixed(2)} ${cp.p1.y.toFixed(2)}`;
+            if (cp.limit > 0) pathData += ` Q ${cp.q.x.toFixed(2)} ${cp.q.y.toFixed(2)}, ${cp.p2.x.toFixed(2)} ${cp.p2.y.toFixed(2)}`;
+          });
+          pathData += ' Z';
+          target.setAttribute('d', pathData);
+        }
+      }
+    } catch (e) {}
+
     updateElementAttribute(activePageIndex, selectedLayerId, updates);
   };
 
@@ -991,69 +1339,17 @@ const ElementShapesProperties = ({
     if (Object.keys(updates).length > 0) updateElementAttribute(activePageIndex, selectedLayerId, updates);
   };
 
-  const [isNodeEditActive, setIsNodeEditActive] = useState(false);
-
-  useEffect(() => {
-    const handleNodeEditChange = (e) => {
-      setIsNodeEditActive(Boolean(e.detail?.active));
-    };
-    window.addEventListener('node-edit-mode-changed', handleNodeEditChange);
-    return () => window.removeEventListener('node-edit-mode-changed', handleNodeEditChange);
-  }, []);
-
   const isVectorPath = (
     shapeType === 'path' ||
     shapeType === 'vector-path' ||
     shapeType === 'shape' ||
-    selectedElementProps['data-type'] === 'vector-path' ||
-    selectedElementProps['data-type'] === 'shape' ||
-    selectedElementProps.tagName?.toLowerCase() === 'path' ||
-    Boolean(selectedElementProps.d) ||
+    selectedElementProps?.['data-type'] === 'vector-path' ||
+    selectedElementProps?.['data-type'] === 'shape' ||
+    selectedElementProps?.tagName?.toLowerCase() === 'path' ||
+    Boolean(selectedElementProps?.d) ||
     isNodeEditActive ||
     Boolean(selectedLayerId)
   );
-
-  const [activeNodeType, setActiveNodeType] = useState(null);
-  const [selectedNodeCount, setSelectedNodeCount] = useState(1);
-  const [canJoinNodes, setCanJoinNodes] = useState(false);
-  const [isLineSelected, setIsLineSelected] = useState(false);
-
-  useEffect(() => {
-    const handleNodeSelected = (e) => {
-      if (e.detail?.nodeType) {
-        setActiveNodeType(e.detail.nodeType);
-      }
-      const count = e.detail?.selectedCount !== undefined ? e.detail.selectedCount : e.detail?.count;
-      if (count !== undefined) {
-        setSelectedNodeCount(count);
-      }
-      if (e.detail?.canJoin !== undefined) {
-        setCanJoinNodes(Boolean(e.detail.canJoin) && count === 2);
-      } else {
-        setCanJoinNodes(count === 2);
-      }
-      if (e.detail?.isLineSelected !== undefined) {
-        setIsLineSelected(Boolean(e.detail.isLineSelected));
-      } else {
-        setIsLineSelected(false);
-      }
-    };
-    const handleNodeEditChange = (e) => {
-      setIsNodeEditActive(Boolean(e.detail?.active));
-      if (e.detail?.active) {
-        setSelectedNodeCount(1);
-        setCanJoinNodes(false);
-        setIsLineSelected(false);
-        setActiveNodeType(null); // Reset stale type; enterNodeEditMode will dispatch node-selected with the real type
-      }
-    };
-    window.addEventListener('node-selected', handleNodeSelected);
-    window.addEventListener('node-edit-mode-changed', handleNodeEditChange);
-    return () => {
-      window.removeEventListener('node-selected', handleNodeSelected);
-      window.removeEventListener('node-edit-mode-changed', handleNodeEditChange);
-    };
-  }, []);
 
   const triggerPathAction = (action) => {
     if (['sharp', 'smooth', 'balanced', 'custom'].includes(action)) {
@@ -1071,6 +1367,111 @@ const ElementShapesProperties = ({
         <span className="text-[0.9vw] font-semibold text-gray-900 whitespace-nowrap tracking-wider">Element Shape Properties</span>
         <div className="h-[0.0925vw] bg-gray-200 flex-1" style={{ marginRight: '-1.5vw' }}> </div>
       </div>
+
+      {/* Image Masking Section (Shown at the top of the properties when Mask option is clicked or image is present) */}
+      {(isMaskEnabled || slotImage) && (
+        <div className="px-[0.2vw] space-y-[0.35vw] py-[0.4vw]">
+          <div className="flex items-center justify-between mb-[0.4vw]">
+            <span className="text-[0.8vw] font-semibold text-gray-800">Mask Image</span>
+            <button
+              type="button"
+              onClick={handleRemoveMask}
+              className="text-[0.65vw] text-red-500 hover:text-red-700 font-medium cursor-pointer transition-colors"
+            >
+              Remove
+            </button>
+          </div>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept="image/*"
+            onChange={handleFileChange}
+          />
+
+          {!slotImage ? (
+            /* BEFORE UPLOAD: Dashed Add Images Box */
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const files = e.dataTransfer.files;
+                if (files && files.length > 0) {
+                  handleFileChange({ target: { files: files } });
+                }
+              }}
+              className="w-full h-[4.2vw] border-[1.5px] border-dashed border-[#9CA3AF] rounded-[0.8vw] bg-[#F4F5F7] hover:bg-[#ECEEF2] hover:border-gray-500 flex items-center justify-center gap-[0.5vw] text-[#6B7280] hover:text-[#374151] cursor-pointer transition-all select-none shadow-2xs group"
+            >
+              <Plus size="1.15vw" strokeWidth={1.8} className="text-[#6B7280] group-hover:text-[#374151] transition-colors" />
+              <span className="text-[0.85vw] font-normal text-[#6B7280] group-hover:text-[#374151] transition-colors">
+                Add Images
+              </span>
+            </div>
+          ) : (
+            /* AFTER UPLOAD: Card with Drag Grip, Thumbnail, Name, Resolution/Size, Edit Pen, and Trash */
+            <div className="w-full bg-[#F3F4F6] rounded-[0.6vw] p-[0.5vw] flex items-center justify-between select-none border border-transparent hover:border-gray-200 transition-all shadow-2xs">
+              <div className="flex items-center gap-[0.8vw] min-w-0 flex-1">
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="relative group/thumb w-[4vw] h-[3vw] rounded-[0.35vw] overflow-hidden bg-black shrink-0 border border-gray-200/60 shadow-2xs cursor-pointer"
+                  title="Click to replace image"
+                >
+                  <img src={slotImage} alt={slotImageName || 'Mask'} className="w-full h-full object-cover transition-transform duration-200 group-hover/thumb:scale-105" />
+                  <div className="absolute inset-0 bg-black/45 opacity-0 group-hover/thumb:opacity-100 flex flex-col items-center justify-center text-white transition-all duration-200">
+                    <ArrowRightLeft size="0.85vw" strokeWidth={1.8} className="text-white mb-[0.1vw]" />
+                    <span className="text-[0.52vw] font-medium text-white tracking-wide">Replace</span>
+                  </div>
+                </div>
+                <div className="flex flex-col min-w-0 flex-1 justify-center ml-[0.2vw]">
+                  <span className="text-[0.78vw] font-medium text-gray-800 truncate" title={slotImageName}>
+                    {slotImageName || 'Image Name .jpg'}
+                  </span>
+                  <span className="text-[0.65vw] text-gray-400 font-normal mt-[0.1vw]">
+                    {slotImageMeta || '1920 X 1080 • 24MB'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-[0.5vw] shrink-0 ml-[0.5vw]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      const doc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                      const el = doc.getElementById(selectedLayerId);
+                      const s = el?.querySelector('path, polygon, rect, circle, ellipse') || el;
+                      if (s) {
+                        const b = s.getBBox();
+                        if (b.width && b.height) {
+                          setShapeAspectRatio(b.width / b.height);
+                        }
+                      }
+                    } catch (e) {}
+                    setShowAdjustModal(true);
+                  }}
+                  className="text-gray-500 hover:text-gray-800 transition-colors p-[0.2vw] cursor-pointer"
+                  title="Adjust Image"
+                >
+                  <SquarePen size="1vw" strokeWidth={1.5} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteImage}
+                  className="text-[#EF4444] hover:text-[#DC2626] transition-colors p-[0.2vw] cursor-pointer"
+                  title="Delete Image"
+                >
+                  <Trash2 size="1vw" strokeWidth={1.5} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {(shapeType === 'polygon' || shapeType === 'star') && (
         <div className="px-[0.2vw] space-y-[0.3vw] py-[0.5vw]">
@@ -1102,143 +1503,38 @@ const ElementShapesProperties = ({
         </div>
       )}
 
-      {/* Image Masking Section */}
-      <div className="px-[0.2vw] space-y-[0.3vw] py-[0.5vw]">
-        <div className="text-[0.8vw] font-semibold text-gray-800 mb-[0.5vw]">Image Slots</div>
-        <div className="grid grid-cols-2 gap-[1vw]">
-          <div className="flex flex-col gap-[0.5vw]">
-            <span className="text-[0.8vw] text-gray-600 font-medium flex items-center justify-between">
-              Image
-              {slotImage && (
-                <span className="text-[0.6vw] text-green-600 bg-green-50 px-[0.3vw] py-[0.1vw] rounded">Filled</span>
-              )}
-            </span>
-            <div
-              className={`border border-dashed rounded-[0.5vw] flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden group ${
-                slotImage 
-                  ? 'border-gray-300 hover:border-[#4c5add] bg-gray-50 h-[5vw]'
-                  : 'border-[#4c5add] bg-blue-50/30 hover:bg-blue-50 p-[1vw]'
-              }`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const files = e.dataTransfer.files;
-                if (files && files.length > 0) {
-                  handleFileChange({ target: { files: files } });
-                }
-              }}
-              onClick={() => {
-                if (fileInputRef.current) {
-                  fileInputRef.current.click();
-                }
-              }}
-            >
-              {slotImage ? (
-                <>
-                  <img src={slotImage} alt="Shape Mask" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Upload size="1.2vw" className="text-white mb-[0.2vw]" />
-                    <span className="text-[0.65vw] text-white font-medium">Replace</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <Upload size="1vw" className="text-[#4c5add] mb-[0.2vw]" />
-                  <span className="text-[0.6vw] text-[#4c5add] font-semibold text-center leading-tight">Drop on Slot<br/>or Click</span>
-                </>
-              )}
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="image/*"
-                onChange={handleFileChange}
-              />
-            </div>
-          </div>
-        </div>
-        {slotImage && (
-          <div className="flex flex-col gap-[0.5vw] mt-[1vw]">
-
-            <PropertySlider 
-              label="Rotation" 
-              value={slotRotation} 
-              onChange={(val) => updateRotation(val)} 
-              min={-180} 
-              max={180} 
-            />
-          </div>
-        )}
-      </div>
-
-      <div className="px-[0.2vw] mt-[-1vw] py-[0.5vw]">
-        <PropertySlider
-          label="Opacity"
-          value={Math.round(parseFloat(selectedElementProps['fill-opacity'] !== undefined ? selectedElementProps['fill-opacity'] : (selectedElementProps.opacity !== undefined ? selectedElementProps.opacity : 1)) * 100)}
-          onChange={(val) => {
-            const num = parseInt(val);
-            if (!isNaN(num)) {
-              handleSetBackgroundColor(prev => ({ ...prev, fillOpacity: num }));
-            }
-          }}
-          min={0}
-          max={100}
-        />
-      </div>
-
-      <div>
-        <Color
-          openSubSection={openSubSection}
-          setOpenSubSection={setOpenSubSection}
-          backgroundColor={backgroundColor}
-          setBackgroundColor={handleSetBackgroundColor}
-          activeColorPicker={activeColorPicker}
-          setActiveColorPicker={setActiveColorPicker}
-          showStrokeSettings={showStrokeSettings}
-          setShowStrokeSettings={setShowStrokeSettings}
-          isStrokeStyleOpen={isStrokeStyleOpen}
-          setIsStrokeStyleOpen={setIsStrokeStyleOpen}
-          dropdownPos={dropdownPos}
-          setDropdownPos={setDropdownPos}
-          strokeSettingsPos={strokeSettingsPos}
-          setStrokeSettingsPos={setStrokeSettingsPos}
-          isDashPosOpen={isDashPosOpen}
-          setIsDashPosOpen={setIsDashPosOpen}
-          activePopup={activePopup}
-          setActivePopup={setActivePopup}
-          colorsOnPage={colorsOnPage}
-          showDetailedPicker={showDetailedPicker}
-          setShowDetailedPicker={setShowDetailedPicker}
-          hideFill={shapeType === 'line'}
-        />
-      </div>
-
-      {!hideCornerRadius && (shapeType === 'rect' || shapeType === 'rectangle' || shapeType === 'shape' || selectedElementProps.innerTagName === 'rect') && (
-        <CornerRadius
-          openSubSection={openSubSection}
-          setOpenSubSection={setOpenSubSection}
-          radius={radius}
-          setRadius={handleSetRadius}
-          isRadiusLinked={isRadiusLinked}
-          setIsRadiusLinked={handleSetIsRadiusLinked}
-          tagName={selectedElementProps.tagName || 'rect'}
+      {/* Image Adjust / Crop Modal (Strictly for Image Adjustment like slideshow) */}
+      {showAdjustModal && (slotOriginalImage || slotImage) && (
+        <ImageAdjustModal
+          isOpen={showAdjustModal}
+          onClose={() => setShowAdjustModal(false)}
+          imageSrc={slotOriginalImage || slotImage}
+          initialFixType={slotFixType || 'Fill All'}
+          initialOpacity={slotOpacity !== undefined ? slotOpacity : 100}
+          initialFilters={slotFilters || null}
+          initialCrop={slotCropData || null}
+          frameAspectRatio={shapeAspectRatio || 1}
+          onSave={handleSaveAdjustedImage}
         />
       )}
 
-      <Effect
-        isShape={true}
-        openSubSection={openSubSection}
-        setOpenSubSection={setOpenSubSection}
+      <ShapeAppearanceControls
+        backgroundColor={backgroundColor}
+        setBackgroundColor={handleSetBackgroundColor}
+        activeColorPicker={activeColorPicker}
+        setActiveColorPicker={setActiveColorPicker}
+        colorsOnPage={colorsOnPage}
+        radius={radius}
+        setRadius={handleSetRadius}
+        isRadiusLinked={isRadiusLinked}
+        setIsRadiusLinked={handleSetIsRadiusLinked}
+        hideCornerRadius={shouldHideCornerRadius}
         activeEffects={activeEffects}
         setActiveEffects={handleSetActiveEffects}
         effectSettings={effectSettings}
         setEffectSettings={handleSetEffectSettings}
-        activeColorPicker={activeColorPicker}
-        setActiveColorPicker={setActiveColorPicker}
+        openSubSection={openSubSection}
+        setOpenSubSection={setOpenSubSection}
         showDetailedPicker={showDetailedPicker}
         setShowDetailedPicker={setShowDetailedPicker}
       />

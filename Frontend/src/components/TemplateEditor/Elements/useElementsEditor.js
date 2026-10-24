@@ -2122,9 +2122,12 @@ export const handleMapResize = ({ el, adjustedWidth, adjustedHeight, adjustedX, 
   }
 
   iframe.setAttribute('width', innerW.toString());
-  iframe.setAttribute('height', innerH.toString());
+  iframe.setAttribute('height', (innerH + 56).toString());
+  iframe.style.setProperty('position', 'absolute', 'important');
+  iframe.style.setProperty('top', '-56px', 'important');
+  iframe.style.setProperty('left', '0', 'important');
   iframe.style.setProperty('width', innerW + 'px', 'important');
-  iframe.style.setProperty('height', innerH + 'px', 'important');
+  iframe.style.setProperty('height', (innerH + 56) + 'px', 'important');
   iframe.style.setProperty('transform', 'none', 'important');
   iframe.style.setProperty('pointer-events', 'none', 'important');
   iframe.style.setProperty('border', 'none', 'important');
@@ -2242,7 +2245,13 @@ export const ELEMENTS_GLOBAL_STYLES = `
     inset: 0 !important;
     pointer-events: none !important;
   }
-  [data-type="map"] foreignObject iframe {
+  [data-type="map"] foreignObject iframe,
+  [id^="map-"] foreignObject iframe {
+    position: absolute !important;
+    top: -56px !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: calc(100% + 56px) !important;
     pointer-events: none !important;
     border: none !important;
     display: block !important;
@@ -2378,14 +2387,25 @@ export const ELEMENTS_GLOBAL_STYLES = `
   }
 
   @container (max-width: 175px) {
-    [data-type="map"] foreignObject .map-action-btn-secondary:last-child {
-      display: none !important;
+    [data-type="map"] foreignObject .map-actions-row {
+      gap: 2px !important;
+    }
+    [data-type="map"] foreignObject .map-action-btn {
+      padding: 3px 2px !important;
+      font-size: 7px !important;
+      display: flex !important;
+      min-width: 0 !important;
+    }
+    [data-type="map"] foreignObject .map-action-btn svg {
+      width: 7.5px !important;
+      height: 7.5px !important;
     }
     [data-type="map"] foreignObject .map-action-btn-primary {
-      flex: 1.2 !important;
+      flex: 1.1 !important;
     }
     [data-type="map"] foreignObject .map-action-btn-secondary {
-      flex: 1 !important;
+      flex: 0.95 !important;
+      display: flex !important;
     }
   }
 

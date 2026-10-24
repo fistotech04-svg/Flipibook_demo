@@ -4000,9 +4000,14 @@ const TemplateEditor = () => {
             } else {
               element.setAttribute(attr, val);
               
-              if (element.tagName.toLowerCase() === 'g' && (element.getAttribute('data-type') === 'shape' || element.getAttribute('data-shape-type') === 'shape')) {
+              if (element.tagName.toLowerCase() === 'g' && (
+                element.getAttribute('data-type') === 'shape' ||
+                element.getAttribute('data-shape-type') === 'shape' ||
+                element.getAttribute('data-is-element-shape') === 'true' ||
+                (element.querySelector && element.querySelector('[data-is-element-shape="true"]'))
+              )) {
                 const inner = element.querySelector('path, polygon, rect, circle, ellipse, line');
-                if (inner && ['data-shape-type', 'data-count', 'data-ratio', 'data-radius', 'data-cx', 'data-cy', 'data-rx', 'rx', 'data-tl', 'data-tr', 'data-bl', 'data-br'].includes(attr)) {
+                if (inner && ['data-shape-type', 'data-shape-id', 'data-count', 'data-ratio', 'data-radius', 'data-cx', 'data-cy', 'data-rx', 'rx', 'data-tl', 'data-tr', 'data-bl', 'data-br', 'data-corner-linked'].includes(attr)) {
                   inner.setAttribute(attr, val);
                 }
               }
@@ -4049,17 +4054,35 @@ const TemplateEditor = () => {
         updates.forEach(([attr, val]) => {
           if (val === null || val === 'none' || val === '#') return; // no redraw needed
 
-          // --- DYNAMIC SHAPE REDRAW (FOR POLYGON/STAR/ROUNDED RECT) ---
+          // --- DYNAMIC SHAPE REDRAW (FOR POLYGON/STAR/ROUNDED RECT/DIAMOND) ---
           const isRectCorner = ['data-tl', 'data-tr', 'data-bl', 'data-br'].includes(attr);
           if (attr === 'data-count' || attr === 'data-rx' || attr === 'data-ry' || attr === 'data-ratio' || attr === 'data-radius' || isRectCorner || attr === 'rx') {
             let targetShape = element;
             if (element.tagName.toLowerCase() === 'g') {
               const inner = element.querySelector('path, polygon, rect, circle, ellipse, line');
-              if (inner && inner.hasAttribute('data-shape-type')) {
+              if (inner && (inner.hasAttribute('data-shape-type') || inner.getAttribute('data-is-element-shape') === 'true')) {
                 targetShape = inner;
               }
             }
-            const shapeType = targetShape.getAttribute('data-shape-type') || (targetShape.tagName === 'rect' ? 'rectangle' : null);
+            let shapeType = targetShape.getAttribute('data-shape-type') || (targetShape.tagName.toLowerCase() === 'rect' ? 'rectangle' : null);
+            if (!shapeType && targetShape.getAttribute('data-is-element-shape') === 'true') {
+              shapeType = 'rectangle';
+            }
+
+            const pathD = targetShape.getAttribute('d') || '';
+            const isDiamond = shapeType === 'diamond' ||
+              targetShape.getAttribute('data-shape-id') === 'rounded-diamond' ||
+              (pathD && (pathD.includes('50 12') || pathD.includes('50 88') || pathD.includes('85 43') || pathD.includes('15 57') || pathD.includes('85 57')));
+
+            if (isDiamond) {
+              shapeType = 'diamond';
+              if (targetShape.getAttribute('data-shape-type') !== 'diamond') {
+                targetShape.setAttribute('data-shape-type', 'diamond');
+              }
+              if (element && element.getAttribute && element.getAttribute('data-shape-type') !== 'diamond') {
+                element.setAttribute('data-shape-type', 'diamond');
+              }
+            }
 
             if (shapeType === 'polygon' || shapeType === 'star') {
               const cx = parseFloat(targetShape.getAttribute('data-cx') || 0);
@@ -4115,11 +4138,46 @@ const TemplateEditor = () => {
             else if (shapeType === 'rectangle' && (isRectCorner || attr === 'rx') && !rectRedrawnThisBatch) {
               // All corner attrs are already written in Pass 1 — read them fresh.
               rectRedrawnThisBatch = true;
-              const x = parseFloat(targetShape.getAttribute('x') || 0);
-              const y = parseFloat(targetShape.getAttribute('y') || 0);
-              const w = parseFloat(targetShape.getAttribute('width') || 0);
-              const h = parseFloat(targetShape.getAttribute('height') || 0);
+              let x = parseFloat(targetShape.getAttribute('x') || 0);
+              let y = parseFloat(targetShape.getAttribute('y') || 0);
+              let w = parseFloat(targetShape.getAttribute('width') || 0);
+              let h = parseFloat(targetShape.getAttribute('height') || 0);
               const defR = parseFloat(targetShape.getAttribute('rx') || 0);
+
+              if ((!w || !h) && typeof targetShape.getBBox === 'function') {
+                try {
+                  const bbox = targetShape.getBBox();
+                  if (bbox && bbox.width > 0 && bbox.height > 0) {
+                    x = bbox.x;
+                    y = bbox.y;
+                    w = bbox.width;
+                    h = bbox.height;
+                  }
+                } catch (e) {}
+              }
+
+              if (!w || !h) {
+                const parentSvg = targetShape.closest('svg');
+                if (parentSvg) {
+                  const vb = parentSvg.getAttribute('viewBox');
+                  if (vb) {
+                    const parts = vb.split(/[ ,]+/).map(parseFloat);
+                    if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+                      x = parts[0] + 14;
+                      y = parts[1] + 14;
+                      w = parts[2] - 28;
+                      h = parts[3] - 28;
+                    }
+                  }
+                }
+              }
+
+              if (w > 0 && h > 0) {
+                targetShape.setAttribute('x', x);
+                targetShape.setAttribute('y', y);
+                targetShape.setAttribute('width', w);
+                targetShape.setAttribute('height', h);
+              }
 
               // Clamp each corner radius to at most half the rect's shorter dimension.
               // Without clamping, radii > w/2 or h/2 cause bezier arcs to cross,
@@ -4152,6 +4210,113 @@ const TemplateEditor = () => {
                 targetShape.parentNode.replaceChild(path, targetShape);
               } else {
                 targetShape.setAttribute('d', d);
+              }
+
+              const bgRect = element.querySelector('.frame-bg-rect');
+              if (bgRect) {
+                bgRect.setAttribute('rx', maxR.toString());
+                bgRect.setAttribute('ry', maxR.toString());
+              }
+            }
+            else if (shapeType === 'diamond' && (isRectCorner || attr === 'rx') && !rectRedrawnThisBatch) {
+              rectRedrawnThisBatch = true;
+              let x = parseFloat(targetShape.getAttribute('x') || 0);
+              let y = parseFloat(targetShape.getAttribute('y') || 0);
+              let w = parseFloat(targetShape.getAttribute('width') || 0);
+              let h = parseFloat(targetShape.getAttribute('height') || 0);
+              const defR = parseFloat(targetShape.getAttribute('rx') || 0);
+
+              if ((!w || !h) && typeof targetShape.getBBox === 'function') {
+                try {
+                  const bbox = targetShape.getBBox();
+                  if (bbox && bbox.width > 0 && bbox.height > 0) {
+                    x = bbox.x;
+                    y = bbox.y;
+                    w = bbox.width;
+                    h = bbox.height;
+                  }
+                } catch (e) {}
+              }
+
+              if (!w || !h) {
+                const parentSvg = targetShape.closest('svg');
+                if (parentSvg) {
+                  const vb = parentSvg.getAttribute('viewBox');
+                  if (vb) {
+                    const parts = vb.split(/[ ,]+/).map(parseFloat);
+                    if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+                      x = parts[0] + 10;
+                      y = parts[1] + 10;
+                      w = parts[2] - 20;
+                      h = parts[3] - 20;
+                    }
+                  }
+                }
+              }
+
+              if (!w || !h) {
+                x = 10;
+                y = 10;
+                w = 80;
+                h = 80;
+              }
+
+              targetShape.setAttribute('x', x);
+              targetShape.setAttribute('y', y);
+              targetShape.setAttribute('width', w);
+              targetShape.setAttribute('height', h);
+
+              const parseR = (v, d) => (v !== null && v !== '') ? (isNaN(parseFloat(v)) ? 0 : parseFloat(v)) : d;
+              const tl = parseR(targetShape.getAttribute('data-tl'), defR);
+              const tr = parseR(targetShape.getAttribute('data-tr'), defR);
+              const bl = parseR(targetShape.getAttribute('data-bl'), defR);
+              const br = parseR(targetShape.getAttribute('data-br'), defR);
+
+              const cx = x + w / 2;
+              const cy = y + h / 2;
+              const pts = [
+                { x: cx, y: y, r: tl },       // Top
+                { x: x + w, y: cy, r: tr },   // Right
+                { x: cx, y: y + h, r: br },   // Bottom
+                { x: x, y: cy, r: bl }        // Left
+              ];
+
+              const cornerPoints = pts.map((curr, i) => {
+                const prev = pts[(i + pts.length - 1) % pts.length];
+                const next = pts[(i + 1) % pts.length];
+                const d1 = { x: curr.x - prev.x, y: curr.y - prev.y };
+                const d2 = { x: next.x - curr.x, y: next.y - curr.y };
+                const l1 = Math.hypot(d1.x, d1.y) || 1;
+                const l2 = Math.hypot(d2.x, d2.y) || 1;
+                const limit = Math.max(0, Math.min(curr.r, l1 / 2, l2 / 2));
+                return {
+                  limit,
+                  q: { x: curr.x, y: curr.y },
+                  p1: { x: curr.x - (d1.x / l1) * limit, y: curr.y - (d1.y / l1) * limit },
+                  p2: { x: curr.x + (d2.x / l2) * limit, y: curr.y + (d2.y / l2) * limit }
+                };
+              });
+
+              let pathData = '';
+              cornerPoints.forEach((cp, i) => {
+                if (i === 0) {
+                  pathData += `M ${cp.p1.x.toFixed(2)} ${cp.p1.y.toFixed(2)}`;
+                } else {
+                  pathData += ` L ${cp.p1.x.toFixed(2)} ${cp.p1.y.toFixed(2)}`;
+                }
+                if (cp.limit > 0) {
+                  pathData += ` Q ${cp.q.x.toFixed(2)} ${cp.q.y.toFixed(2)}, ${cp.p2.x.toFixed(2)} ${cp.p2.y.toFixed(2)}`;
+                }
+              });
+              pathData += ' Z';
+
+              targetShape.setAttribute('d', pathData);
+
+              const maxR = Math.max(tl, tr, bl, br);
+              const bgRect = element.querySelector('.frame-bg-rect');
+              if (bgRect) {
+                bgRect.setAttribute('rx', maxR.toString());
+                bgRect.setAttribute('ry', maxR.toString());
               }
             }
           }
@@ -5481,10 +5646,34 @@ const TemplateEditor = () => {
 
                 const shapeType = el.getAttribute('data-shape-type') || (el.tagName === 'rect' ? 'rectangle' : null);
                 if (shapeType === 'rectangle' && (el.getAttribute('data-tl') || el.getAttribute('data-tr') || el.getAttribute('data-bl') || el.getAttribute('data-br') || el.getAttribute('rx'))) {
-                  const x = parseFloat(el.getAttribute('x') || 0);
-                  const y = parseFloat(el.getAttribute('y') || 0);
-                  const w = parseFloat(el.getAttribute('width') || 0);
-                  const h = parseFloat(el.getAttribute('height') || 0);
+                  let x = parseFloat(el.getAttribute('x') || 0);
+                  let y = parseFloat(el.getAttribute('y') || 0);
+                  let w = parseFloat(el.getAttribute('width') || 0);
+                  let h = parseFloat(el.getAttribute('height') || 0);
+
+                  if (!w || !h) {
+                    const parentSvg = el.closest('svg');
+                    if (parentSvg) {
+                      const vb = parentSvg.getAttribute('viewBox');
+                      if (vb) {
+                        const parts = vb.split(/[ ,]+/).map(parseFloat);
+                        if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+                          x = parts[0] + 14;
+                          y = parts[1] + 14;
+                          w = parts[2] - 28;
+                          h = parts[3] - 28;
+                        }
+                      }
+                    }
+                  }
+
+                  if (w > 0 && h > 0) {
+                    el.setAttribute('x', x);
+                    el.setAttribute('y', y);
+                    el.setAttribute('width', w);
+                    el.setAttribute('height', h);
+                  }
+
                   const defR = parseFloat(el.getAttribute('rx') || 0);
                   const maxR = Math.min(w / 2, h / 2);
                   const parseR = (v, d) => (v !== null && v !== '') ? (isNaN(parseFloat(v)) ? 0 : parseFloat(v)) : d;
@@ -5504,6 +5693,94 @@ const TemplateEditor = () => {
                   } else {
                     el.setAttribute('d', d);
                   }
+                }
+
+                const pathD = el.getAttribute('d') || '';
+                const isDiamond = shapeType === 'diamond' ||
+                  el.getAttribute('data-shape-id') === 'rounded-diamond' ||
+                  (pathD && (pathD.includes('50 12') || pathD.includes('50 88') || pathD.includes('85 43') || pathD.includes('15 57') || pathD.includes('85 57')));
+
+                if (isDiamond && (el.getAttribute('data-tl') || el.getAttribute('data-tr') || el.getAttribute('data-bl') || el.getAttribute('data-br') || el.getAttribute('rx'))) {
+                  let x = parseFloat(el.getAttribute('x') || 0);
+                  let y = parseFloat(el.getAttribute('y') || 0);
+                  let w = parseFloat(el.getAttribute('width') || 0);
+                  let h = parseFloat(el.getAttribute('height') || 0);
+
+                  if (!w || !h) {
+                    const parentSvg = el.closest('svg');
+                    if (parentSvg) {
+                      const vb = parentSvg.getAttribute('viewBox');
+                      if (vb) {
+                        const parts = vb.split(/[ ,]+/).map(parseFloat);
+                        if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+                          x = parts[0] + 10;
+                          y = parts[1] + 10;
+                          w = parts[2] - 20;
+                          h = parts[3] - 20;
+                        }
+                      }
+                    }
+                  }
+
+                  if (!w || !h) {
+                    x = 10;
+                    y = 10;
+                    w = 80;
+                    h = 80;
+                  }
+
+                  el.setAttribute('x', x);
+                  el.setAttribute('y', y);
+                  el.setAttribute('width', w);
+                  el.setAttribute('height', h);
+                  el.setAttribute('data-shape-type', 'diamond');
+
+                  const defR = parseFloat(el.getAttribute('rx') || 0);
+                  const parseR = (v, d) => (v !== null && v !== '') ? (isNaN(parseFloat(v)) ? 0 : parseFloat(v)) : d;
+                  const tl = parseR(el.getAttribute('data-tl'), defR);
+                  const tr = parseR(el.getAttribute('data-tr'), defR);
+                  const bl = parseR(el.getAttribute('data-bl'), defR);
+                  const br = parseR(el.getAttribute('data-br'), defR);
+
+                  const cx = x + w / 2;
+                  const cy = y + h / 2;
+                  const pts = [
+                    { x: cx, y: y, r: tl },
+                    { x: x + w, y: cy, r: tr },
+                    { x: cx, y: y + h, r: br },
+                    { x: x, y: cy, r: bl }
+                  ];
+
+                  const cornerPoints = pts.map((curr, i) => {
+                    const prev = pts[(i + pts.length - 1) % pts.length];
+                    const next = pts[(i + 1) % pts.length];
+                    const d1 = { x: curr.x - prev.x, y: curr.y - prev.y };
+                    const d2 = { x: next.x - curr.x, y: next.y - curr.y };
+                    const l1 = Math.hypot(d1.x, d1.y) || 1;
+                    const l2 = Math.hypot(d2.x, d2.y) || 1;
+                    const limit = Math.max(0, Math.min(curr.r, l1 / 2, l2 / 2));
+                    return {
+                      limit,
+                      q: { x: curr.x, y: curr.y },
+                      p1: { x: curr.x - (d1.x / l1) * limit, y: curr.y - (d1.y / l1) * limit },
+                      p2: { x: curr.x + (d2.x / l2) * limit, y: curr.y + (d2.y / l2) * limit }
+                    };
+                  });
+
+                  let pathData = '';
+                  cornerPoints.forEach((cp, i) => {
+                    if (i === 0) {
+                      pathData += `M ${cp.p1.x.toFixed(2)} ${cp.p1.y.toFixed(2)}`;
+                    } else {
+                      pathData += ` L ${cp.p1.x.toFixed(2)} ${cp.p1.y.toFixed(2)}`;
+                    }
+                    if (cp.limit > 0) {
+                      pathData += ` Q ${cp.q.x.toFixed(2)} ${cp.q.y.toFixed(2)}, ${cp.p2.x.toFixed(2)} ${cp.p2.y.toFixed(2)}`;
+                    }
+                  });
+                  pathData += ' Z';
+
+                  el.setAttribute('d', pathData);
                 }
               });
 
