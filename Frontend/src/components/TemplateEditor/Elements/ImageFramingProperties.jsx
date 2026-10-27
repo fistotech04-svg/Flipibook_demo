@@ -4,35 +4,57 @@ import { checkIsAnimatedWebp } from '../editorUtils';
 import Color from '../Color';
 import Effect from '../Effect';
 
-const PropertySlider = ({ label, value, onChange, onPointerUp, min = 0, max = 100 }) => {
+// Section Header matching AudioProperties exact styling
+const SectionHeader = ({ title }) => (
+  <div className="flex items-center gap-[0.4vw] mt-[0.3vw]">
+    <span className="text-[0.9vw] font-medium text-black whitespace-nowrap">{title}</span>
+    <div className="h-[0.06vw] bg-gray-200 flex-1 ml-[0.3vw]" />
+  </div>
+);
+
+// PropertyRow matching AudioProperties exact alignment (w-[5.6vw] pl-[0.5vw])
+const PropertyRow = ({ label, children, className = '' }) => (
+  <div className={`flex items-center gap-[0.5vw] ${className}`}>
+    <div className="w-[5.6vw] shrink-0 flex items-center pl-[0.5vw] justify-between text-gray-700 font-medium">
+      <span className={`${label.length > 12 ? 'text-[0.68vw]' : 'text-[0.78vw]'} tracking-tight whitespace-nowrap`}>
+        {label}
+      </span>
+      <span className="text-gray-500 font-medium text-[0.8vw]">:</span>
+    </div>
+    <div className="flex-1 min-w-0">
+      {children}
+    </div>
+  </div>
+);
+
+// PropertySlider using PropertyRow with signature #E05638 styling
+const PropertySlider = ({ label, value, onChange, onPointerUp, min = 0, max = 100, unit = '' }) => {
+  const numVal = value || 0;
+  const pct = Math.max(0, Math.min(100, ((numVal - min) / (max - min)) * 100));
+
   return (
-    <div className="flex items-center gap-[0.5vw] py-[0.4vw]">
-      <span className="text-[0.8vw] font-semibold text-gray-600 whitespace-nowrap min-w-[5.5vw]">{label} :</span>
-      <div className="flex-grow flex items-center gap-[1vw]">
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step="1"
-          value={value || 0}
-          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-          onPointerUp={onPointerUp}
-          className="flex-grow h-[0.25vw] appearance-none cursor-pointer bg-gray-200 rounded-full outline-none"
-        />
-        <div className="w-[2.8vw] h-[1.8vw] flex items-center justify-center bg-white border border-gray-100 rounded-[0.4vw] shadow-sm flex-shrink-0">
+    <PropertyRow label={label}>
+      <div className="flex items-center gap-[0.5vw] w-full h-[2.5vw]">
+        <div className="flex-1 flex items-center relative">
           <input
-            type="number"
+            type="range"
             min={min}
             max={max}
-            value={value || 0}
+            step="1"
+            value={numVal}
             onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-            onBlur={onPointerUp}
-            onKeyDown={(e) => { if (e.key === 'Enter') onPointerUp(); }}
-            className="w-full text-center text-[0.8vw] text-gray-700 font-semibold outline-none bg-transparent"
+            onPointerUp={onPointerUp}
+            className="w-full h-[0.25vw] appearance-none cursor-pointer bg-gray-200 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[0.85vw] [&::-webkit-slider-thumb]:h-[0.85vw] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#E05638] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md"
+            style={{
+              background: `linear-gradient(to right, #E05638 0%, #E05638 ${pct}%, #e5e7eb ${pct}%, #e5e7eb 100%)`,
+            }}
           />
         </div>
+        <span className="text-[0.8vw] text-gray-800 font-medium w-[2.8vw] text-right shrink-0">
+          {numVal}{unit}
+        </span>
       </div>
-    </div>
+    </PropertyRow>
   );
 };
 
@@ -149,24 +171,16 @@ const ImageFramingProperties = ({ selectedElement, selectedLayerId, activePageIn
 
   const activeEffects = [];
   if (selectedElementProps?.['data-effect-drop-shadow'] === 'true') activeEffects.push('Drop Shadow');
-  if (selectedElementProps?.['data-effect-inner-shadow'] === 'true') activeEffects.push('Inner Shadow');
-  if (selectedElementProps?.['data-effect-blur'] === 'true') activeEffects.push('Blur');
 
   const handleSetActiveEffects = (updater) => {
     const currentActive = [];
     if (selectedElementProps?.['data-effect-drop-shadow'] === 'true') currentActive.push('Drop Shadow');
-    if (selectedElementProps?.['data-effect-inner-shadow'] === 'true') currentActive.push('Inner Shadow');
-    if (selectedElementProps?.['data-effect-blur'] === 'true') currentActive.push('Blur');
 
     const next = typeof updater === 'function' ? updater(currentActive) : updater;
     const updates = {};
     const hasDropShadow = next.includes('Drop Shadow');
-    const hasInnerShadow = next.includes('Inner Shadow');
-    const hasBlur = next.includes('Blur');
 
     if ((selectedElementProps?.['data-effect-drop-shadow'] === 'true') !== hasDropShadow) updates['data-effect-drop-shadow'] = hasDropShadow ? 'true' : 'false';
-    if ((selectedElementProps?.['data-effect-inner-shadow'] === 'true') !== hasInnerShadow) updates['data-effect-inner-shadow'] = hasInnerShadow ? 'true' : 'false';
-    if ((selectedElementProps?.['data-effect-blur'] === 'true') !== hasBlur) updates['data-effect-blur'] = hasBlur ? 'true' : 'false';
 
     if (Object.keys(updates).length > 0) updateElementAttribute(activePageIndex, selectedLayerId, updates);
   };
@@ -179,38 +193,22 @@ const ImageFramingProperties = ({ selectedElement, selectedLayerId, activePageIn
       spread: parseInt(selectedElementProps?.['data-effect-drop-shadow-spread'] || 0),
       color: selectedElementProps?.['data-effect-drop-shadow-color'] || '#000000',
       opacity: parseInt(selectedElementProps?.['data-effect-drop-shadow-opacity'] || 35),
-    },
-    'Inner Shadow': {
-      x: parseInt(selectedElementProps?.['data-effect-inner-shadow-x'] || 2),
-      y: parseInt(selectedElementProps?.['data-effect-inner-shadow-y'] || 2),
-      blur: parseInt(selectedElementProps?.['data-effect-inner-shadow-blur'] || 0),
-      spread: parseInt(selectedElementProps?.['data-effect-inner-shadow-spread'] || 0),
-      color: selectedElementProps?.['data-effect-inner-shadow-color'] || '#000000',
-      opacity: parseInt(selectedElementProps?.['data-effect-inner-shadow-opacity'] || 35),
-    },
-    'Blur': {
-      blur: parseFloat(selectedElementProps?.['data-effect-blur-value'] !== undefined ? selectedElementProps?.['data-effect-blur-value'] : (selectedElementProps?.['data-effect-blur-blur'] || 0.3)),
-      spread: parseInt(selectedElementProps?.['data-effect-blur-spread'] || 0),
-      clipContent: selectedElementProps?.['data-effect-blur-clip'] === 'true'
     }
   };
 
   const handleSetEffectSettings = (updater) => {
     const next = typeof updater === 'function' ? updater(effectSettings) : updater;
     const updates = {};
-    ['Drop Shadow', 'Inner Shadow'].forEach(type => {
-      const prefix = type === 'Drop Shadow' ? 'drop-shadow' : 'inner-shadow';
+    if (next['Drop Shadow']) {
+      const type = 'Drop Shadow';
+      const prefix = 'drop-shadow';
       if (effectSettings[type].x !== next[type].x) updates[`data-effect-${prefix}-x`] = next[type].x.toString();
       if (effectSettings[type].y !== next[type].y) updates[`data-effect-${prefix}-y`] = next[type].y.toString();
       if (effectSettings[type].blur !== next[type].blur) updates[`data-effect-${prefix}-blur`] = next[type].blur.toString();
       if (effectSettings[type].spread !== next[type].spread) updates[`data-effect-${prefix}-spread`] = next[type].spread.toString();
       if (effectSettings[type].color !== next[type].color) updates[`data-effect-${prefix}-color`] = next[type].color;
       if (effectSettings[type].opacity !== next[type].opacity) updates[`data-effect-${prefix}-opacity`] = next[type].opacity.toString();
-    });
-
-    if (effectSettings['Blur'].blur !== next['Blur'].blur) updates[`data-effect-blur-value`] = next['Blur'].blur.toString();
-    if (effectSettings['Blur'].spread !== next['Blur'].spread) updates[`data-effect-blur-spread`] = next['Blur'].spread.toString();
-    if (effectSettings['Blur'].clipContent !== next['Blur'].clipContent) updates[`data-effect-blur-clip`] = next['Blur'].clipContent ? 'true' : 'false';
+    }
 
     if (Object.keys(updates).length > 0) updateElementAttribute(activePageIndex, selectedLayerId, updates);
   };
@@ -1084,31 +1082,26 @@ const ImageFramingProperties = ({ selectedElement, selectedLayerId, activePageIn
   };
 
   return (
-    <div className="flex flex-col gap-[1vw] p-[1vw]">
-      {/* Title Header */}
-      <div className="flex items-center gap-[0.75vw] mb-[0.5vw]">
-        <span className="text-[0.9vw] font-semibold text-gray-900 whitespace-nowrap tracking-wider">
-          Image Framing Properties
-        </span>
-        <div className="h-[0.1vw] flex-1 bg-gray-200 mr-[-3vw]"></div>
-      </div>
-      <div className="text-[0.8vw] font-semibold text-gray-800">Image Slots </div>
-      <div className="grid grid-cols-2 gap-[1vw]">
+    <div className="w-full flex flex-col gap-[0.6vw] font-sans text-gray-800 pt-[0.2vw] pr-[0.2vw] select-none">
+      {/* ─── 1. IMAGE SLOTS ─── */}
+      <SectionHeader title="Image Slots" />
+
+      <div className="grid grid-cols-2 gap-[0.6vw] pl-[0.5vw] pr-[0.2vw]">
         {slots.map((slot, i) => (
-          <div key={slot.id} className="flex flex-col gap-[0.5vw]">
-            <span className="text-[0.8vw] text-gray-600 font-medium flex items-center justify-between">
+          <div key={slot.id} className="flex flex-col gap-[0.3vw]">
+            <span className="text-[0.75vw] text-gray-700 font-medium flex items-center justify-between">
               {slots.length > 1 ? `Slot ${i + 1}` : 'Image'}
               {slot.currentImage && (
-                <span className="text-[0.6vw] text-green-600 bg-green-50 px-[0.3vw] py-[0.1vw] rounded">Filled</span>
+                <span className="text-[0.6vw] text-green-700 bg-green-50 border border-green-200/50 px-[0.3vw] py-[0.05vw] rounded-[0.25vw] font-medium">Filled</span>
               )}
             </span>
             <div
-              className={`border border-dashed rounded-[0.5vw] flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden group ${
-                activeSlotId === slot.id ? 'ring-1 ring-offset-1 ring-blue-500 border-blue-500 ' : ''
+              className={`border-2 border-dashed rounded-[0.5vw] flex flex-col items-center justify-center cursor-pointer transition-all relative overflow-hidden group ${
+                activeSlotId === slot.id ? 'ring-2 ring-[#E05638]/40 border-[#E05638]' : ''
               } ${
                 slot.currentImage 
-                  ? (activeSlotId === slot.id ? 'bg-blue-50 h-[5vw]' : 'border-gray-300 hover:border-[#4c5add] bg-gray-50 h-[5vw]')
-                  : (activeSlotId === slot.id ? 'bg-blue-100 p-[1vw]' : 'border-[#4c5add] bg-blue-50/30 hover:bg-blue-50 p-[1vw]')
+                  ? (activeSlotId === slot.id ? 'bg-[#E05638]/5 h-[5vw]' : 'border-gray-200 hover:border-[#E05638] bg-gray-50 h-[5vw]')
+                  : (activeSlotId === slot.id ? 'bg-[#E05638]/10 p-[0.8vw]' : 'border-gray-200 hover:border-[#E05638] bg-gray-50/50 hover:bg-[#E05638]/5 p-[0.8vw]')
               }`}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -1131,8 +1124,8 @@ const ImageFramingProperties = ({ selectedElement, selectedLayerId, activePageIn
                 </>
               ) : (
                 <>
-                  <Upload size="1vw" className="text-[#4c5add] mb-[0.2vw]" />
-                  <span className="text-[0.6vw] text-[#4c5add] font-semibold text-center leading-tight">Drop on Slot<br/>or Click</span>
+                  <Upload size="1vw" className="text-[#E05638] mb-[0.2vw]" />
+                  <span className="text-[0.6vw] text-[#E05638] font-medium text-center leading-tight">Drop on Slot<br/>or Click</span>
                 </>
               )}
               <input
@@ -1147,48 +1140,52 @@ const ImageFramingProperties = ({ selectedElement, selectedLayerId, activePageIn
         ))}
       </div>
       {slots.length === 0 && (
-        <div className="text-[0.8vw] text-gray-500 text-center py-[2vw]">
+        <div className="text-[0.78vw] text-gray-500 text-center py-[1.5vw]">
           No image slots found in this frame.
         </div>
       )}
       
-      <div className="flex flex-col gap-[0.5vw] mt-[1vw]">
-        {slots.length > 1 && (
-          <PropertySlider 
-            label="Partition Gap" 
-            value={gap} 
-            onChange={(val) => updateGapAndRadius(val, radius, true)} 
-            onPointerUp={syncDomChanges}
-            min={0} 
-            max={50} 
-          />
-        )}
+      {/* ─── 2. DIMENSIONS & SPACING ─── */}
+      <SectionHeader title="Dimensions & Spacing" />
 
-        {slots.some(s => s.path.tagName.toLowerCase() === 'rect') && (
-          <PropertySlider 
-            label="Corner Radius" 
-            value={activeSlotId ? (slotRadii[activeSlotId] || 0) : radius} 
-            onChange={(val) => {
-              if (activeSlotId) {
-                updateSlotRadius(activeSlotId, val, true);
-              } else {
-                updateGapAndRadius(gap, val, true);
-              }
-            }} 
-            onPointerUp={syncDomChanges}
-            min={0} 
-            max={100} 
-          />
-        )}
+      {slots.length > 1 && (
         <PropertySlider 
-          label="Rotation" 
-          value={activeSlotId ? (slotRotations[activeSlotId] || 0) : (Object.values(slotRotations)[0] || 0)} 
-          onChange={(val) => updateRotation(val, true)} 
+          label="Partition Gap" 
+          value={gap} 
+          onChange={(val) => updateGapAndRadius(val, radius, true)} 
           onPointerUp={syncDomChanges}
-          min={-180} 
-          max={180} 
+          min={0} 
+          max={50} 
+          unit="px"
         />
-      </div>
+      )}
+
+      {slots.some(s => s.path.tagName.toLowerCase() === 'rect') && (
+        <PropertySlider 
+          label="Corner Radius" 
+          value={activeSlotId ? (slotRadii[activeSlotId] || 0) : radius} 
+          onChange={(val) => {
+            if (activeSlotId) {
+              updateSlotRadius(activeSlotId, val, true);
+            } else {
+              updateGapAndRadius(gap, val, true);
+            }
+          }} 
+          onPointerUp={syncDomChanges}
+          min={0} 
+          max={100} 
+          unit="px"
+        />
+      )}
+      <PropertySlider 
+        label="Rotation" 
+        value={activeSlotId ? (slotRotations[activeSlotId] || 0) : (Object.values(slotRotations)[0] || 0)} 
+        onChange={(val) => updateRotation(val, true)} 
+        onPointerUp={syncDomChanges}
+        min={-180} 
+        max={180} 
+        unit="°"
+      />
 
       <Color
         openSubSection={openSubSection}
@@ -1226,6 +1223,8 @@ const ImageFramingProperties = ({ selectedElement, selectedLayerId, activePageIn
         setActiveColorPicker={setActiveColorPicker}
         showDetailedPicker={showDetailedPicker}
         setShowDetailedPicker={setShowDetailedPicker}
+        hideBlur={true}
+        hideInnerShadow={true}
       />
     </div>
   );

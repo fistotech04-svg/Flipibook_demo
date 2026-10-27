@@ -280,6 +280,136 @@ const PLAYER_STYLE_OPTIONS = [
   { value: 'audio-icon', label: 'Audio Icon (Compact)' }
 ];
 
+// Preset color palettes for each audio template style
+export const AUDIO_TEMPLATE_PALETTES = {
+  'glassmorphism': { icon: '#334155', bg: '#ffffff', stroke: '#e2e8f0' },
+  'forest-moss': { icon: '#c9e4b7', bg: '#16291a', stroke: '#23422a' },
+  'cyber-blue': { icon: '#00f2fe', bg: '#0c1421', stroke: '#182840' },
+  'silver-mono': { icon: '#1e293b', bg: '#8c8c8c', stroke: '#ffffff' },
+  'sunset-vibrant': { icon: '#ffffff', bg: '#ff2a55', stroke: '#ff2a55' },
+  'cyberpunk-wide': { icon: '#00f2fe', bg: '#080d15', stroke: '#162133' },
+  'audio-icon': { icon: '#000000', bg: '#ffffff', stroke: '#900000' }
+};
+
+/**
+ * Extracts the audio colors (icon color, background fill, border/stroke color)
+ * from the live audio element node on canvas
+ */
+export const extractAudioColors = (el) => {
+  if (!el) {
+    return { iconColor: '#334155', bgColor: '#ffffff', strokeColor: '#e2e8f0' };
+  }
+  const root = el.closest?.('[data-type="audio-frame"], g[id^="audio-"]') || el;
+  const tplId = root.getAttribute('data-audio-template') || 'glassmorphism';
+  const defaults = AUDIO_TEMPLATE_PALETTES[tplId] || AUDIO_TEMPLATE_PALETTES['glassmorphism'];
+
+  const rawStroke = root.getAttribute('data-stroke-color');
+  const rawIcon = root.getAttribute('data-icon-color');
+  const wasCorrupted = tplId !== 'audio-icon' && rawStroke === '#900000' && rawIcon === '#000000';
+
+  // 1. Extract Icon Color
+  let icon = wasCorrupted ? null : rawIcon;
+  if (!icon) {
+    const progFill = root.querySelector('.progress-fill');
+    const playIconPoly = root.querySelector('.play-pause-icon polygon');
+    const timeText = root.querySelector('.audio-current-time');
+    const prevPoly = root.querySelector('.prev-icon polygon');
+    const volPoly = root.querySelector('.volume-icon polygon');
+    const candidate = progFill?.getAttribute('fill') ||
+      playIconPoly?.getAttribute('fill') ||
+      timeText?.getAttribute('fill') ||
+      prevPoly?.getAttribute('fill') ||
+      volPoly?.getAttribute('fill');
+
+    if (candidate && candidate !== 'none' && candidate !== 'transparent' && (!wasCorrupted || candidate !== '#000000')) {
+      icon = candidate;
+    } else {
+      icon = defaults.icon;
+    }
+  }
+
+  // 2. Extract Background Color
+  let bg = wasCorrupted ? null : root.getAttribute('data-fill-color');
+  if (!bg) {
+    const fillLayer = root.querySelector('.audio-fill-layer');
+    const layerFill = fillLayer?.getAttribute('fill');
+    if (layerFill && !layerFill.startsWith('url(#') && layerFill !== 'none') {
+      bg = layerFill;
+    } else {
+      bg = defaults.bg;
+    }
+  }
+
+  // 3. Extract Stroke Color
+  let stroke = wasCorrupted ? null : rawStroke;
+  if (!stroke) {
+    const fillLayer = root.querySelector('.audio-fill-layer');
+    const layerStroke = fillLayer?.getAttribute('stroke');
+    if (layerStroke && layerStroke !== 'none' && (!wasCorrupted || layerStroke !== '#900000')) {
+      stroke = layerStroke;
+    } else {
+      stroke = defaults.stroke;
+    }
+  }
+
+  return {
+    iconColor: icon || defaults.icon,
+    bgColor: bg || defaults.bg,
+    strokeColor: stroke || defaults.stroke
+  };
+};
+
+/**
+ * Updates fill, stroke, and icon colors directly on the canvas SVG element
+ */
+export const applyColorsToCanvas = (el, { icon, bg, stroke }) => {
+  if (!el) return;
+  const root = el.closest?.('[data-type="audio-frame"], g[id^="audio-"]') || el;
+
+  if (bg !== undefined) {
+    const fillLayer = root.querySelector('.audio-fill-layer');
+    if (fillLayer) {
+      fillLayer.setAttribute('fill', bg);
+    }
+    root.setAttribute('data-fill-color', bg);
+  }
+
+  if (stroke !== undefined) {
+    const fillLayer = root.querySelector('.audio-fill-layer');
+    if (fillLayer) {
+      fillLayer.setAttribute('stroke', stroke);
+      fillLayer.setAttribute('stroke-width', stroke === 'none' ? '0' : '1.5');
+    }
+    root.setAttribute('data-stroke-color', stroke);
+  }
+
+  if (icon !== undefined) {
+    const iconElements = root.querySelectorAll(
+      '.prev-icon polygon, .next-icon polygon, .audio-current-time, .audio-total-time, .progress-fill, .progress-knob, .volume-icon polygon, .volume-fill, .volume-knob, .play-pause-bg'
+    );
+    iconElements.forEach((item) => {
+      item.setAttribute('fill', icon);
+    });
+
+    const strokeElements = root.querySelectorAll(
+      '.volume-icon path, .loop-icon path'
+    );
+    strokeElements.forEach((item) => {
+      item.setAttribute('stroke', icon);
+    });
+
+    const squareIconPolygon = root.querySelectorAll('.play-pause-icon polygon');
+    squareIconPolygon.forEach((item) => {
+      if (!root.querySelector('.play-pause-bg')) {
+        item.setAttribute('fill', icon);
+        item.setAttribute('stroke', icon);
+      }
+    });
+
+    root.setAttribute('data-icon-color', icon);
+  }
+};
+
 const SKIP_STEPS = [1, 2, 3, 5, 10, 15, 30, 60];
 
 const AudioProperties = ({
@@ -320,10 +450,11 @@ const AudioProperties = ({
   const [controlLoop, setControlLoop] = useState(true);
   const [controlMute, setControlMute] = useState(true);
 
-  // Colors States (matching #000000, #FFFFFF, #900000)
-  const [iconColor, setIconColor] = useState('#000000');
-  const [bgColor, setBgColor] = useState('#FFFFFF');
-  const [strokeColor, setStrokeColor] = useState('#900000');
+  // Colors States (dynamically extracted from the selected audio element)
+  const initialColors = extractAudioColors(selectedElement);
+  const [iconColor, setIconColor] = useState(() => initialColors.iconColor);
+  const [bgColor, setBgColor] = useState(() => initialColors.bgColor);
+  const [strokeColor, setStrokeColor] = useState(() => initialColors.strokeColor);
 
   // ColorPicker & Effects States
   const [activeColorPicker, setActiveColorPicker] = useState(null);
@@ -508,15 +639,26 @@ const AudioProperties = ({
     const audioMutedAttr = selectedElement.getAttribute('data-audio-muted');
     if (audioMutedAttr !== null) setIsMuted(audioMutedAttr === 'true');
 
-    // Colors
-    const iconCol = selectedElement.getAttribute('data-icon-color');
-    if (iconCol) setIconColor(iconCol);
+    // Colors Extraction & Hydration from canvas element
+    const extracted = extractAudioColors(selectedElement);
+    setIconColor(extracted.iconColor);
+    setBgColor(extracted.bgColor);
+    setStrokeColor(extracted.strokeColor);
 
-    const fillCol = selectedElement.getAttribute('data-fill-color');
-    if (fillCol) setBgColor(fillCol);
-
-    const strokeCol = selectedElement.getAttribute('data-stroke-color');
-    if (strokeCol) setStrokeColor(strokeCol);
+    // If element was missing color attributes or had the old #900000 corruption, heal it on canvas
+    const rootEl = selectedElement.closest?.('[data-type="audio-frame"], g[id^="audio-"]') || selectedElement;
+    const currentTpl = rootEl.getAttribute('data-audio-template') || 'glassmorphism';
+    const wasCorrupted = currentTpl !== 'audio-icon' && rootEl.getAttribute('data-stroke-color') === '#900000' && rootEl.getAttribute('data-icon-color') === '#000000';
+    if (!rootEl.getAttribute('data-icon-color') || !rootEl.getAttribute('data-fill-color') || !rootEl.getAttribute('data-stroke-color') || wasCorrupted) {
+      applyColorsToCanvas(rootEl, {
+        icon: extracted.iconColor,
+        bg: extracted.bgColor,
+        stroke: extracted.strokeColor
+      });
+      rootEl.setAttribute('data-icon-color', extracted.iconColor);
+      rootEl.setAttribute('data-fill-color', extracted.bgColor);
+      rootEl.setAttribute('data-stroke-color', extracted.strokeColor);
+    }
 
     // Drop Shadow
     const hasDs = selectedElement.getAttribute('data-effect-drop-shadow') === 'true';
@@ -621,50 +763,6 @@ const AudioProperties = ({
       audioRef.current.muted = isMuted;
     }
   }, [playbackSpeed, defaultVolume, isLooping, isMuted]);
-
-  // Sync colors to the live SVG element on canvas
-  useEffect(() => {
-    if (!selectedElement) return;
-
-    // 1. Background fill
-    const fillLayer = selectedElement.querySelector('.audio-fill-layer');
-    if (fillLayer) {
-      fillLayer.setAttribute('fill', bgColor);
-      fillLayer.setAttribute('stroke', strokeColor);
-      fillLayer.setAttribute('stroke-width', '1.5');
-    }
-
-    // 2. Icon color applied to inner SVG controls
-    const iconElements = selectedElement.querySelectorAll(
-      '.prev-icon polygon, .next-icon polygon, .audio-current-time, .audio-total-time, .progress-fill, .progress-knob, .volume-icon polygon, .volume-fill, .volume-knob, .play-pause-bg'
-    );
-    iconElements.forEach((el) => {
-      el.setAttribute('fill', iconColor);
-    });
-
-    const strokeElements = selectedElement.querySelectorAll(
-      '.volume-icon path, .loop-icon path'
-    );
-    strokeElements.forEach((el) => {
-      el.setAttribute('stroke', iconColor);
-    });
-
-    // Play/Pause icon inside audio-icon square variant
-    const squareIconPolygon = selectedElement.querySelectorAll('.play-pause-icon polygon');
-    squareIconPolygon.forEach((el) => {
-      if (!selectedElement.querySelector('.play-pause-bg')) {
-        el.setAttribute('fill', iconColor);
-        el.setAttribute('stroke', iconColor);
-      }
-    });
-
-    // Sync attributes
-    selectedElement.setAttribute('data-fill-color', bgColor);
-    selectedElement.setAttribute('data-stroke-color', strokeColor);
-    selectedElement.setAttribute('data-icon-color', iconColor);
-
-    if (onUpdate) onUpdate();
-  }, [iconColor, bgColor, strokeColor, selectedElement]); // eslint-disable-line
 
   // Sync control toggles visibility to SVG element on canvas
   useEffect(() => {
@@ -1076,27 +1174,61 @@ const AudioProperties = ({
     });
   };
 
+  const handleIconColorChange = (val) => {
+    setIconColor(val);
+    updateAttribute('data-icon-color', val);
+    applyColorsToCanvas(selectedElement, { icon: val });
+    if (onUpdate) onUpdate();
+  };
+
+  const handleBgColorChange = (val) => {
+    setBgColor(val);
+    updateAttribute('data-fill-color', val);
+    applyColorsToCanvas(selectedElement, { bg: val });
+    if (onUpdate) onUpdate();
+  };
+
+  const handleStrokeColorChange = (val) => {
+    setStrokeColor(val);
+    updateAttribute('data-stroke-color', val);
+    applyColorsToCanvas(selectedElement, { stroke: val });
+    if (onUpdate) onUpdate();
+  };
+
+  const handlePlayerStyleChange = (val) => {
+    setPlayerStyle(val);
+    updateAttribute('data-audio-template', val);
+
+    // Update colors to the new template style's palette
+    const newPalette = AUDIO_TEMPLATE_PALETTES[val] || AUDIO_TEMPLATE_PALETTES['glassmorphism'];
+    setIconColor(newPalette.icon);
+    setBgColor(newPalette.bg);
+    setStrokeColor(newPalette.stroke);
+
+    applyColorsToCanvas(selectedElement, {
+      icon: newPalette.icon,
+      bg: newPalette.bg,
+      stroke: newPalette.stroke
+    });
+    updateAttribute('data-icon-color', newPalette.icon);
+    updateAttribute('data-fill-color', newPalette.bg);
+    updateAttribute('data-stroke-color', newPalette.stroke);
+
+    if (onUpdate) onUpdate();
+  };
+
   const COLOR_MAP = {
     iconColor: {
       value: iconColor,
-      onChange: (val) => {
-        setIconColor(val);
-        updateAttribute('data-icon-color', val);
-      }
+      onChange: handleIconColorChange
     },
     bgColor: {
       value: bgColor,
-      onChange: (val) => {
-        setBgColor(val);
-        updateAttribute('data-fill-color', val);
-      }
+      onChange: handleBgColorChange
     },
     strokeColor: {
       value: strokeColor,
-      onChange: (val) => {
-        setStrokeColor(val);
-        updateAttribute('data-stroke-color', val);
-      }
+      onChange: handleStrokeColorChange
     }
   };
 
@@ -1183,11 +1315,7 @@ const AudioProperties = ({
         <CustomDropdown
           value={playerStyle}
           options={PLAYER_STYLE_OPTIONS}
-          onChange={(val) => {
-            setPlayerStyle(val);
-            updateAttribute('data-audio-template', val);
-            if (onUpdate) onUpdate();
-          }}
+          onChange={handlePlayerStyleChange}
         />
       </PropertyRow>
 
@@ -1370,10 +1498,7 @@ const AudioProperties = ({
       <PropertyRow label="Icon Color">
         <ColorInput
           color={iconColor}
-          onChange={(val) => {
-            setIconColor(val);
-            updateAttribute('data-icon-color', val);
-          }}
+          onChange={handleIconColorChange}
           opacity={100}
           onOpenPicker={() => setActiveColorPicker((prev) => (prev === 'iconColor' ? null : 'iconColor'))}
           isActive={activeColorPicker === 'iconColor'}
@@ -1384,10 +1509,7 @@ const AudioProperties = ({
       <PropertyRow label="Bg Color">
         <ColorInput
           color={bgColor}
-          onChange={(val) => {
-            setBgColor(val);
-            updateAttribute('data-fill-color', val);
-          }}
+          onChange={handleBgColorChange}
           opacity={100}
           onOpenPicker={() => setActiveColorPicker((prev) => (prev === 'bgColor' ? null : 'bgColor'))}
           isActive={activeColorPicker === 'bgColor'}
@@ -1398,10 +1520,7 @@ const AudioProperties = ({
       <PropertyRow label="Stroke Color">
         <ColorInput
           color={strokeColor}
-          onChange={(val) => {
-            setStrokeColor(val);
-            updateAttribute('data-stroke-color', val);
-          }}
+          onChange={handleStrokeColorChange}
           opacity={100}
           onOpenPicker={() => setActiveColorPicker((prev) => (prev === 'strokeColor' ? null : 'strokeColor'))}
           isActive={activeColorPicker === 'strokeColor'}

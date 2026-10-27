@@ -1310,7 +1310,7 @@ const RightSidebar = ({
           ) : activeMainTool === 'element' ? (
             <Elements />
           ) : (
-            <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar">
+            <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden no-scrollbar">
               {isPdfProject ? (
                 <InteractionPanel
                   selectedElementProps={selectedElementProps}
@@ -1328,7 +1328,7 @@ const RightSidebar = ({
                   flipbookName={effectiveBook}
                 />
               ) : (
-                <div className="flex flex-col p-[1.5vw] gap-[1.5vw]">
+                <div className="flex flex-col p-[1.5vw] gap-[1.5vw] overflow-x-hidden">
                   {(selectedElementProps || activeMainTool === 'grid') ? (
                     <div className="flex flex-col gap-[1.5vw]">
                       {selectedElementProps?.isEmbed ? (
@@ -1885,7 +1885,8 @@ const RightSidebar = ({
                         <AudioProperties
                           selectedElement={(() => {
                             const pageContainer = document.querySelector(`.page-svg-container[data-page-index="${activePageIndex}"]`);
-                            return pageContainer?.querySelector(`[id="${selectedLayerId}"]`) || document.getElementById(selectedLayerId);
+                            const rawEl = pageContainer?.querySelector(`[id="${selectedLayerId}"]`) || document.getElementById(selectedLayerId);
+                            return rawEl?.closest?.('[data-type="audio-frame"], g[id^="audio-"]') || rawEl;
                           })()}
                           selectedLayerId={selectedLayerId}
                           activePageIndex={activePageIndex}

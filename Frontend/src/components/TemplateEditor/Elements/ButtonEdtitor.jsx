@@ -1501,7 +1501,7 @@ const ButtonEditor = ({
       `}</style>
 
       {/* ─── 1. BUTTON CONTENT SECTION ──────────────────────────── */}
-      <SectionHeader title="Button Content" />
+      <SectionHeader title="Button Properties" />
 
       {/* Row 1: Button Text */}
       <PropertyRow label="Button Text">

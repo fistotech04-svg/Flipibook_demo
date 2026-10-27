@@ -9,7 +9,31 @@ import Effect from '../Effect';
 import ShapeAppearanceControls from './ShapeAppearanceControls';
 import ImageAdjustModal from './ImageAdjustModal';
 import { ChevronLeft, ChevronRight, Upload, Plus, GripVertical, SquarePen, Trash2, ArrowRightLeft } from 'lucide-react';
-const PropertySlider = ({ label, value, onChange, min = 0, max = 100, disabled = false }) => {
+// Section Header matching AudioProperties exact styling
+const SectionHeader = ({ title }) => (
+  <div className="flex items-center gap-[0.4vw] mt-[0.3vw]">
+    <span className="text-[0.9vw] font-medium text-black whitespace-nowrap">{title}</span>
+    <div className="h-[0.06vw] bg-gray-200 flex-1 ml-[0.3vw]" />
+  </div>
+);
+
+// PropertyRow matching AudioProperties exact alignment (w-[5.6vw] pl-[0.5vw])
+const PropertyRow = ({ label, children, className = '' }) => (
+  <div className={`flex items-center gap-[0.5vw] ${className}`}>
+    <div className="w-[5.6vw] shrink-0 flex items-center pl-[0.5vw] justify-between text-gray-700 font-medium">
+      <span className={`${label.length > 12 ? 'text-[0.68vw]' : 'text-[0.78vw]'} tracking-tight whitespace-nowrap`}>
+        {label}
+      </span>
+      <span className="text-gray-500 font-medium text-[0.8vw]">:</span>
+    </div>
+    <div className="flex-1 min-w-0">
+      {children}
+    </div>
+  </div>
+);
+
+// PropertySlider using PropertyRow with signature #E05638 styling
+const PropertySlider = ({ label, value, onChange, min = 0, max = 100, disabled = false, unit = '' }) => {
   const [localVal, setLocalVal] = useState(value);
   const isFocused = useRef(false);
 
@@ -19,73 +43,37 @@ const PropertySlider = ({ label, value, onChange, min = 0, max = 100, disabled =
     }
   }, [value]);
 
-  const handleManualInput = (val) => {
-    if (disabled) return;
-    setLocalVal(val);
-    const num = parseInt(val);
-    if (!isNaN(num)) {
-      onChange(val);
-    }
-  };
-
-  const handleBlur = () => {
-    isFocused.current = false;
-    if (disabled) return;
-    let num = parseInt(localVal);
-    if (isNaN(num)) num = min;
-
-    const corrected = Math.min(Math.max(num, min), max);
-    setLocalVal(corrected);
-    onChange(corrected.toString());
-  };
-
-  const handleFocus = () => {
-    isFocused.current = true;
-  };
+  const numVal = parseFloat(localVal !== undefined ? localVal : value) || 0;
+  const pct = Math.max(0, Math.min(100, ((numVal - min) / (max - min)) * 100));
 
   return (
-    <div className={`flex items-center gap-[1vw] py-[0.4vw] transition-opacity duration-200 ${disabled ? 'opacity-40 pointer-events-none' : ''}`}>
-      <span
-        className="text-[0.8vw] font-semibold text-gray-600 w-[4vw] flex-shrink-0 cursor-ew-resize select-none hover:text-indigo-600 transition-colors"
-        onPointerDown={(e) => {
-          handleScrubHelper(e, value, (v) => {
-            const num = parseFloat(v);
-            const corrected = Math.min(Math.max(num, min), max);
-            onChange(corrected.toString());
-          });
-        }}
-      >{label} :</span>
-      <div className="flex-grow flex items-center gap-[1vw]">
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step="1"
-          value={value || 0}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.value)}
-          className="flex-grow h-[0.25vw] appearance-none cursor-pointer bg-gray-200 rounded-full outline-none disabled:cursor-not-allowed"
-          style={{
-            background: disabled
-              ? '#e5e7eb'
-              : `linear-gradient(to right, #6366f1 0%, #6366f1 ${((value || 0) - min) / (max - min) * 100}%, #e5e7eb ${((value || 0) - min) / (max - min) * 100}%, #e5e7eb 100%)`,
-          }}
-        />
-        <div className="w-[2.8vw] h-[1.8vw] flex items-center justify-center bg-white border border-gray-100 rounded-[0.4vw] shadow-sm overflow-hidden">
+    <PropertyRow label={label} className={disabled ? 'opacity-40 pointer-events-none' : ''}>
+      <div className="flex items-center gap-[0.5vw] w-full h-[2.5vw]">
+        <div className="flex-1 flex items-center relative">
           <input
-            type="number"
+            type="range"
             min={min}
             max={max}
-            value={localVal === undefined ? '' : localVal}
-            onChange={(e) => handleManualInput(e.target.value)}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
+            step="1"
+            value={numVal}
             disabled={disabled}
-            className="w-full text-center text-[0.8vw] text-gray-700 font-semibold outline-none bg-transparent no-spin disabled:text-gray-400"
+            onChange={(e) => {
+              setLocalVal(e.target.value);
+              onChange(e.target.value);
+            }}
+            className="w-full h-[0.25vw] appearance-none cursor-pointer bg-gray-200 rounded-full outline-none disabled:cursor-not-allowed [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[0.85vw] [&::-webkit-slider-thumb]:h-[0.85vw] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#E05638] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md"
+            style={{
+              background: disabled
+                ? '#e5e7eb'
+                : `linear-gradient(to right, #E05638 0%, #E05638 ${pct}%, #e5e7eb ${pct}%, #e5e7eb 100%)`,
+            }}
           />
         </div>
+        <span className="text-[0.8vw] text-gray-800 font-medium w-[2.8vw] text-right shrink-0">
+          {numVal}{unit}
+        </span>
       </div>
-    </div>
+    </PropertyRow>
   );
 };
 
@@ -1361,22 +1349,19 @@ const ElementShapesProperties = ({
   const isPenChosen = activeMainTool === 'pen';
 
   return (
-    <div className="flex flex-col gap-[0.4vw] font-sans">
+    <div className="w-full flex flex-col gap-[0.6vw] font-sans text-gray-800 pt-[0.2vw] pr-[0.2vw] select-none">
 
-      <div className="flex items-center gap-[0.75vw] mb-[0.2vw]">
-        <span className="text-[0.9vw] font-semibold text-gray-900 whitespace-nowrap tracking-wider">Element Shape Properties</span>
-        <div className="h-[0.0925vw] bg-gray-200 flex-1" style={{ marginRight: '-1.5vw' }}> </div>
-      </div>
+      <SectionHeader title="Element Shape Properties" />
 
       {/* Image Masking Section (Shown at the top of the properties when Mask option is clicked or image is present) */}
       {(isMaskEnabled || slotImage) && (
-        <div className="px-[0.2vw] space-y-[0.35vw] py-[0.4vw]">
-          <div className="flex items-center justify-between mb-[0.4vw]">
-            <span className="text-[0.8vw] font-semibold text-gray-800">Mask Image</span>
+        <div className="flex flex-col gap-[0.35vw]">
+          <div className="flex items-center justify-between pl-[0.5vw] pr-[0.2vw]">
+            <span className="text-[0.78vw] font-medium text-gray-700">Mask Image</span>
             <button
               type="button"
               onClick={handleRemoveMask}
-              className="text-[0.65vw] text-red-500 hover:text-red-700 font-medium cursor-pointer transition-colors"
+              className="text-[0.7vw] text-red-500 hover:text-red-700 font-medium cursor-pointer transition-colors"
             >
               Remove
             </button>
@@ -1390,91 +1375,94 @@ const ElementShapesProperties = ({
             onChange={handleFileChange}
           />
 
-          {!slotImage ? (
-            /* BEFORE UPLOAD: Dashed Add Images Box */
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const files = e.dataTransfer.files;
-                if (files && files.length > 0) {
-                  handleFileChange({ target: { files: files } });
-                }
-              }}
-              className="w-full h-[4.2vw] border-[1.5px] border-dashed border-[#9CA3AF] rounded-[0.8vw] bg-[#F4F5F7] hover:bg-[#ECEEF2] hover:border-gray-500 flex items-center justify-center gap-[0.5vw] text-[#6B7280] hover:text-[#374151] cursor-pointer transition-all select-none shadow-2xs group"
-            >
-              <Plus size="1.15vw" strokeWidth={1.8} className="text-[#6B7280] group-hover:text-[#374151] transition-colors" />
-              <span className="text-[0.85vw] font-normal text-[#6B7280] group-hover:text-[#374151] transition-colors">
-                Add Images
-              </span>
-            </div>
-          ) : (
-            /* AFTER UPLOAD: Card with Drag Grip, Thumbnail, Name, Resolution/Size, Edit Pen, and Trash */
-            <div className="w-full bg-[#F3F4F6] rounded-[0.6vw] p-[0.5vw] flex items-center justify-between select-none border border-transparent hover:border-gray-200 transition-all shadow-2xs">
-              <div className="flex items-center gap-[0.8vw] min-w-0 flex-1">
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="relative group/thumb w-[4vw] h-[3vw] rounded-[0.35vw] overflow-hidden bg-black shrink-0 border border-gray-200/60 shadow-2xs cursor-pointer"
-                  title="Click to replace image"
-                >
-                  <img src={slotImage} alt={slotImageName || 'Mask'} className="w-full h-full object-cover transition-transform duration-200 group-hover/thumb:scale-105" />
-                  <div className="absolute inset-0 bg-black/45 opacity-0 group-hover/thumb:opacity-100 flex flex-col items-center justify-center text-white transition-all duration-200">
-                    <ArrowRightLeft size="0.85vw" strokeWidth={1.8} className="text-white mb-[0.1vw]" />
-                    <span className="text-[0.52vw] font-medium text-white tracking-wide">Replace</span>
+          <div className="pl-[0.5vw] pr-[0.2vw]">
+            {!slotImage ? (
+              /* BEFORE UPLOAD: Dashed Add Images Box */
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const files = e.dataTransfer.files;
+                  if (files && files.length > 0) {
+                    handleFileChange({ target: { files: files } });
+                  }
+                }}
+                className="w-full h-[4.2vw] border-[1.5px] border-dashed border-gray-300 rounded-[0.6vw] bg-gray-50 hover:bg-gray-100/80 hover:border-[#E05638] flex items-center justify-center gap-[0.5vw] text-gray-500 hover:text-[#E05638] cursor-pointer transition-all select-none shadow-2xs group"
+              >
+                <Plus size="1.15vw" strokeWidth={1.8} className="text-gray-400 group-hover:text-[#E05638] transition-colors" />
+                <span className="text-[0.8vw] font-medium text-gray-600 group-hover:text-[#E05638] transition-colors">
+                  Add Images
+                </span>
+              </div>
+            ) : (
+              /* AFTER UPLOAD: Card with Drag Grip, Thumbnail, Name, Resolution/Size, Edit Pen, and Trash */
+              <div className="w-full bg-gray-50 rounded-[0.6vw] p-[0.5vw] flex items-center justify-between select-none border border-gray-200 transition-all shadow-2xs">
+                <div className="flex items-center gap-[0.8vw] min-w-0 flex-1">
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="relative group/thumb w-[4vw] h-[3vw] rounded-[0.35vw] overflow-hidden bg-black shrink-0 border border-gray-200 shadow-2xs cursor-pointer"
+                    title="Click to replace image"
+                  >
+                    <img src={slotImage} alt={slotImageName || 'Mask'} className="w-full h-full object-cover transition-transform duration-200 group-hover/thumb:scale-105" />
+                    <div className="absolute inset-0 bg-black/45 opacity-0 group-hover/thumb:opacity-100 flex flex-col items-center justify-center text-white transition-all duration-200">
+                      <ArrowRightLeft size="0.85vw" strokeWidth={1.8} className="text-white mb-[0.1vw]" />
+                      <span className="text-[0.52vw] font-medium text-white tracking-wide">Replace</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col min-w-0 flex-1 justify-center ml-[0.2vw]">
+                    <span className="text-[0.78vw] font-medium text-gray-800 truncate" title={slotImageName}>
+                      {slotImageName || 'Image Name .jpg'}
+                    </span>
+                    <span className="text-[0.65vw] text-gray-400 font-medium mt-[0.1vw]">
+                      {slotImageMeta || '1920 X 1080 • 24MB'}
+                    </span>
                   </div>
                 </div>
-                <div className="flex flex-col min-w-0 flex-1 justify-center ml-[0.2vw]">
-                  <span className="text-[0.78vw] font-medium text-gray-800 truncate" title={slotImageName}>
-                    {slotImageName || 'Image Name .jpg'}
-                  </span>
-                  <span className="text-[0.65vw] text-gray-400 font-normal mt-[0.1vw]">
-                    {slotImageMeta || '1920 X 1080 • 24MB'}
-                  </span>
+                <div className="flex items-center gap-[0.5vw] shrink-0 ml-[0.5vw]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        const doc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
+                        const el = doc.getElementById(selectedLayerId);
+                        const s = el?.querySelector('path, polygon, rect, circle, ellipse') || el;
+                        if (s) {
+                          const b = s.getBBox();
+                          if (b.width && b.height) {
+                            setShapeAspectRatio(b.width / b.height);
+                          }
+                        }
+                      } catch (e) {}
+                      setShowAdjustModal(true);
+                    }}
+                    className="text-gray-400 hover:text-gray-700 transition-colors p-[0.2vw] cursor-pointer"
+                    title="Adjust Image"
+                  >
+                    <SquarePen size="1vw" strokeWidth={1.5} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteImage}
+                    className="text-gray-400 hover:text-red-500 transition-colors p-[0.2vw] cursor-pointer"
+                    title="Delete Image"
+                  >
+                    <Trash2 size="1vw" strokeWidth={1.5} />
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-[0.5vw] shrink-0 ml-[0.5vw]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    try {
-                      const doc = document.getElementById('main-flipbook-editor')?.contentDocument || document;
-                      const el = doc.getElementById(selectedLayerId);
-                      const s = el?.querySelector('path, polygon, rect, circle, ellipse') || el;
-                      if (s) {
-                        const b = s.getBBox();
-                        if (b.width && b.height) {
-                          setShapeAspectRatio(b.width / b.height);
-                        }
-                      }
-                    } catch (e) {}
-                    setShowAdjustModal(true);
-                  }}
-                  className="text-gray-500 hover:text-gray-800 transition-colors p-[0.2vw] cursor-pointer"
-                  title="Adjust Image"
-                >
-                  <SquarePen size="1vw" strokeWidth={1.5} />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeleteImage}
-                  className="text-[#EF4444] hover:text-[#DC2626] transition-colors p-[0.2vw] cursor-pointer"
-                  title="Delete Image"
-                >
-                  <Trash2 size="1vw" strokeWidth={1.5} />
-                </button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 
       {(shapeType === 'polygon' || shapeType === 'star') && (
-        <div className="px-[0.2vw] space-y-[0.3vw] py-[0.5vw]">
+        <div className="flex flex-col gap-[0.35vw]">
+          <SectionHeader title="Shape Parameters" />
           <PropertySlider
             label={shapeType === 'polygon' ? "Sides" : "Points"}
             value={parseInt(selectedElementProps['data-count'] || (shapeType === 'polygon' ? 3 : 5))}

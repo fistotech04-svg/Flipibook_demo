@@ -124,7 +124,7 @@ const RadioGroup = ({ options, value, onChange }) => (
 const SectionHeader = ({ title }) => (
   <div className="flex items-center gap-[0.5vw] py-[0.25vw] mt-[0.25vw]">
     <span className="text-[0.8vw] font-semibold text-gray-800 whitespace-nowrap">{title}</span>
-    <div className="h-[0.0925vw] bg-gray-200 flex-1" style={{ marginRight: '-2vw' }}> </div>
+    <div className="h-[0.0925vw] bg-gray-200 flex-1"> </div>
   </div>
 );
 
@@ -2544,7 +2544,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
   }, [activePageIndex]);
 
   return (
-    <div className="space-y-[1vw] font-sans pb-[2vw]">
+    <div className="space-y-[1vw] font-sans pb-[2vw] overflow-x-hidden">
       {/* ── 1. Top Add Images Button ── */}
       <div
         onClick={() => fileInputRef.current?.click()}
@@ -2627,7 +2627,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
 
                   <div className="flex-1" />
 
-                  {/* Actions: Adjust Image, Edit Text, Replace & Delete */}
+                  {/* Actions: Adjust Image, Edit Text & Delete */}
                   <div className="flex items-center gap-[0.3vw] shrink-0">
                     <button
                       type="button"
@@ -2664,18 +2664,6 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
                       {hasText && !isTextOpen && (
                         <span className="absolute top-[0.1vw] right-[0.1vw] w-[0.25vw] h-[0.25vw] bg-[#EC5137] rounded-full" />
                       )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setReplaceTargetIndex(i);
-                        replaceInputRef.current?.click();
-                      }}
-                      className="text-gray-400 hover:text-gray-700 transition-colors p-[0.2vw]"
-                      title="Replace Image"
-                    >
-                      <ArrowRightLeft size="0.9vw" strokeWidth={1.8} />
                     </button>
                     <button
                       type="button"
@@ -2742,7 +2730,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
       {/* ── 3. Slideshow Properties Header ── */}
       <div className="flex items-center gap-[0.5vw] pt-[0.4vw]">
         <span className="text-[0.85vw] font-bold text-gray-900 whitespace-nowrap">Slideshow Properties</span>
-        <div className="h-[0.0925vw] bg-gray-200 flex-1" style={{ marginRight: '-1.5vw' }}></div>
+        <div className="h-[0.0925vw] bg-gray-200 flex-1"></div>
       </div>
 
       {/* Auto Slide Duration */}
@@ -2979,7 +2967,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
       <div className="space-y-[0.6vw] pt-[0.4vw]">
         <div className="flex items-center gap-[0.5vw]">
           <span className="text-[0.85vw] font-bold text-gray-900 whitespace-nowrap">Background Color</span>
-          <div className="h-[0.0925vw] bg-gray-200 flex-1" style={{ marginRight: '-1.5vw' }}></div>
+          <div className="h-[0.0925vw] bg-gray-200 flex-1"></div>
         </div>
         <div className="flex items-center justify-between gap-[0.5vw]">
           <div
@@ -3013,7 +3001,7 @@ const SlideshowEditor = ({ selectedElement, activePageIndex, onUpdate, isOpen, o
       <div className="space-y-[0.75vw] pt-[0.4vw]">
         <div className="flex items-center gap-[0.5vw]">
           <span className="text-[0.85vw] font-bold text-gray-900 whitespace-nowrap">Stoke Color</span>
-          <div className="h-[0.0925vw] bg-gray-200 flex-1" style={{ marginRight: '-1.5vw' }}></div>
+          <div className="h-[0.0925vw] bg-gray-200 flex-1"></div>
         </div>
         {/* Swatch & Hex input row */}
         <div className="flex items-center justify-between gap-[0.5vw]">

@@ -14,32 +14,61 @@ import {
 import ColorPicker from '../ColorPicker';
 import Effect from '../Effect';
 
-// Section header matching QRCodeProperties.jsx
+// Section header matching AudioProperties / QRCodeProperties
 const SectionHeader = ({ title }) => (
-  <div className="flex items-center gap-[0.4vw] mt-[0.2vw]">
+  <div className="flex items-center gap-[0.4vw] mt-[0.3vw]">
     <span className="text-[0.9vw] font-medium text-black whitespace-nowrap">{title}</span>
     <div className="h-[0.06vw] bg-gray-200 flex-1 ml-[0.3vw]" />
   </div>
 );
 
-// Custom Dropdown matching QRCodeProperties.jsx design
+// PropertyRow matching AudioProperties exact alignment (w-[5.6vw] pl-[0.5vw])
+const PropertyRow = ({ label, children, className = '' }) => (
+  <div className={`flex items-center gap-[0.5vw] ${className}`}>
+    <div className="w-[5.6vw] shrink-0 flex items-center pl-[0.5vw] justify-between text-gray-700 font-medium">
+      <span className={`${label.length > 12 ? 'text-[0.68vw]' : 'text-[0.78vw]'} tracking-tight whitespace-nowrap`}>
+        {label}
+      </span>
+      <span className="text-gray-500 font-medium text-[0.8vw]">:</span>
+    </div>
+    <div className="flex-1 min-w-0">
+      {children}
+    </div>
+  </div>
+);
+
+// Custom Dropdown matching AudioProperties exact design (h-[2.5vw] rounded-[0.5vw])
 const CustomSelect = ({ value, onChange, options, className = '' }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
   const selectedOption = options.find((opt) => String(opt.value) === String(value)) || options[0];
 
   return (
-    <div className={`relative w-full ${className}`}>
+    <div ref={containerRef} className={`relative w-full ${className}`}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full h-[2.5vw] flex items-center justify-between bg-white border ${
-          isOpen ? 'border-2 border-[#EC5137] shadow-xs' : 'border border-gray-200 hover:border-gray-300'
-        } rounded-[0.5vw] px-[0.6vw] text-[0.75vw] text-gray-700 font-medium transition-colors cursor-pointer shadow-2xs`}
+          isOpen ? 'border-2 border-[#E05638] shadow-xs' : 'border border-gray-200 hover:border-gray-300'
+        } rounded-[0.5vw] px-[0.6vw] text-[0.78vw] text-gray-800 font-medium transition-colors cursor-pointer shadow-2xs`}
       >
         <span className="font-medium truncate">{selectedOption?.label || value}</span>
         <ChevronDown
           className={`w-[0.9vw] h-[0.9vw] text-gray-500 transition-transform duration-200 flex-shrink-0 ml-[0.3vw] ${
-            isOpen ? 'rotate-180 text-[#EC5137]' : ''
+            isOpen ? 'rotate-180 text-[#E05638]' : ''
           }`}
         />
       </button>
@@ -60,8 +89,8 @@ const CustomSelect = ({ value, onChange, options, className = '' }) => {
                   }}
                   className={`px-[0.9vw] py-[0.45vw] text-[0.78vw] font-medium transition-colors text-left flex items-center justify-between cursor-pointer group ${
                     isSelected
-                      ? 'text-[#EC5137] bg-[#EC5137]/10 font-semibold'
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-[#EC5137]'
+                      ? 'text-[#E05638] bg-[#E05638]/10 font-semibold'
+                      : 'text-gray-700 hover:bg-gray-50 hover:text-[#E05638]'
                   }`}
                 >
                   <span className="truncate">{opt.label}</span>
@@ -75,22 +104,58 @@ const CustomSelect = ({ value, onChange, options, className = '' }) => {
   );
 };
 
+// Color Swatch + Hex Input Box matching AudioProperties exact structure
+const ColorInput = ({ color, onChange, opacity = 100, onOpenPicker, isActive = false }) => {
+  const displayColor = color && color.startsWith('#') ? color.toUpperCase() : color || '#000000';
+
+  return (
+    <div className="flex items-center gap-[0.4vw] w-full">
+      <div
+        onClick={onOpenPicker}
+        className={`color-box color-box-trigger w-[2vw] h-[2vw] rounded-[0.5vw] border flex-shrink-0 relative overflow-hidden flex items-center justify-center cursor-pointer shadow-2xs hover:scale-105 transition-all ${
+          isActive ? 'border-[#E05638] ring-2 ring-[#E05638]/40 scale-105 shadow-xs' : 'border-gray-200 hover:border-gray-300'
+        }`}
+        style={{ backgroundColor: color === 'none' || color === 'transparent' ? '#ffffff' : color }}
+        title="Click to open color palette"
+      >
+        {(color === 'none' || color === 'transparent') && (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[1.5px] bg-red-500 rotate-45" />
+        )}
+      </div>
+      <div className="flex-1 h-[2.5vw] flex items-center justify-between border border-gray-200 rounded-[0.5vw] bg-white px-[0.6vw] text-[0.8vw] text-gray-800 focus-within:border-[#E05638] shadow-2xs">
+        <input
+          type="text"
+          value={color && color.includes('gradient') ? 'GRADIENT' : displayColor}
+          onChange={(e) => {
+            let val = e.target.value;
+            if (!val.startsWith('#') && val.length > 0 && !val.includes('gradient')) val = '#' + val;
+            onChange(val);
+          }}
+          className="w-[5.2vw] font-mono text-[0.8vw] text-gray-800 bg-transparent focus:outline-none uppercase font-medium"
+          maxLength={7}
+        />
+        <span className="text-gray-400 text-[0.75vw] font-medium">{opacity}%</span>
+      </div>
+    </div>
+  );
+};
+
 // RadioButton component with signature accent
 const RadioButton = ({ label, checked, onChange }) => (
   <label className="flex items-center gap-[0.4vw] cursor-pointer select-none">
     <div
       onClick={onChange}
       className={`w-[1.05vw] h-[1.05vw] rounded-full border-2 flex items-center justify-center transition-all ${
-        checked ? 'border-[#E05638]' : 'border-gray-700 hover:border-black'
+        checked ? 'border-[#E05638]' : 'border-gray-400 hover:border-gray-600'
       }`}
     >
       {checked && <div className="w-[0.5vw] h-[0.5vw] rounded-full bg-[#E05638]" />}
     </div>
-    <span className="text-[0.78vw] text-gray-600 font-medium">{label}</span>
+    <span className="text-[0.78vw] text-gray-700 font-medium">{label}</span>
   </label>
 );
 
-// Toggle switch matching QRCodeProperties.jsx
+// Toggle switch matching AudioProperties exact structure & style
 const ToggleSwitch = ({ checked, onChange }) => (
   <button
     type="button"
@@ -745,191 +810,149 @@ const ThirdPartyEmbedProperties = ({
       {/* ─── 1. 3RD PARTY EMBED PROPERTY ─── */}
       <SectionHeader title="3rd Party Embed Property" />
 
-      <div className="flex flex-col gap-[0.5vw]">
-        {/* Embed Via row */}
-        <div className="flex items-center gap-[0.8vw]">
-          <span className="text-[0.78vw] font-medium text-gray-700">Embed Via :</span>
-          <div className="flex items-center gap-[1.2vw]">
-            <RadioButton
-              label="URL"
-              checked={embedVia === 'URL'}
-              onChange={() => handleEmbedViaChange('URL')}
-            />
-            <RadioButton
-              label="Embed Code"
-              checked={embedVia === 'Embed Code'}
-              onChange={() => handleEmbedViaChange('Embed Code')}
-            />
-          </div>
+      {/* Embed Via row */}
+      <PropertyRow label="Embed Via">
+        <div className="flex items-center gap-[1.2vw]">
+          <RadioButton
+            label="URL"
+            checked={embedVia === 'URL'}
+            onChange={() => handleEmbedViaChange('URL')}
+          />
+          <RadioButton
+            label="Embed Code"
+            checked={embedVia === 'Embed Code'}
+            onChange={() => handleEmbedViaChange('Embed Code')}
+          />
         </div>
+      </PropertyRow>
 
-        <div className="flex flex-col gap-[0.25vw]">
-          <span className="text-[0.7vw] text-gray-500 font-medium">
-            {embedVia === 'Embed Code' ? 'Code' : 'Source URL'}
-          </span>
+      <div className="flex flex-col gap-[0.25vw] pl-[0.5vw] pr-[0.2vw]">
+        <span className="text-[0.7vw] text-gray-500 font-medium">
+          {embedVia === 'Embed Code' ? 'Code' : 'Source URL'}
+        </span>
 
-          {embedVia === 'Embed Code' ? (
-            <textarea
-              placeholder="Paste HTML code here"
+        {embedVia === 'Embed Code' ? (
+          <textarea
+            placeholder="Paste HTML code here"
+            value={embedSrc}
+            onChange={(e) => handleSetEmbedSrc(e.target.value)}
+            rows={3}
+            className="w-full border border-gray-200 rounded-[0.5vw] p-[0.6vw] text-[0.78vw] font-normal text-gray-800 placeholder-gray-400 outline-none focus:border-[#E05638] focus:ring-1 focus:ring-[#E05638] bg-white h-[5.5vw] resize-none shadow-2xs font-mono"
+          />
+        ) : (
+          <div className="flex border border-gray-200 rounded-[0.5vw] overflow-hidden focus-within:border-[#E05638] focus-within:ring-1 focus-within:ring-[#E05638] transition-all bg-white shadow-2xs">
+            <input
+              type="text"
+              placeholder="e.g. https://..."
               value={embedSrc}
               onChange={(e) => handleSetEmbedSrc(e.target.value)}
-              rows={3}
-              className="w-full border border-gray-200 rounded-[0.5vw] p-[0.6vw] text-[0.78vw] font-normal text-gray-800 placeholder-gray-400 outline-none focus:border-[#E05638] focus:ring-1 focus:ring-[#E05638] bg-white h-[5.5vw] resize-none shadow-2xs font-mono"
+              className="flex-1 px-[0.6vw] py-[0.5vw] text-[0.78vw] font-normal outline-none text-gray-800 placeholder-gray-400 bg-transparent"
             />
-          ) : (
-            <div className="flex border border-gray-200 rounded-[0.5vw] overflow-hidden focus-within:border-[#E05638] focus-within:ring-1 focus-within:ring-[#E05638] transition-all bg-white shadow-2xs">
-              <input
-                type="text"
-                placeholder="e.g. https://..."
-                value={embedSrc}
-                onChange={(e) => handleSetEmbedSrc(e.target.value)}
-                className="flex-1 px-[0.6vw] py-[0.5vw] text-[0.78vw] font-normal outline-none text-gray-800 placeholder-gray-400 bg-transparent"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  if (embedSrc) {
-                    navigator.clipboard.writeText(embedSrc.startsWith('http') ? embedSrc : 'https://' + embedSrc);
-                    setCopiedUrl(true);
-                    setTimeout(() => setCopiedUrl(false), 1500);
-                  }
-                }}
-                className="px-[0.6vw] flex items-center justify-center text-gray-500 hover:text-[#E05638] transition-colors bg-gray-50 border-l border-gray-200 cursor-pointer"
-                title={copiedUrl ? 'Copied!' : 'Copy Link'}
-              >
-                {copiedUrl ? (
-                  <Check className="w-[0.85vw] h-[0.85vw] text-green-600" />
-                ) : (
-                  <Copy className="w-[0.85vw] h-[0.85vw]" />
-                )}
-              </button>
-            </div>
-          )}
-        </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (embedSrc) {
+                  navigator.clipboard.writeText(embedSrc.startsWith('http') ? embedSrc : 'https://' + embedSrc);
+                  setCopiedUrl(true);
+                  setTimeout(() => setCopiedUrl(false), 1500);
+                }
+              }}
+              className="px-[0.6vw] flex items-center justify-center text-gray-500 hover:text-[#E05638] transition-colors bg-gray-50 border-l border-gray-200 cursor-pointer"
+              title={copiedUrl ? 'Copied!' : 'Copy Link'}
+            >
+              {copiedUrl ? (
+                <Check className="w-[0.85vw] h-[0.85vw] text-green-600" />
+              ) : (
+                <Copy className="w-[0.85vw] h-[0.85vw]" />
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ─── 2. EMBED CONTROLS ─── */}
       <SectionHeader title="Embed Controls" />
 
-      <div className="flex flex-col gap-[0.5vw]">
-        {/* Open website button */}
-        <div className="flex items-center justify-between w-full">
-          <span className="text-[0.78vw] text-gray-700 font-medium whitespace-nowrap">Open website button</span>
-          <div className="flex-1 mx-[0.4vw] border-b border-dashed border-gray-300"></div>
-          <ToggleSwitch
-            checked={openWebsiteBtn}
-            onChange={handleOpenWebsiteBtnChange}
-          />
-        </div>
-
-        {/* Allow Fullscreen */}
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-[0.25vw]">
-            <span className="text-[0.78vw] text-gray-700 font-medium">Allow Fullscreen</span>
-            <span className="text-gray-400 text-[0.68vw] font-normal">(if option available)</span>
-          </div>
-          <ToggleSwitch
-            checked={allowFullscreen}
-            onChange={handleAllowFullscreenChange}
-          />
-        </div>
-
-        {/* Behavior */}
-        <div className="flex flex-col gap-[0.25vw]">
-          <span className="text-[0.72vw] text-gray-500 font-medium">Behavior</span>
-          <CustomSelect
-            value={behavior}
-            onChange={handleBehaviorChange}
-            options={BEHAVIOR_OPTIONS}
-          />
-        </div>
+      {/* Open website button */}
+      <div className="flex items-center justify-between pl-[0.5vw] pr-[0.2vw] h-[2.2vw]">
+        <span className="text-[0.78vw] text-gray-700 font-medium whitespace-nowrap">Open website button</span>
+        <ToggleSwitch
+          checked={openWebsiteBtn}
+          onChange={handleOpenWebsiteBtnChange}
+        />
       </div>
 
-      {/* ─── 3. STOKE COLOR ─── */}
-      <SectionHeader title="Stoke Color" />
+      {/* Allow Fullscreen */}
+      <div className="flex items-center justify-between pl-[0.5vw] pr-[0.2vw] h-[2.2vw]">
+        <div className="flex items-center gap-[0.25vw]">
+          <span className="text-[0.78vw] text-gray-700 font-medium">Allow Fullscreen</span>
+          <span className="text-gray-400 text-[0.68vw] font-normal">(if available)</span>
+        </div>
+        <ToggleSwitch
+          checked={allowFullscreen}
+          onChange={handleAllowFullscreenChange}
+        />
+      </div>
 
-      <div className="flex flex-col gap-[0.5vw]">
-        {/* Color row */}
-        <div className="flex items-center gap-[0.4vw] w-full">
-          <div
-            onClick={() => setActiveColorPicker(activeColorPicker === 'strokeColor' ? null : 'strokeColor')}
-            className={`color-box color-box-trigger w-[2vw] h-[2vw] rounded-[0.5vw] border flex-shrink-0 relative overflow-hidden flex items-center justify-center cursor-pointer shadow-2xs hover:scale-105 transition-all ${
-              activeColorPicker === 'strokeColor' ? 'border-[#E05638] ring-2 ring-[#E05638]/40 scale-105 shadow-xs' : 'border-gray-200 hover:border-gray-300'
-            }`}
-            style={{ backgroundColor: strokeColor === 'none' || strokeColor === 'transparent' ? '#ffffff' : strokeColor }}
-            title="Click to open color palette"
+      {/* Behavior */}
+      <PropertyRow label="Behavior">
+        <CustomSelect
+          value={behavior}
+          onChange={handleBehaviorChange}
+          options={BEHAVIOR_OPTIONS}
+        />
+      </PropertyRow>
+
+      {/* ─── 3. STROKE COLOR ─── */}
+      <SectionHeader title="Stroke Color" />
+
+      {/* Color row */}
+      <PropertyRow label="Color">
+        <ColorInput
+          color={strokeColor}
+          onChange={handleStrokeColorChange}
+          opacity={strokeOpacity}
+          onOpenPicker={() => setActiveColorPicker(activeColorPicker === 'strokeColor' ? null : 'strokeColor')}
+          isActive={activeColorPicker === 'strokeColor'}
+        />
+      </PropertyRow>
+
+      {/* Stroke Width */}
+      <PropertyRow label="Stroke Width">
+        <div className="flex items-center gap-[0.3vw] h-[2.5vw] w-full">
+          <button
+            type="button"
+            onClick={() => handleStrokeWidthChange(Math.max(0, strokeWidth - 1))}
+            className="w-[2vw] h-full flex items-center justify-center bg-gray-100 rounded-[0.4vw] text-gray-600 hover:bg-gray-200 transition-colors cursor-pointer text-[1vw]"
           >
-            {(strokeColor === 'none' || strokeColor === 'transparent') && (
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[1.5px] bg-red-500 rotate-45" />
-            )}
-          </div>
-
-          <div className="flex-1 h-[2.5vw] flex items-center justify-between border border-gray-200 rounded-[0.5vw] bg-white px-[0.6vw] text-[0.8vw] text-gray-800 focus-within:border-[#E05638] shadow-2xs">
+            -
+          </button>
+          <div className="flex-1 h-full bg-white border border-gray-200 rounded-[0.5vw] flex items-center justify-center shadow-2xs focus-within:border-[#E05638]">
             <input
-              type="text"
-              value={strokeColor && strokeColor.includes('gradient') ? 'GRADIENT' : (strokeColor?.toUpperCase() || '#000000')}
-              onChange={(e) => {
-                let val = e.target.value;
-                if (!val.startsWith('#') && val.length > 0 && !val.includes('gradient')) val = '#' + val;
-                handleStrokeColorChange(val);
-              }}
-              className="w-[5.2vw] font-mono text-[0.8vw] text-gray-800 bg-transparent focus:outline-none uppercase"
-              maxLength={7}
+              type="number"
+              value={strokeWidth}
+              onChange={(e) => handleStrokeWidthChange(Math.max(0, parseFloat(e.target.value) || 0))}
+              className="w-full text-center text-[0.8vw] text-gray-700 outline-none bg-transparent font-medium no-spin"
             />
-            <span className="text-gray-400 text-[0.75vw] font-medium">{strokeOpacity}%</span>
           </div>
-
-          <div
-            onClick={() => setActiveColorPicker(activeColorPicker === 'strokeColor' ? null : 'strokeColor')}
-            className="h-[2.5vw] flex items-center justify-between px-[0.6vw] border border-gray-200 rounded-[0.5vw] bg-white cursor-pointer hover:border-gray-300 min-w-[4.2vw] shadow-2xs"
+          <button
+            type="button"
+            onClick={() => handleStrokeWidthChange(strokeWidth + 1)}
+            className="w-[2vw] h-full flex items-center justify-center bg-gray-100 rounded-[0.4vw] text-gray-600 hover:bg-gray-200 transition-colors cursor-pointer text-[1vw]"
           >
-            <span className="text-[0.75vw] text-gray-600 font-medium">HEX</span>
-            <ChevronDown size="0.8vw" className="text-gray-400 ml-[0.3vw]" />
-          </div>
+            +
+          </button>
         </div>
+      </PropertyRow>
 
-        {/* Stoke Width & Line Corner */}
-        <div className="grid grid-cols-2 gap-[0.6vw]">
-          {/* Stoke Width */}
-          <div className="flex flex-col gap-[0.25vw]">
-            <span className="text-[0.72vw] text-gray-500 font-medium">Stoke Width</span>
-            <div className="flex items-center gap-[0.3vw] h-[2.5vw]">
-              <button
-                type="button"
-                onClick={() => handleStrokeWidthChange(Math.max(0, strokeWidth - 1))}
-                className="w-[2vw] h-full flex items-center justify-center bg-gray-100 rounded-[0.4vw] text-gray-600 hover:bg-gray-200 transition-colors cursor-pointer text-[1vw]"
-              >
-                -
-              </button>
-              <div className="flex-1 h-full bg-white border border-gray-200 rounded-[0.5vw] flex items-center justify-center shadow-2xs focus-within:border-[#E05638]">
-                <input
-                  type="number"
-                  value={strokeWidth}
-                  onChange={(e) => handleStrokeWidthChange(Math.max(0, parseFloat(e.target.value) || 0))}
-                  className="w-full text-center text-[0.8vw] text-gray-700 outline-none bg-transparent font-medium no-spin"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => handleStrokeWidthChange(strokeWidth + 1)}
-                className="w-[2vw] h-full flex items-center justify-center bg-gray-100 rounded-[0.4vw] text-gray-600 hover:bg-gray-200 transition-colors cursor-pointer text-[1vw]"
-              >
-                +
-              </button>
-            </div>
-          </div>
-
-          {/* Line Corner */}
-          <div className="flex flex-col gap-[0.25vw]">
-            <span className="text-[0.72vw] text-gray-500 font-medium">Line Corner</span>
-            <CustomSelect
-              value={lineCorner}
-              onChange={handleLineCornerChange}
-              options={LINE_CORNER_OPTIONS}
-            />
-          </div>
-        </div>
-      </div>
+      {/* Line Corner */}
+      <PropertyRow label="Line Corner">
+        <CustomSelect
+          value={lineCorner}
+          onChange={handleLineCornerChange}
+          options={LINE_CORNER_OPTIONS}
+        />
+      </PropertyRow>
 
       {/* ─── 4. CORNER RADIUS ─── */}
       <SectionHeader title="Corner Radius" />

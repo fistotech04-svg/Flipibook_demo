@@ -973,7 +973,7 @@ const QRCodeProperties = ({
   }, [qrColor, backdrop, logoBgColor, textColor, frameBgColor, arrowColor]);
 
   return (
-    <div className="w-full flex flex-col gap-[0.6vw] font-sans text-gray-800 pt-[0.2vw] pr-[0.2vw] select-none">
+    <div className="w-full flex flex-col gap-[0.6vw] font-sans text-gray-800 pt-[0.2vw] select-none overflow-x-hidden">
       {/* 1. Header: QR Property */}
       <div className="flex items-center gap-[0.4vw]">
         <span className="text-[0.9vw] font-medium text-black whitespace-nowrap">QR Property</span>
@@ -1056,7 +1056,7 @@ const QRCodeProperties = ({
       </PropertyRow>
 
       {/* 11. Center Logo Box (Light gray container) */}
-      <div className="bg-[#F8F9FA] -mx-[0.2vw] px-[0.6vw] py-[0.6vw] rounded-[0.6vw] border border-gray-100 flex flex-col gap-[0.5vw] my-[0.2vw]">
+      <div className="bg-[#F8F9FA] px-[0.6vw] py-[0.6vw] rounded-[0.6vw] border border-gray-100 flex flex-col gap-[0.5vw] my-[0.2vw]">
         <div className="flex items-center justify-between">
           <span className="text-[0.8vw] font-medium text-gray-900">Add logo at center of QR</span>
           {/* Toggle Switch */}
@@ -1207,7 +1207,7 @@ const QRCodeProperties = ({
       {/* 12. Frames Section */}
       <div className="flex items-center gap-[0.4vw] mt-[0.3vw]">
         <span className="text-[0.9vw] font-medium text-black whitespace-nowrap">Frames</span>
-        <div className="h-[0.06vw] bg-gray-200 flex-1 mr-[-2vw]" />
+        <div className="h-[0.06vw] bg-gray-200 flex-1 ml-[0.3vw]" />
       </div>
 
       {/* Frame Style Preview Box */}

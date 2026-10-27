@@ -9,40 +9,176 @@ import {
   ANIMATED_SHAPES_PRESETS
 } from './Animated_Decorators';
 
-const SectionHeader = ({ title, icon: IconComponent }) => (
-  <div className="flex items-center gap-[0.4vw] my-[0.3vw]">
-    <h2 className="text-[0.8vw] font-bold text-[#1e2538] whitespace-nowrap tracking-tight">{title}</h2>
-    <div className="h-[0.08vw] bg-gray-200 flex-1"></div>
+// Section Header matching AudioProperties exact styling
+const SectionHeader = ({ title }) => (
+  <div className="flex items-center gap-[0.4vw] mt-[0.3vw]">
+    <span className="text-[0.9vw] font-medium text-black whitespace-nowrap">{title}</span>
+    <div className="h-[0.06vw] bg-gray-200 flex-1 ml-[0.3vw]" />
   </div>
 );
 
-const PropertySlider = ({ label, value, onChange, min = 0, max = 360, step = 1, unit = '' }) => (
-  <div className="flex items-center justify-between py-[0.1vw]">
-    <span className="text-[0.7vw] font-medium text-gray-700 w-[5.5vw]">{label} :</span>
-    <div className="flex-grow flex items-center gap-[0.5vw]">
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value !== undefined ? value : min}
-        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-        className="flex-grow h-[0.25vw] appearance-none cursor-pointer bg-gray-200 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[0.8vw] [&::-webkit-slider-thumb]:h-[0.8vw] [&::-webkit-slider-thumb]:bg-[#544af4] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-[0_0_5px_rgba(84,74,244,0.5)]"
-        style={{
-          background: `linear-gradient(to right, #544af4 0%, #544af4 ${Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100))}%, #e5e7eb ${Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100))}%, #e5e7eb 100%)`,
-        }}
-      />
-      <div className="w-[3.2vw] h-[1.4vw] flex items-center justify-center bg-white border border-gray-200 rounded-[0.3vw] shadow-sm">
-        <input
-          type="text"
-          value={`${value !== undefined ? value : min}${unit}`}
-          readOnly
-          className="w-full text-center text-[0.7vw] text-gray-700 font-medium outline-none bg-transparent cursor-default"
-        />
-      </div>
+// PropertyRow matching AudioProperties exact alignment (w-[5.6vw] pl-[0.5vw])
+const PropertyRow = ({ label, children, className = '' }) => (
+  <div className={`flex items-center gap-[0.5vw] ${className}`}>
+    <div className="w-[5.6vw] shrink-0 flex items-center pl-[0.5vw] justify-between text-gray-700 font-medium">
+      <span className={`${label.length > 12 ? 'text-[0.68vw]' : 'text-[0.78vw]'} tracking-tight whitespace-nowrap`}>
+        {label}
+      </span>
+      <span className="text-gray-500 font-medium text-[0.8vw]">:</span>
+    </div>
+    <div className="flex-1 min-w-0">
+      {children}
     </div>
   </div>
 );
+
+// Toggle Switch matching AudioProperties exact structure & style
+const Toggle = ({ checked, onChange }) => (
+  <button
+    type="button"
+    onClick={() => onChange(!checked)}
+    className={`w-[1.9vw] h-[1.1vw] flex items-center rounded-full p-[0.1vw] cursor-pointer transition-colors ${
+      checked ? 'bg-[#E05638]' : 'bg-gray-300'
+    }`}
+  >
+    <div
+      className={`bg-white w-[0.9vw] h-[0.9vw] rounded-full shadow-md transform transition-transform ${
+        checked ? 'translate-x-[0.8vw]' : 'translate-x-0'
+      }`}
+    />
+  </button>
+);
+
+// PropertySlider using PropertyRow with signature #E05638 styling
+const PropertySlider = ({ label, value, onChange, min = 0, max = 360, step = 1, unit = '' }) => {
+  const numVal = value !== undefined ? value : min;
+  const pct = Math.max(0, Math.min(100, ((numVal - min) / (max - min)) * 100));
+
+  return (
+    <PropertyRow label={label}>
+      <div className="flex items-center gap-[0.5vw] w-full h-[2.5vw]">
+        <div className="flex-1 flex items-center relative">
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={numVal}
+            onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+            className="w-full h-[0.25vw] appearance-none cursor-pointer bg-gray-200 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[0.85vw] [&::-webkit-slider-thumb]:h-[0.85vw] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#E05638] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md"
+            style={{
+              background: `linear-gradient(to right, #E05638 0%, #E05638 ${pct}%, #e5e7eb ${pct}%, #e5e7eb 100%)`,
+            }}
+          />
+        </div>
+        <span className="text-[0.8vw] text-gray-800 font-medium w-[2.8vw] text-right shrink-0">
+          {numVal} {unit}
+        </span>
+      </div>
+    </PropertyRow>
+  );
+};
+
+// Color Swatch + Hex Input Box matching AudioProperties exact structure
+const ColorInput = ({ color, onChange, opacity = 100, onOpenPicker, isActive = false }) => {
+  const displayColor = color && color.startsWith('#') ? color.toUpperCase() : color || '#000000';
+
+  return (
+    <div className="flex items-center gap-[0.4vw] w-full">
+      <div
+        onClick={onOpenPicker}
+        className={`color-box color-box-trigger w-[2vw] h-[2vw] rounded-[0.5vw] border flex-shrink-0 relative overflow-hidden flex items-center justify-center cursor-pointer shadow-2xs hover:scale-105 transition-all ${
+          isActive ? 'border-[#E05638] ring-2 ring-[#E05638]/40 scale-105 shadow-xs' : 'border-gray-200 hover:border-gray-300'
+        }`}
+        style={{ backgroundColor: color || '#000000' }}
+        title="Click to open color palette"
+      />
+      <div className="flex-1 h-[2.5vw] flex items-center justify-between border border-gray-200 rounded-[0.5vw] bg-white px-[0.6vw] text-[0.8vw] text-gray-800 focus-within:border-[#E05638] shadow-2xs">
+        <input
+          type="text"
+          value={displayColor}
+          onChange={(e) => {
+            let val = e.target.value;
+            if (!val.startsWith('#') && val.length > 0) val = '#' + val;
+            onChange(val);
+          }}
+          className="w-[5.2vw] font-mono text-[0.8vw] text-gray-800 bg-transparent focus:outline-none uppercase font-medium"
+          maxLength={7}
+        />
+        <span className="text-gray-400 text-[0.75vw] font-medium">{opacity}%</span>
+      </div>
+    </div>
+  );
+};
+
+// Custom Dropdown matching AudioProperties exact design (h-[2.5vw] rounded-[0.5vw])
+const CustomSelect = ({ value, onChange, options, className = '' }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  const selectedOption = options.find((opt) => String(opt.value ?? opt.id) === String(value)) || options[0];
+
+  return (
+    <div ref={containerRef} className={`relative w-full ${className}`}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full h-[2.5vw] flex items-center justify-between bg-white border ${
+          isOpen ? 'border-2 border-[#E05638] shadow-xs' : 'border border-gray-200 hover:border-gray-300'
+        } rounded-[0.5vw] px-[0.6vw] text-[0.78vw] text-gray-800 font-medium transition-colors cursor-pointer shadow-2xs`}
+      >
+        <span className="font-medium truncate">{selectedOption?.label || selectedOption?.name || value}</span>
+        <ChevronDown
+          className={`w-[0.9vw] h-[0.9vw] text-gray-500 transition-transform duration-200 flex-shrink-0 ml-[0.3vw] ${
+            isOpen ? 'rotate-180 text-[#E05638]' : ''
+          }`}
+        />
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-[90]" onClick={() => setIsOpen(false)} />
+          <div className="absolute left-0 right-0 top-full mt-[0.35vw] bg-white border border-gray-100 rounded-[0.6vw] shadow-2xl overflow-hidden z-[100] flex flex-col py-[0.3vw] max-h-[14vw] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            {options.map((opt) => {
+              const optVal = opt.value ?? opt.id ?? opt;
+              const optLabel = opt.label ?? opt.name ?? opt;
+              const isSelected = String(optVal) === String(value);
+              return (
+                <button
+                  key={optVal}
+                  type="button"
+                  onClick={() => {
+                    onChange(optVal);
+                    setIsOpen(false);
+                  }}
+                  className={`px-[0.9vw] py-[0.45vw] text-[0.78vw] font-medium transition-colors text-left flex items-center justify-between cursor-pointer group ${
+                    isSelected
+                      ? 'text-[#E05638] bg-[#E05638]/10 font-semibold'
+                      : 'text-gray-700 hover:bg-gray-50 hover:text-[#E05638]'
+                  }`}
+                >
+                  <span className="truncate">{optLabel}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 const fontFamilies = [
   'Arial', 'Inter', 'Roboto', 'Bangers', 'Times New Roman', 'Courier New',
@@ -525,16 +661,16 @@ const AnimatedDecoratorsProperties = ({
   };
 
   return (
-    <div className="flex flex-col gap-[0.7vw] p-[0.6vw] font-sans text-[#1e2538]">
+    <div className="w-full flex flex-col gap-[0.6vw] font-sans text-gray-800 pt-[0.2vw] pr-[0.2vw] select-none">
       {/* Header Badge */}
-      <div className="flex items-center justify-between pb-[0.3vw] border-b border-gray-100">
+      <div className="flex items-center justify-between pb-[0.3vw] pl-[0.5vw] pr-[0.2vw] border-b border-gray-100">
         <div className="flex items-center gap-[0.4vw]">
-          <Sparkles className="w-[1vw] h-[1vw] text-indigo-600" />
-          <span className="text-[0.88vw] font-bold text-gray-900 truncate max-w-[12vw]">
+          <Sparkles className="w-[1vw] h-[1vw] text-[#E05638]" />
+          <span className="text-[0.85vw] font-medium text-gray-800 truncate max-w-[12vw]">
             {presetTitle}
           </span>
         </div>
-        <span className="text-[0.6vw] font-bold text-indigo-600 uppercase bg-indigo-50 border border-indigo-200/50 px-[0.4vw] py-[0.1vw] rounded">
+        <span className="text-[0.65vw] font-medium text-[#E05638] uppercase bg-[#E05638]/10 px-[0.4vw] py-[0.1vw] rounded-[0.3vw]">
           {categoryName}
         </span>
       </div>
@@ -544,396 +680,310 @@ const AnimatedDecoratorsProperties = ({
           ===================================================================== */}
       {!isStarburst ? (
         <>
-          {/* Card 1: Combined Motion Engine */}
-          <div className="flex flex-col gap-[0.45vw] bg-gray-50/70 p-[0.6vw] rounded-[0.5vw] border border-gray-200/70">
-            <SectionHeader title="Motion Engine" icon={Clapperboard} />
+          {/* ─── 1. MOTION ENGINE ─── */}
+          <SectionHeader title="Motion Engine" />
 
-            {/* Motion Effect */}
-            <div>
-              <label className="block text-[0.68vw] font-semibold text-gray-600 mb-[0.15vw]">
-                Motion Effect
-              </label>
-              <select
-                value={animPreset}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setAnimPreset(val);
-                  applyUpdates({ animPreset: val });
-                }}
-                className="w-full text-[0.75vw] p-[0.35vw] border border-gray-200 rounded-[0.35vw] bg-white outline-none cursor-pointer focus:border-indigo-500 font-medium"
-              >
-                {MOTION_EFFECTS.map((eff) => (
-                  <option key={eff.id} value={eff.id}>
-                    {eff.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Motion Effect */}
+          <PropertyRow label="Motion Effect">
+            <CustomSelect
+              value={animPreset}
+              onChange={(val) => {
+                setAnimPreset(val);
+                applyUpdates({ animPreset: val });
+              }}
+              options={MOTION_EFFECTS}
+            />
+          </PropertyRow>
 
-            {/* Speed / Duration */}
-            <div className="flex flex-col gap-[0.2vw]">
-              <div className="flex items-center justify-between">
-                <span className="text-[0.68vw] font-semibold text-gray-600">Speed</span>
-                <div className="flex items-center gap-[0.2vw]">
-                  {[
-                    { label: 'Fast', val: 1.0 },
-                    { label: 'Normal', val: 2.0 },
-                    { label: 'Smooth', val: 3.5 }
-                  ].map((pill) => (
-                    <button
-                      key={pill.label}
-                      onClick={() => {
-                        setDuration(pill.val);
-                        applyUpdates({ duration: pill.val });
-                      }}
-                      className={`text-[0.6vw] px-[0.35vw] py-[0.1vw] rounded font-medium transition-colors ${
-                        duration === pill.val
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-white border border-gray-200 text-gray-600 hover:border-indigo-400'
-                      }`}
-                    >
-                      {pill.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <PropertySlider
-                label="Duration"
-                value={duration}
-                min={0.3}
-                max={6.0}
-                step={0.1}
-                unit="s"
-                onChange={(val) => {
-                  setDuration(val);
-                  applyUpdates({ duration: val });
-                }}
-              />
-            </div>
+          {/* Speed / Duration */}
+          <PropertySlider
+            label="Duration"
+            value={duration}
+            min={0.3}
+            max={6.0}
+            step={0.1}
+            unit="s"
+            onChange={(val) => {
+              setDuration(val);
+              applyUpdates({ duration: val });
+            }}
+          />
 
-            {/* Playback Mode Pills */}
-            <div>
-              <span className="text-[0.68vw] font-semibold text-gray-600 block mb-[0.2vw]">Playback Mode</span>
-              <div className="grid grid-cols-3 gap-[0.3vw]">
-                {[
-                  { id: 'infinite', label: 'Loop' },
-                  { id: 'alternate', label: 'Bounce' },
-                  { id: 'once', label: 'Play Once' }
-                ].map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => {
-                      setLoopMode(m.id);
-                      applyUpdates({ loopMode: m.id });
-                    }}
-                    className={`text-[0.68vw] py-[0.25vw] rounded-[0.3vw] font-medium text-center border transition-all ${
-                      loopMode === m.id
-                        ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-sm'
-                        : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
-                    }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
+          {/* Playback Mode */}
+          <PropertyRow label="Playback">
+            <div className="grid grid-cols-3 gap-[0.3vw] w-full">
+              {[
+                { id: 'infinite', label: 'Loop' },
+                { id: 'alternate', label: 'Bounce' },
+                { id: 'once', label: 'Play Once' }
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => {
+                    setLoopMode(m.id);
+                    applyUpdates({ loopMode: m.id });
+                  }}
+                  className={`text-[0.72vw] py-[0.35vw] rounded-[0.4vw] font-medium text-center border transition-all cursor-pointer ${
+                    loopMode === m.id
+                      ? 'bg-[#E05638]/10 border-[#E05638] text-[#E05638] font-semibold'
+                      : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
             </div>
+          </PropertyRow>
+
+          {/* ─── 2. COLOR & STYLING ─── */}
+          <SectionHeader title="Color & Styling" />
+
+          {/* Curated Duo Themes */}
+          <PropertyRow label="Presets">
+            <div className="grid grid-cols-4 gap-[0.25vw] w-full">
+              {COLOR_COMBINATIONS.map((combo) => (
+                <button
+                  key={combo.name}
+                  type="button"
+                  onClick={() => applyDuoTheme(combo)}
+                  title={combo.name}
+                  className="p-[0.25vw] rounded-[0.4vw] bg-white border border-gray-200 hover:border-[#E05638] flex items-center justify-center gap-[0.2vw] transition-all shadow-2xs cursor-pointer"
+                >
+                  <span className="w-[0.65vw] h-[0.65vw] rounded-full" style={{ background: combo.fill }} />
+                  <span className="w-[0.65vw] h-[0.65vw] rounded-full" style={{ background: combo.stroke }} />
+                </button>
+              ))}
+            </div>
+          </PropertyRow>
+
+          {/* Primary Color */}
+          <PropertyRow label="Primary Color">
+            <ColorInput
+              color={primaryColor}
+              onChange={(newCol) => {
+                setPrimaryColor(newCol);
+                applyUpdates({ primaryColor: newCol });
+              }}
+              onOpenPicker={() => setActivePicker((prev) => (prev === 'primary' ? null : 'primary'))}
+              isActive={activePicker === 'primary'}
+            />
+          </PropertyRow>
+
+          {/* Accent Color */}
+          <PropertyRow label="Accent Color">
+            <ColorInput
+              color={accentColor}
+              onChange={(newCol) => {
+                setAccentColor(newCol);
+                applyUpdates({ accentColor: newCol });
+              }}
+              onOpenPicker={() => setActivePicker((prev) => (prev === 'accent' ? null : 'accent'))}
+              isActive={activePicker === 'accent'}
+            />
+          </PropertyRow>
+
+          {/* Line Weight */}
+          <PropertySlider
+            label="Line Weight"
+            value={strokeWidth}
+            min={0}
+            max={20}
+            unit="px"
+            onChange={(val) => {
+              setStrokeWidth(val);
+              applyUpdates({ strokeWidth: val });
+            }}
+          />
+
+          {/* Dash Style */}
+          <PropertyRow label="Dash Style">
+            <CustomSelect
+              value={dashStyle}
+              onChange={(val) => {
+                setDashStyle(val);
+                applyUpdates({ dashStyle: val });
+              }}
+              options={[
+                { value: 'preserve', label: 'Keep Preset Flow' },
+                { value: 'none', label: 'Solid Line' },
+                { value: '6,6', label: 'Dashed Flow' },
+                { value: '3,6', label: 'Dotted Flow' }
+              ]}
+            />
+          </PropertyRow>
+
+          {/* Glow Aura Toggle */}
+          <div className="flex items-center justify-between pl-[0.5vw] pr-[0.2vw] h-[2.2vw]">
+            <span className="text-[0.78vw] text-gray-700 font-medium">Glow Aura</span>
+            <Toggle
+              checked={glowEnabled}
+              onChange={() => {
+                const next = !glowEnabled;
+                setGlowEnabled(next);
+                applyUpdates({ glowEnabled: next });
+              }}
+            />
           </div>
 
-          {/* Card 2: Combined Color & Styling */}
-          <div className="flex flex-col gap-[0.45vw] bg-gray-50/70 p-[0.6vw] rounded-[0.5vw] border border-gray-200/70">
-            <SectionHeader title="Color & Styling" icon={Palette} />
-
-            {/* Curated Duo Themes */}
-            <div>
-              <span className="text-[0.68vw] font-semibold text-gray-600 block mb-[0.2vw]">Preset Themes</span>
-              <div className="grid grid-cols-4 gap-[0.25vw]">
-                {COLOR_COMBINATIONS.map((combo) => (
-                  <button
-                    key={combo.name}
-                    onClick={() => applyDuoTheme(combo)}
-                    title={combo.name}
-                    className="p-[0.2vw] rounded-[0.3vw] bg-white border border-gray-200 hover:border-indigo-400 flex items-center justify-center gap-[0.2vw] transition-all shadow-sm"
-                  >
-                    <span className="w-[0.65vw] h-[0.65vw] rounded-full" style={{ background: combo.fill }} />
-                    <span className="w-[0.65vw] h-[0.65vw] rounded-full" style={{ background: combo.stroke }} />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Dual Color Swatches */}
-            <div className="grid grid-cols-2 gap-[0.4vw] mt-[0.1vw]">
-              <div className="flex flex-col gap-[0.15vw]">
-                <span className="text-[0.68vw] font-semibold text-gray-600">Primary Color</span>
-                <div
-                  ref={triggerRefs.primary}
-                  onClick={() => setActivePicker(activePicker === 'primary' ? null : 'primary')}
-                  className="flex items-center gap-[0.35vw] p-[0.3vw] border border-gray-200 rounded-[0.3vw] cursor-pointer hover:border-indigo-500 bg-white shadow-sm"
-                >
-                  <div
-                    className="w-[1.2vw] h-[1.2vw] rounded-[0.2vw] border border-gray-200 shadow-inner"
-                    style={{ backgroundColor: primaryColor }}
-                  />
-                  <span className="text-[0.7vw] font-mono text-gray-700">{primaryColor}</span>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-[0.15vw]">
-                <span className="text-[0.68vw] font-semibold text-gray-600">Accent Color</span>
-                <div
-                  ref={triggerRefs.accent}
-                  onClick={() => setActivePicker(activePicker === 'accent' ? null : 'accent')}
-                  className="flex items-center gap-[0.35vw] p-[0.3vw] border border-gray-200 rounded-[0.3vw] cursor-pointer hover:border-indigo-500 bg-white shadow-sm"
-                >
-                  <div
-                    className="w-[1.2vw] h-[1.2vw] rounded-[0.2vw] border border-gray-200 shadow-inner"
-                    style={{ backgroundColor: accentColor }}
-                  />
-                  <span className="text-[0.7vw] font-mono text-gray-700">{accentColor}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Stroke Width & Dash Style */}
-            <div className="flex flex-col gap-[0.35vw] pt-[0.2vw] border-t border-gray-200/60 mt-[0.1vw]">
-              <PropertySlider
-                label="Line Weight"
-                value={strokeWidth}
-                min={0}
-                max={20}
-                unit="px"
-                onChange={(val) => {
-                  setStrokeWidth(val);
-                  applyUpdates({ strokeWidth: val });
-                }}
-              />
-
-              <div className="flex items-center justify-between py-[0.1vw]">
-                <span className="text-[0.7vw] font-medium text-gray-700 w-[5.5vw]">Dash Style :</span>
-                <select
-                  value={dashStyle}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setDashStyle(val);
-                    applyUpdates({ dashStyle: val });
-                  }}
-                  className="flex-grow text-[0.7vw] p-[0.25vw] border border-gray-200 rounded-[0.3vw] bg-white outline-none cursor-pointer"
-                >
-                  <option value="preserve">Keep Preset Flow</option>
-                  <option value="none">Solid Line</option>
-                  <option value="6,6">Dashed Flow</option>
-                  <option value="3,6">Dotted Flow</option>
-                </select>
-              </div>
-
-              {/* Glow Aura Toggle */}
-              <div className="flex items-center justify-between py-[0.1vw]">
-                <div className="flex items-center gap-[0.3vw]">
-                  <button
-                    onClick={() => {
-                      const next = !glowEnabled;
-                      setGlowEnabled(next);
-                      applyUpdates({ glowEnabled: next });
-                    }}
-                    className={`w-[1.6vw] h-[0.9vw] rounded-full p-[0.1vw] transition-colors relative ${
-                      glowEnabled ? 'bg-indigo-600' : 'bg-gray-300'
-                    }`}
-                  >
-                    <div
-                      className={`w-[0.7vw] h-[0.7vw] rounded-full bg-white transition-transform ${
-                        glowEnabled ? 'translate-x-[0.7vw]' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                  <span className="text-[0.7vw] font-medium text-gray-700">Glow Aura</span>
-                </div>
-              </div>
-
-              {glowEnabled && (
-                <PropertySlider
-                  label="Intensity"
-                  value={glowIntensity}
-                  min={2}
-                  max={30}
-                  unit="px"
-                  onChange={(val) => {
-                    setGlowIntensity(val);
-                    applyUpdates({ glowIntensity: val });
-                  }}
-                />
-              )}
-            </div>
-          </div>
+          {glowEnabled && (
+            <PropertySlider
+              label="Glow Size"
+              value={glowIntensity}
+              min={2}
+              max={30}
+              unit="px"
+              onChange={(val) => {
+                setGlowIntensity(val);
+                applyUpdates({ glowIntensity: val });
+              }}
+            />
+          )}
         </>
       ) : (
         /* =====================================================================
            MODE B: UNCOMBINED STARBURST BADGES (Original Full Individual Properties)
            ===================================================================== */
         <>
-          {/* Badge Text */}
-          <div className="flex flex-col gap-[0.5vw]">
-            <SectionHeader title="Badge Text" icon={Type} />
-            <div className="flex flex-col gap-[0.2vw]">
-              <span className="text-[0.72vw] font-semibold text-gray-600">Text Lines:</span>
-              <textarea
-                value={starburstText}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setStarburstText(val);
-                  applyUpdates({ text: val });
-                }}
-                rows={3}
-                className="w-full text-[0.78vw] p-[0.5vw] border border-gray-200 rounded-[0.4vw] outline-none focus:border-indigo-500 font-sans resize-none"
-                placeholder="Enter Starburst text..."
-              />
-            </div>
+          {/* ─── 1. BADGE TEXT ─── */}
+          <SectionHeader title="Badge Text" />
 
-            {/* Typography Controls */}
-            <div className="grid grid-cols-3 gap-[0.4vw]">
-              <div>
-                <span className="text-[0.68vw] font-semibold text-gray-600">Font</span>
-                <select
-                  value={fontFamily}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setFontFamily(val);
-                    applyUpdates({ fontFamily: val });
-                  }}
-                  className="w-full text-[0.72vw] p-[0.35vw] border border-gray-200 rounded-[0.3vw] bg-white outline-none cursor-pointer"
-                >
-                  {fontFamilies.map((f) => (
-                    <option key={f} value={f}>{f}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <span className="text-[0.68vw] font-semibold text-gray-600">Weight</span>
-                <select
-                  value={fontWeight}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setFontWeight(val);
-                    applyUpdates({ fontWeight: val });
-                  }}
-                  className="w-full text-[0.72vw] p-[0.35vw] border border-gray-200 rounded-[0.3vw] bg-white outline-none cursor-pointer"
-                >
-                  {fontWeights.map((w) => (
-                    <option key={w.value} value={w.value}>{w.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <span className="text-[0.68vw] font-semibold text-gray-600">Size</span>
-                <select
-                  value={fontSize}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value, 10);
-                    setFontSize(val);
-                    applyUpdates({ fontSize: val });
-                  }}
-                  className="w-full text-[0.72vw] p-[0.35vw] border border-gray-200 rounded-[0.3vw] bg-white outline-none cursor-pointer"
-                >
-                  {fontSizes.map((s) => (
-                    <option key={s} value={s}>{s}px</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Starburst Individual Colors */}
-          <div className="flex flex-col gap-[0.5vw]">
-            <SectionHeader title="Color & Styling" icon={Palette} />
-            <div className="grid grid-cols-2 gap-[0.5vw]">
-              <div className="flex flex-col gap-[0.2vw]">
-                <span className="text-[0.68vw] font-semibold text-gray-600">Idle Starburst</span>
-                <div
-                  ref={triggerRefs.burst}
-                  onClick={() => setActivePicker(activePicker === 'burst' ? null : 'burst')}
-                  className="flex items-center gap-[0.35vw] p-[0.35vw] border border-gray-200 rounded-[0.35vw] cursor-pointer hover:border-indigo-500 bg-white shadow-sm"
-                >
-                  <div className="w-[1.2vw] h-[1.2vw] rounded-[0.2vw] border border-gray-200" style={{ backgroundColor: burstColor }} />
-                  <span className="text-[0.7vw] font-mono text-gray-700">{burstColor}</span>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-[0.2vw]">
-                <span className="text-[0.68vw] font-semibold text-gray-600">Hover Starburst</span>
-                <div
-                  ref={triggerRefs.hoverBurst}
-                  onClick={() => setActivePicker(activePicker === 'hoverBurst' ? null : 'hoverBurst')}
-                  className="flex items-center gap-[0.35vw] p-[0.35vw] border border-gray-200 rounded-[0.35vw] cursor-pointer hover:border-indigo-500 bg-white shadow-sm"
-                >
-                  <div className="w-[1.2vw] h-[1.2vw] rounded-[0.2vw] border border-gray-200" style={{ backgroundColor: hoverBurstColor }} />
-                  <span className="text-[0.7vw] font-mono text-gray-700">{hoverBurstColor}</span>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-[0.2vw]">
-                <span className="text-[0.68vw] font-semibold text-gray-600">Idle Text</span>
-                <div
-                  ref={triggerRefs.text}
-                  onClick={() => setActivePicker(activePicker === 'text' ? null : 'text')}
-                  className="flex items-center gap-[0.35vw] p-[0.35vw] border border-gray-200 rounded-[0.35vw] cursor-pointer hover:border-indigo-500 bg-white shadow-sm"
-                >
-                  <div className="w-[1.2vw] h-[1.2vw] rounded-[0.2vw] border border-gray-200" style={{ backgroundColor: textColor }} />
-                  <span className="text-[0.7vw] font-mono text-gray-700">{textColor}</span>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-[0.2vw]">
-                <span className="text-[0.68vw] font-semibold text-gray-600">Hover Text</span>
-                <div
-                  ref={triggerRefs.hoverText}
-                  onClick={() => setActivePicker(activePicker === 'hoverText' ? null : 'hoverText')}
-                  className="flex items-center gap-[0.35vw] p-[0.35vw] border border-gray-200 rounded-[0.35vw] cursor-pointer hover:border-indigo-500 bg-white shadow-sm"
-                >
-                  <div className="w-[1.2vw] h-[1.2vw] rounded-[0.2vw] border border-gray-200" style={{ backgroundColor: hoverTextColor }} />
-                  <span className="text-[0.7vw] font-mono text-gray-700">{hoverTextColor}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Starburst Individual Rotations & Radius */}
-          <div className="flex flex-col gap-[0.5vw]">
-            <SectionHeader title="Rotation & Animation" icon={Sliders} />
-            <PropertySlider
-              label="Idle Rotation"
-              value={rotation}
-              min={-180}
-              max={180}
-              unit="°"
-              onChange={(val) => {
-                setRotation(val);
-                applyUpdates({ rotation: val });
+          <div className="flex flex-col gap-[0.25vw] pl-[0.5vw] pr-[0.2vw]">
+            <span className="text-[0.7vw] font-medium text-gray-500">Text Lines</span>
+            <textarea
+              value={starburstText}
+              onChange={(e) => {
+                const val = e.target.value;
+                setStarburstText(val);
+                applyUpdates({ text: val });
               }}
-            />
-            <PropertySlider
-              label="Hover Spin"
-              value={hoverRotation}
-              min={-360}
-              max={360}
-              unit="°"
-              onChange={(val) => {
-                setHoverRotation(val);
-                applyUpdates({ hoverRotation: val });
-              }}
-            />
-            <PropertySlider
-              label="Corner Radius"
-              value={borderRadius}
-              min={0}
-              max={50}
-              unit="px"
-              onChange={(val) => {
-                setBorderRadius(val);
-                applyUpdates({ borderRadius: val });
-              }}
+              rows={3}
+              className="w-full text-[0.78vw] p-[0.6vw] border border-gray-200 rounded-[0.5vw] outline-none focus:border-[#E05638] font-sans resize-none shadow-2xs bg-white text-gray-800"
+              placeholder="Enter Starburst text..."
             />
           </div>
+
+          <PropertyRow label="Font">
+            <CustomSelect
+              value={fontFamily}
+              onChange={(val) => {
+                setFontFamily(val);
+                applyUpdates({ fontFamily: val });
+              }}
+              options={fontFamilies.map((f) => ({ value: f, label: f }))}
+            />
+          </PropertyRow>
+
+          <PropertyRow label="Weight">
+            <CustomSelect
+              value={fontWeight}
+              onChange={(val) => {
+                setFontWeight(val);
+                applyUpdates({ fontWeight: val });
+              }}
+              options={fontWeights.map((w) => ({ value: w.value, label: w.name }))}
+            />
+          </PropertyRow>
+
+          <PropertyRow label="Size">
+            <CustomSelect
+              value={fontSize}
+              onChange={(val) => {
+                const v = parseInt(val, 10);
+                setFontSize(v);
+                applyUpdates({ fontSize: v });
+              }}
+              options={fontSizes.map((s) => ({ value: s, label: `${s}px` }))}
+            />
+          </PropertyRow>
+
+          {/* ─── 2. COLOR & STYLING ─── */}
+          <SectionHeader title="Color & Styling" />
+
+          <PropertyRow label="Idle Color">
+            <ColorInput
+              color={burstColor}
+              onChange={(newCol) => {
+                setBurstColor(newCol);
+                applyUpdates({ burstColor: newCol });
+              }}
+              onOpenPicker={() => setActivePicker((prev) => (prev === 'burst' ? null : 'burst'))}
+              isActive={activePicker === 'burst'}
+            />
+          </PropertyRow>
+
+          <PropertyRow label="Hover Color">
+            <ColorInput
+              color={hoverBurstColor}
+              onChange={(newCol) => {
+                setHoverBurstColor(newCol);
+                applyUpdates({ hoverBurstColor: newCol });
+              }}
+              onOpenPicker={() => setActivePicker((prev) => (prev === 'hoverBurst' ? null : 'hoverBurst'))}
+              isActive={activePicker === 'hoverBurst'}
+            />
+          </PropertyRow>
+
+          <PropertyRow label="Idle Text">
+            <ColorInput
+              color={textColor}
+              onChange={(newCol) => {
+                setTextColor(newCol);
+                applyUpdates({ textColor: newCol });
+              }}
+              onOpenPicker={() => setActivePicker((prev) => (prev === 'text' ? null : 'text'))}
+              isActive={activePicker === 'text'}
+            />
+          </PropertyRow>
+
+          <PropertyRow label="Hover Text">
+            <ColorInput
+              color={hoverTextColor}
+              onChange={(newCol) => {
+                setHoverTextColor(newCol);
+                applyUpdates({ hoverTextColor: newCol });
+              }}
+              onOpenPicker={() => setActivePicker((prev) => (prev === 'hoverText' ? null : 'hoverText'))}
+              isActive={activePicker === 'hoverText'}
+            />
+          </PropertyRow>
+
+          {/* ─── 3. ROTATION & ANIMATION ─── */}
+          <SectionHeader title="Rotation & Animation" />
+
+          <PropertySlider
+            label="Idle Rotation"
+            value={rotation}
+            min={-180}
+            max={180}
+            unit="°"
+            onChange={(val) => {
+              setRotation(val);
+              applyUpdates({ rotation: val });
+            }}
+          />
+          <PropertySlider
+            label="Hover Spin"
+            value={hoverRotation}
+            min={-360}
+            max={360}
+            unit="°"
+            onChange={(val) => {
+              setHoverRotation(val);
+              applyUpdates({ hoverRotation: val });
+            }}
+          />
+          <PropertySlider
+            label="Corner Radius"
+            value={borderRadius}
+            min={0}
+            max={50}
+            unit="px"
+            onChange={(val) => {
+              setBorderRadius(val);
+              applyUpdates({ borderRadius: val });
+            }}
+          />
         </>
       )}
 
@@ -941,47 +991,56 @@ const AnimatedDecoratorsProperties = ({
       {activePicker &&
         createPortal(
           <div
-            ref={colorPickerRef}
-            className="fixed z-[99999] bg-white rounded-xl shadow-2xl border border-gray-200 p-[0.8vw]"
-            style={getPortalPosition(triggerRefs[activePicker])}
+            className="fixed z-[5000]"
+            style={{
+              top: '50%',
+              right: '19.5vw',
+              transform: 'translateY(-50%)'
+            }}
           >
-            <ColorPicker
-              color={
-                activePicker === 'primary'
-                  ? primaryColor
-                  : activePicker === 'accent'
-                  ? accentColor
-                  : activePicker === 'burst'
-                  ? burstColor
-                  : activePicker === 'hoverBurst'
-                  ? hoverBurstColor
-                  : activePicker === 'text'
-                  ? textColor
-                  : hoverTextColor
-              }
-              onChange={(newCol) => {
-                if (activePicker === 'primary') {
-                  setPrimaryColor(newCol);
-                  applyUpdates({ primaryColor: newCol });
-                } else if (activePicker === 'accent') {
-                  setAccentColor(newCol);
-                  applyUpdates({ accentColor: newCol });
-                } else if (activePicker === 'burst') {
-                  setBurstColor(newCol);
-                  applyUpdates({ burstColor: newCol });
-                } else if (activePicker === 'hoverBurst') {
-                  setHoverBurstColor(newCol);
-                  applyUpdates({ hoverBurstColor: newCol });
-                } else if (activePicker === 'text') {
-                  setTextColor(newCol);
-                  applyUpdates({ textColor: newCol });
-                } else if (activePicker === 'hoverText') {
-                  setHoverTextColor(newCol);
-                  applyUpdates({ hoverTextColor: newCol });
-                }
-              }}
-              onClose={() => setActivePicker(null)}
+            <div
+              className="fixed inset-0 z-[-1]"
+              onClick={() => setActivePicker(null)}
             />
+            <div className="animate-in fade-in zoom-in-95 duration-200">
+              <ColorPicker
+                color={
+                  activePicker === 'primary'
+                    ? primaryColor
+                    : activePicker === 'accent'
+                    ? accentColor
+                    : activePicker === 'burst'
+                    ? burstColor
+                    : activePicker === 'hoverBurst'
+                    ? hoverBurstColor
+                    : activePicker === 'text'
+                    ? textColor
+                    : hoverTextColor
+                }
+                onChange={(newCol) => {
+                  if (activePicker === 'primary') {
+                    setPrimaryColor(newCol);
+                    applyUpdates({ primaryColor: newCol });
+                  } else if (activePicker === 'accent') {
+                    setAccentColor(newCol);
+                    applyUpdates({ accentColor: newCol });
+                  } else if (activePicker === 'burst') {
+                    setBurstColor(newCol);
+                    applyUpdates({ burstColor: newCol });
+                  } else if (activePicker === 'hoverBurst') {
+                    setHoverBurstColor(newCol);
+                    applyUpdates({ hoverBurstColor: newCol });
+                  } else if (activePicker === 'text') {
+                    setTextColor(newCol);
+                    applyUpdates({ textColor: newCol });
+                  } else if (activePicker === 'hoverText') {
+                    setHoverTextColor(newCol);
+                    applyUpdates({ hoverTextColor: newCol });
+                  }
+                }}
+                onClose={() => setActivePicker(null)}
+              />
+            </div>
           </div>,
           document.body
         )}

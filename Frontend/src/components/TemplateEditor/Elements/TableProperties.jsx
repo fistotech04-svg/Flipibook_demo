@@ -87,6 +87,78 @@ const parseRgbaColor = (colorStr, defaultHex = '#ffffff') => {
   return { hex: defaultHex, opacity: 100 };
 };
 
+// Section Header matching AudioProperties exact styling
+const SectionHeader = ({ title }) => (
+  <div className="flex items-center gap-[0.4vw] mt-[0.3vw]">
+    <span className="text-[0.9vw] font-medium text-black whitespace-nowrap">{title}</span>
+    <div className="h-[0.06vw] bg-gray-200 flex-1 ml-[0.3vw]" />
+  </div>
+);
+
+// PropertyRow matching AudioProperties exact alignment (w-[5.6vw] pl-[0.5vw])
+const PropertyRow = ({ label, children, className = '' }) => (
+  <div className={`flex items-center gap-[0.5vw] ${className}`}>
+    <div className="w-[5.6vw] shrink-0 flex items-center pl-[0.5vw] justify-between text-gray-700 font-medium">
+      <span className={`${label.length > 12 ? 'text-[0.68vw]' : 'text-[0.78vw]'} tracking-tight whitespace-nowrap`}>
+        {label}
+      </span>
+      <span className="text-gray-500 font-medium text-[0.8vw]">:</span>
+    </div>
+    <div className="flex-1 min-w-0">
+      {children}
+    </div>
+  </div>
+);
+
+// Toggle Switch matching AudioProperties exact structure & style
+const Toggle = ({ checked, onChange }) => (
+  <button
+    type="button"
+    onClick={() => onChange(!checked)}
+    className={`w-[1.9vw] h-[1.1vw] flex items-center rounded-full p-[0.1vw] cursor-pointer transition-colors ${
+      checked ? 'bg-[#E05638]' : 'bg-gray-300'
+    }`}
+  >
+    <div
+      className={`bg-white w-[0.9vw] h-[0.9vw] rounded-full shadow-md transform transition-transform ${
+        checked ? 'translate-x-[0.8vw]' : 'translate-x-0'
+      }`}
+    />
+  </button>
+);
+
+// Color Swatch + Hex Input Box matching AudioProperties exact structure
+const ColorInput = ({ color, onChange, opacity = 100, onOpenPicker, isActive = false }) => {
+  const displayColor = color && color.startsWith('#') ? color.toUpperCase() : color || '#000000';
+
+  return (
+    <div className="flex items-center gap-[0.4vw] w-full">
+      <div
+        onClick={onOpenPicker}
+        className={`color-box color-box-trigger w-[2vw] h-[2vw] rounded-[0.5vw] border flex-shrink-0 relative overflow-hidden flex items-center justify-center cursor-pointer shadow-2xs hover:scale-105 transition-all ${
+          isActive ? 'border-[#E05638] ring-2 ring-[#E05638]/40 scale-105 shadow-xs' : 'border-gray-200 hover:border-gray-300'
+        }`}
+        style={{ backgroundColor: color || '#000000' }}
+        title="Click to open color palette"
+      />
+      <div className="flex-1 h-[2.5vw] flex items-center justify-between border border-gray-200 rounded-[0.5vw] bg-white px-[0.6vw] text-[0.8vw] text-gray-800 focus-within:border-[#E05638] shadow-2xs">
+        <input
+          type="text"
+          value={displayColor}
+          onChange={(e) => {
+            let val = e.target.value;
+            if (!val.startsWith('#') && val.length > 0) val = '#' + val;
+            onChange(val);
+          }}
+          className="w-[5.2vw] font-mono text-[0.8vw] text-gray-800 bg-transparent focus:outline-none uppercase font-medium"
+          maxLength={7}
+        />
+        <span className="text-gray-400 text-[0.75vw] font-medium">{opacity}%</span>
+      </div>
+    </div>
+  );
+};
+
 const TableProperties = ({
   /* eslint-disable-next-line no-unused-vars */
   selectedElementProps,
@@ -1958,18 +2030,13 @@ const TableProperties = ({
   };
 
   return (
-    <div className="flex flex-col gap-[1.2vw] p-[1.2vw] text-gray-700 select-none pb-[3vw] text-[0.8vw]">
+    <div className="w-full flex flex-col gap-[0.6vw] font-sans text-gray-800 pt-[0.2vw] pr-[0.2vw] select-none pb-[3vw]">
       {/* ── SECTION 1: Excel Data & Clipboard ─────────────────────────── */}
-      <div className="flex flex-col gap-[0.8vw]">
-        <div className="flex items-center gap-[0.5vw]">
-          <span className="text-[0.85vw] font-bold text-gray-800 whitespace-nowrap">
-            Excel Data & Clipboard
-          </span>
-          <div className="flex-1 h-[1px] bg-gray-200" />
-        </div>
+      <div className="flex flex-col gap-[0.5vw]">
+        <SectionHeader title="Excel Data & Clipboard" />
 
-        <div className="grid grid-cols-2 gap-[0.6vw]">
-          <label className="flex items-center justify-center gap-[0.4vw] border border-blue-200 rounded-[0.4vw] h-[2.2vw] bg-blue-50 hover:bg-blue-100 active:scale-98 transition-all text-blue-700 shadow-xs cursor-pointer font-semibold text-[0.74vw]">
+        <div className="grid grid-cols-2 gap-[0.5vw] pl-[0.5vw] pr-[0.2vw]">
+          <label className="flex items-center justify-center gap-[0.4vw] border border-gray-200 rounded-[0.4vw] h-[2.2vw] bg-white hover:bg-gray-50 hover:border-[#E05638] hover:text-[#E05638] active:scale-98 transition-all text-gray-700 shadow-2xs cursor-pointer font-semibold text-[0.74vw]">
             <Upload size="0.9vw" />
             <span>Import .xlsx</span>
             <input
@@ -1983,7 +2050,7 @@ const TableProperties = ({
 
           <button
             onClick={handleExcelExport}
-            className="flex items-center justify-center gap-[0.4vw] border border-emerald-200 rounded-[0.4vw] h-[2.2vw] bg-emerald-50 hover:bg-emerald-100 active:scale-98 transition-all text-emerald-700 shadow-xs font-semibold text-[0.74vw]"
+            className="flex items-center justify-center gap-[0.4vw] border border-gray-200 rounded-[0.4vw] h-[2.2vw] bg-white hover:bg-gray-50 hover:border-[#E05638] hover:text-[#E05638] active:scale-98 transition-all text-gray-700 shadow-2xs font-semibold text-[0.74vw]"
             title="Download table as Excel (.xlsx)"
           >
             <Download size="0.9vw" />
@@ -1991,10 +2058,10 @@ const TableProperties = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-[0.6vw]">
+        <div className="grid grid-cols-2 gap-[0.5vw] pl-[0.5vw] pr-[0.2vw]">
           <button
             onClick={handleCopyCells}
-            className="flex items-center justify-center gap-[0.4vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 active:scale-98 transition-all text-gray-700 shadow-xs text-[0.72vw] font-medium"
+            className="flex items-center justify-center gap-[0.4vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 hover:border-gray-300 active:scale-98 transition-all text-gray-700 shadow-2xs text-[0.72vw] font-medium"
             title="Copy selected cells or table to clipboard (TSV)"
           >
             <Copy size="0.85vw" />
@@ -2003,7 +2070,7 @@ const TableProperties = ({
 
           <button
             onClick={() => handlePasteCells()}
-            className="flex items-center justify-center gap-[0.4vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 active:scale-98 transition-all text-gray-700 shadow-xs text-[0.72vw] font-medium"
+            className="flex items-center justify-center gap-[0.4vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 hover:border-gray-300 active:scale-98 transition-all text-gray-700 shadow-2xs text-[0.72vw] font-medium"
             title="Paste tabular text into table"
           >
             <ClipboardPaste size="0.85vw" />
@@ -2012,10 +2079,10 @@ const TableProperties = ({
         </div>
 
         {/* Cell Selection Status & Inline Editor */}
-        <div className="flex flex-col gap-[0.5vw] bg-gray-50 p-[0.6vw] rounded-[0.5vw] border border-gray-200">
+        <div className="flex flex-col gap-[0.4vw] bg-gray-50/70 p-[0.6vw] rounded-[0.5vw] border border-gray-200 ml-[0.5vw] mr-[0.2vw]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-[0.4vw]">
-              <MousePointer size="0.85vw" className="text-blue-600" />
+              <MousePointer size="0.85vw" className="text-[#E05638]" />
               <span className="text-[0.75vw] font-bold text-gray-700">
                 {getSelectionCoordinateLabel()}
               </span>
@@ -2023,7 +2090,7 @@ const TableProperties = ({
             {selectedCellKeys.size > 0 ? (
               <button
                 onClick={() => clearCellSelection()}
-                className="text-[0.7vw] text-blue-600 hover:text-blue-800 font-semibold cursor-pointer underline"
+                className="text-[0.7vw] text-[#E05638] hover:underline font-semibold cursor-pointer"
               >
                 Clear Selection
               </button>
@@ -2064,7 +2131,7 @@ const TableProperties = ({
                   syncChanges(el);
                 }}
                 placeholder={selectedCellKeys.size === 1 ? "Enter cell text..." : `Editing ${selectedCellKeys.size} cells together...`}
-                className="w-full h-[3.2vw] p-[0.4vw] text-[0.75vw] border border-gray-200 rounded-[0.35vw] bg-white resize-none outline-none focus:border-blue-400"
+                className="w-full h-[3.2vw] p-[0.4vw] text-[0.75vw] border border-gray-200 rounded-[0.35vw] bg-white resize-none outline-none focus:border-[#E05638]"
               />
             </div>
           )}
@@ -2072,24 +2139,15 @@ const TableProperties = ({
       </div>
 
       {/* ── SECTION 2: Table Property & Borders ─────────────────────────── */}
-      <div className="flex flex-col gap-[0.8vw]">
-        <div className="flex items-center gap-[0.5vw]">
-          <span className="text-[0.85vw] font-bold text-gray-800 whitespace-nowrap">
-            Table Property
-          </span>
-          <div className="flex-1 h-[1px] bg-gray-200" />
-        </div>
+      <div className="flex flex-col gap-[0.5vw]">
+        <SectionHeader title="Table Property" />
 
         {/* Border Style */}
-        <div className="flex items-center justify-between">
-          <span className="text-[0.78vw] text-gray-600 font-medium w-[6.5vw] flex items-center justify-between pr-[0.5vw]">
-            <span>Border Style</span>
-            <span>:</span>
-          </span>
-          <div className="flex-1 relative">
+        <PropertyRow label="Border Style">
+          <div className="relative">
             <button
               onClick={() => setIsBorderStyleOpen(!isBorderStyleOpen)}
-              className="w-full flex items-center justify-between border border-gray-200 rounded-[0.4vw] h-[2vw] px-[0.7vw] bg-white hover:border-gray-300 transition-colors shadow-xs"
+              className="w-full flex items-center justify-between border border-gray-200 rounded-[0.5vw] h-[2.5vw] px-[0.7vw] bg-white hover:border-[#E05638] transition-colors shadow-2xs"
             >
               <div className="flex items-center gap-[0.6vw]">
                 <span className="font-bold text-[0.85vw] text-gray-700">
@@ -2103,7 +2161,7 @@ const TableProperties = ({
             </button>
 
             {isBorderStyleOpen && (
-              <div className="absolute top-[2.2vw] left-0 right-0 bg-white border border-gray-200 rounded-[0.4vw] shadow-lg z-50 py-[0.3vw] overflow-hidden">
+              <div className="absolute top-[2.7vw] left-0 right-0 bg-white border border-gray-200 rounded-[0.4vw] shadow-lg z-50 py-[0.3vw] overflow-hidden">
                 {BORDER_STYLES.map(style => (
                   <div
                     key={style.id}
@@ -2113,7 +2171,7 @@ const TableProperties = ({
                       applyTableStyles({ borderStyle: style.id });
                     }}
                     className={`flex items-center gap-[0.6vw] px-[0.7vw] py-[0.4vw] hover:bg-gray-50 cursor-pointer text-[0.75vw] transition-colors ${
-                      borderStyle === style.id ? 'bg-gray-100 font-semibold text-gray-900' : 'text-gray-700'
+                      borderStyle === style.id ? 'bg-[#E05638]/10 font-semibold text-[#E05638]' : 'text-gray-700'
                     }`}
                   >
                     <span className="w-[1.5vw] font-bold text-gray-600">{style.icon}</span>
@@ -2123,12 +2181,12 @@ const TableProperties = ({
               </div>
             )}
           </div>
-        </div>
+        </PropertyRow>
 
         {/* Border Presets Grid */}
-        <div className="flex flex-col gap-[0.4vw]">
+        <div className="flex flex-col gap-[0.3vw] pl-[0.5vw] pr-[0.2vw]">
           <div className="flex items-center justify-between">
-            <span className="text-[0.74vw] text-gray-600 font-medium">Border Presets</span>
+            <span className="text-[0.74vw] text-gray-700 font-medium">Border Presets</span>
             <span className="text-[0.68vw] text-gray-400 font-medium">
               {selectedCellKeys.size > 0 ? `${selectedCellKeys.size} cells` : 'Whole table'}
             </span>
@@ -2136,56 +2194,56 @@ const TableProperties = ({
           <div className="grid grid-cols-4 gap-[0.35vw]">
             <button
               onClick={() => applyBorderPreset('all')}
-              className="border border-gray-200 rounded-[0.4vw] h-[1.9vw] bg-white hover:bg-gray-50 text-[0.72vw] font-medium text-gray-700 active:scale-98 transition-all shadow-xs"
+              className="border border-gray-200 rounded-[0.4vw] h-[1.9vw] bg-white hover:bg-gray-50 hover:border-[#E05638] text-[0.72vw] font-medium text-gray-700 active:scale-98 transition-all shadow-2xs"
               title="All Borders"
             >
               All
             </button>
             <button
               onClick={() => applyBorderPreset('outer')}
-              className="border border-gray-200 rounded-[0.4vw] h-[1.9vw] bg-white hover:bg-gray-50 text-[0.72vw] font-medium text-gray-700 active:scale-98 transition-all shadow-xs"
+              className="border border-gray-200 rounded-[0.4vw] h-[1.9vw] bg-white hover:bg-gray-50 hover:border-[#E05638] text-[0.72vw] font-medium text-gray-700 active:scale-98 transition-all shadow-2xs"
               title="Outer Box Border"
             >
               Outer
             </button>
             <button
               onClick={() => applyBorderPreset('none')}
-              className="border border-gray-200 rounded-[0.4vw] h-[1.9vw] bg-white hover:bg-gray-50 text-[0.72vw] font-medium text-gray-700 active:scale-98 transition-all shadow-xs"
+              className="border border-gray-200 rounded-[0.4vw] h-[1.9vw] bg-white hover:bg-gray-50 hover:border-[#E05638] text-[0.72vw] font-medium text-gray-700 active:scale-98 transition-all shadow-2xs"
               title="No Border"
             >
               None
             </button>
             <button
               onClick={() => applyBorderPreset('bottom')}
-              className="border border-gray-200 rounded-[0.4vw] h-[1.9vw] bg-white hover:bg-gray-50 text-[0.72vw] font-medium text-gray-700 active:scale-98 transition-all shadow-xs"
+              className="border border-gray-200 rounded-[0.4vw] h-[1.9vw] bg-white hover:bg-gray-50 hover:border-[#E05638] text-[0.72vw] font-medium text-gray-700 active:scale-98 transition-all shadow-2xs"
               title="Bottom Border"
             >
               Bottom
             </button>
             <button
               onClick={() => applyBorderPreset('top')}
-              className="border border-gray-200 rounded-[0.4vw] h-[1.9vw] bg-white hover:bg-gray-50 text-[0.72vw] font-medium text-gray-700 active:scale-98 transition-all shadow-xs"
+              className="border border-gray-200 rounded-[0.4vw] h-[1.9vw] bg-white hover:bg-gray-50 hover:border-[#E05638] text-[0.72vw] font-medium text-gray-700 active:scale-98 transition-all shadow-2xs"
               title="Top Border"
             >
               Top
             </button>
             <button
               onClick={() => applyBorderPreset('left')}
-              className="border border-gray-200 rounded-[0.4vw] h-[1.9vw] bg-white hover:bg-gray-50 text-[0.72vw] font-medium text-gray-700 active:scale-98 transition-all shadow-xs"
+              className="border border-gray-200 rounded-[0.4vw] h-[1.9vw] bg-white hover:bg-gray-50 hover:border-[#E05638] text-[0.72vw] font-medium text-gray-700 active:scale-98 transition-all shadow-2xs"
               title="Left Border"
             >
               Left
             </button>
             <button
               onClick={() => applyBorderPreset('right')}
-              className="border border-gray-200 rounded-[0.4vw] h-[1.9vw] bg-white hover:bg-gray-50 text-[0.72vw] font-medium text-gray-700 active:scale-98 transition-all shadow-xs"
+              className="border border-gray-200 rounded-[0.4vw] h-[1.9vw] bg-white hover:bg-gray-50 hover:border-[#E05638] text-[0.72vw] font-medium text-gray-700 active:scale-98 transition-all shadow-2xs"
               title="Right Border"
             >
               Right
             </button>
             <button
               onClick={() => applyBorderPreset('clear')}
-              className="border border-gray-200 rounded-[0.4vw] h-[1.9vw] bg-white hover:bg-red-50 text-red-600 text-[0.72vw] font-medium active:scale-98 transition-all shadow-xs"
+              className="border border-gray-200 rounded-[0.4vw] h-[1.9vw] bg-white hover:bg-red-50 hover:border-red-300 text-red-600 text-[0.72vw] font-medium active:scale-98 transition-all shadow-2xs"
               title="Clear All Borders"
             >
               Clear
@@ -2194,66 +2252,36 @@ const TableProperties = ({
         </div>
 
         {/* Theme / Table Color */}
-        <div className="flex items-center justify-between">
-          <span className="text-[0.78vw] text-gray-600 font-medium w-[6.5vw] flex items-center justify-between pr-[0.5vw]">
-            <span>Theme Color</span>
-            <span>:</span>
-          </span>
-          <div className="flex-1 flex items-center gap-[0.6vw]">
-            <button
-              onClick={() => setActiveColorPicker(activeColorPicker === 'theme' ? null : 'theme')}
-              className="w-[2vw] h-[2vw] rounded-[0.4vw] border border-gray-300 shadow-xs flex-shrink-0 cursor-pointer hover:scale-105 transition-transform"
-              style={{ backgroundColor: themeColor }}
-            />
-            <div className="flex-1 flex items-center justify-between border border-gray-200 rounded-[0.4vw] h-[2vw] px-[0.6vw] bg-white shadow-xs">
-              <input
-                type="text"
-                value={themeColor}
-                onChange={(e) => {
-                  setThemeColor(e.target.value);
-                  applyTableStyles({ themeColor: e.target.value });
-                }}
-                className="w-[5vw] text-[0.75vw] font-medium text-gray-700 outline-none uppercase bg-transparent"
-              />
-              <span className="text-[0.75vw] text-gray-400 font-medium">{themeOpacity}%</span>
-            </div>
-          </div>
-        </div>
+        <PropertyRow label="Theme Color">
+          <ColorInput
+            color={themeColor}
+            onChange={(val) => {
+              setThemeColor(val);
+              applyTableStyles({ themeColor: val });
+            }}
+            opacity={themeOpacity}
+            onOpenPicker={() => setActiveColorPicker(activeColorPicker === 'theme' ? null : 'theme')}
+            isActive={activeColorPicker === 'theme'}
+          />
+        </PropertyRow>
 
         {/* Border Color */}
-        <div className="flex items-center justify-between">
-          <span className="text-[0.78vw] text-gray-600 font-medium w-[6.5vw] flex items-center justify-between pr-[0.5vw]">
-            <span>Border Color</span>
-            <span>:</span>
-          </span>
-          <div className="flex-1 flex items-center gap-[0.6vw]">
-            <button
-              onClick={() => setActiveColorPicker(activeColorPicker === 'border' ? null : 'border')}
-              className="w-[2vw] h-[2vw] rounded-[0.4vw] border border-gray-300 shadow-xs flex-shrink-0 cursor-pointer hover:scale-105 transition-transform"
-              style={{ backgroundColor: borderColor }}
-            />
-            <div className="flex-1 flex items-center justify-between border border-gray-200 rounded-[0.4vw] h-[2vw] px-[0.6vw] bg-white shadow-xs">
-              <input
-                type="text"
-                value={borderColor}
-                onChange={(e) => {
-                  setBorderColor(e.target.value);
-                  applyTableStyles({ borderColor: e.target.value });
-                }}
-                className="w-[5vw] text-[0.75vw] font-medium text-gray-700 outline-none uppercase bg-transparent"
-              />
-              <span className="text-[0.75vw] text-gray-400 font-medium">{borderOpacity}%</span>
-            </div>
-          </div>
-        </div>
+        <PropertyRow label="Border Color">
+          <ColorInput
+            color={borderColor}
+            onChange={(val) => {
+              setBorderColor(val);
+              applyTableStyles({ borderColor: val });
+            }}
+            opacity={borderOpacity}
+            onOpenPicker={() => setActiveColorPicker(activeColorPicker === 'border' ? null : 'border')}
+            isActive={activeColorPicker === 'border'}
+          />
+        </PropertyRow>
 
         {/* Border Width */}
-        <div className="flex items-center justify-between">
-          <span className="text-[0.78vw] text-gray-600 font-medium w-[6.5vw] flex items-center justify-between pr-[0.5vw]">
-            <span>Border Width</span>
-            <span>:</span>
-          </span>
-          <div className="flex-1 flex items-center gap-[0.8vw]">
+        <PropertyRow label="Border Width">
+          <div className="flex items-center gap-[0.5vw]">
             <input
               type="range"
               min={0}
@@ -2264,24 +2292,20 @@ const TableProperties = ({
                 setBorderWidth(val);
                 applyTableStyles({ borderWidth: val });
               }}
-              className="flex-1 h-[0.25vw] appearance-none cursor-pointer bg-gray-200 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[0.85vw] [&::-webkit-slider-thumb]:h-[0.85vw] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-[0.16vw] [&::-webkit-slider-thumb]:border-[#f05a35] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-xs"
+              className="flex-1 h-[0.25vw] appearance-none cursor-pointer bg-gray-200 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[0.85vw] [&::-webkit-slider-thumb]:h-[0.85vw] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-[0.16vw] [&::-webkit-slider-thumb]:border-[#E05638] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-xs"
               style={{
-                background: `linear-gradient(to right, #f05a35 0%, #f05a35 ${(borderWidth / 20) * 100}%, #e5e7eb ${(borderWidth / 20) * 100}%, #e5e7eb 100%)`
+                background: `linear-gradient(to right, #E05638 0%, #E05638 ${(borderWidth / 20) * 100}%, #e5e7eb ${(borderWidth / 20) * 100}%, #e5e7eb 100%)`
               }}
             />
-            <div className="w-[3.2vw] h-[1.8vw] flex items-center justify-center bg-white border border-gray-200 rounded-[0.4vw] shadow-xs">
+            <div className="w-[3.2vw] h-[1.8vw] flex items-center justify-center bg-white border border-gray-200 rounded-[0.4vw] shadow-2xs">
               <span className="text-[0.75vw] text-gray-700 font-medium">{borderWidth}px</span>
             </div>
           </div>
-        </div>
+        </PropertyRow>
 
         {/* Border Radius */}
-        <div className="flex items-center justify-between">
-          <span className="text-[0.78vw] text-gray-600 font-medium w-[6.5vw] flex items-center justify-between pr-[0.5vw]">
-            <span>Border Radius</span>
-            <span>:</span>
-          </span>
-          <div className="flex-1 flex items-center gap-[0.8vw]">
+        <PropertyRow label="Border Radius">
+          <div className="flex items-center gap-[0.5vw]">
             <input
               type="range"
               min={0}
@@ -2292,86 +2316,64 @@ const TableProperties = ({
                 setBorderRadius(val);
                 applyTableStyles({ borderRadius: val });
               }}
-              className="flex-1 h-[0.25vw] appearance-none cursor-pointer bg-gray-200 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[0.85vw] [&::-webkit-slider-thumb]:h-[0.85vw] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-[0.16vw] [&::-webkit-slider-thumb]:border-[#f05a35] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-xs"
+              className="flex-1 h-[0.25vw] appearance-none cursor-pointer bg-gray-200 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[0.85vw] [&::-webkit-slider-thumb]:h-[0.85vw] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-[0.16vw] [&::-webkit-slider-thumb]:border-[#E05638] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-xs"
               style={{
-                background: `linear-gradient(to right, #f05a35 0%, #f05a35 ${(borderRadius / 30) * 100}%, #e5e7eb ${(borderRadius / 30) * 100}%, #e5e7eb 100%)`
+                background: `linear-gradient(to right, #E05638 0%, #E05638 ${(borderRadius / 30) * 100}%, #e5e7eb ${(borderRadius / 30) * 100}%, #e5e7eb 100%)`
               }}
             />
-            <div className="w-[3.2vw] h-[1.8vw] flex items-center justify-center bg-white border border-gray-200 rounded-[0.4vw] shadow-xs">
+            <div className="w-[3.2vw] h-[1.8vw] flex items-center justify-center bg-white border border-gray-200 rounded-[0.4vw] shadow-2xs">
               <span className="text-[0.75vw] text-gray-700 font-medium">{borderRadius}px</span>
             </div>
           </div>
-        </div>
+        </PropertyRow>
       </div>
 
       {/* ── SECTION 3: Structure ───────────────────────────────────────── */}
-      <div className="flex flex-col gap-[0.8vw]">
-        <div className="flex items-center gap-[0.5vw]">
-          <span className="text-[0.85vw] font-bold text-gray-800 whitespace-nowrap">
-            Structure
-          </span>
-          <div className="flex-1 h-[1px] bg-gray-200" />
-        </div>
+      <div className="flex flex-col gap-[0.5vw]">
+        <SectionHeader title="Structure" />
 
         {/* Scroll Option Toggle */}
-        <div className="flex items-center justify-between p-[0.6vw] bg-indigo-50/70 border border-indigo-100 rounded-[0.4vw]">
-          <div className="flex flex-col">
-            <div className="flex items-center gap-[0.4vw]">
-              <span className="text-[0.78vw] font-bold text-gray-800">Scroll Option</span>
-              <span className={`text-[0.6vw] px-[0.35vw] py-[0.08vw] rounded font-semibold ${
-                isScrollable ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-600'
-              }`}>
-                {isScrollable ? 'Scrollable' : 'Fixed'}
-              </span>
-            </div>
-            <span className="text-[0.67vw] text-gray-500">
-              Scroll rows & columns when content overflows
+        <div className="flex items-center justify-between pl-[0.5vw] pr-[0.2vw] h-[2.2vw]">
+          <div className="flex items-center gap-[0.4vw]">
+            <span className="text-[0.78vw] font-medium text-gray-700">Scroll Option</span>
+            <span className={`text-[0.6vw] px-[0.35vw] py-[0.08vw] rounded font-semibold ${
+              isScrollable ? 'bg-[#E05638]/10 text-[#E05638]' : 'bg-gray-100 text-gray-500'
+            }`}>
+              {isScrollable ? 'Scrollable' : 'Fixed'}
             </span>
           </div>
-          <button
-            onClick={() => {
-              const nextVal = !isScrollable;
+          <Toggle
+            checked={isScrollable}
+            onChange={(nextVal) => {
               setIsScrollable(nextVal);
               applyTableStyles({ isScrollable: nextVal });
             }}
-            className={`w-[2.3vw] h-[1.25vw] rounded-full p-[0.15vw] transition-colors duration-200 cursor-pointer flex-shrink-0 ${
-              isScrollable ? 'bg-indigo-600' : 'bg-gray-300'
-            }`}
-            title="Toggle table scrolling"
-          >
-            <div
-              className={`w-[0.95vw] h-[0.95vw] bg-white rounded-full transition-transform duration-200 shadow-xs ${
-                isScrollable ? 'translate-x-[1.05vw]' : 'translate-x-0'
-              }`}
-            />
-          </button>
+          />
         </div>
 
         {/* Fit Table to Page */}
-        <button
-          onClick={() => fitTableToPage()}
-          className="w-full flex items-center justify-center gap-[0.5vw] border border-indigo-200 rounded-[0.4vw] h-[2.2vw] bg-indigo-50 hover:bg-indigo-100 active:scale-98 transition-all text-indigo-700 shadow-xs font-semibold text-[0.76vw]"
-          title="Fit table cleanly inside page boundaries"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="4 14 10 14 10 20" />
-            <polyline points="20 10 14 10 14 4" />
-            <line x1="14" y1="10" x2="21" y2="3" />
-            <line x1="3" y1="21" x2="10" y2="14" />
-          </svg>
-          <span>Fit Table to Page</span>
-        </button>
+        <div className="pl-[0.5vw] pr-[0.2vw]">
+          <button
+            onClick={() => fitTableToPage()}
+            className="w-full flex items-center justify-center gap-[0.5vw] border border-gray-200 rounded-[0.4vw] h-[2.2vw] bg-white hover:bg-gray-50 hover:border-[#E05638] hover:text-[#E05638] active:scale-98 transition-all text-gray-700 shadow-2xs font-semibold text-[0.76vw]"
+            title="Fit table cleanly inside page boundaries"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="4 14 10 14 10 20" />
+              <polyline points="20 10 14 10 14 4" />
+              <line x1="14" y1="10" x2="21" y2="3" />
+              <line x1="3" y1="21" x2="10" y2="14" />
+            </svg>
+            <span>Fit Table to Page</span>
+          </button>
+        </div>
 
         {/* Column */}
-        <div className="flex items-center justify-between">
-          <span className="text-[0.78vw] text-gray-600 font-medium w-[6.5vw] flex items-center justify-between pr-[0.5vw]">
-            <span>Column ({colsCount})</span>
-            <span>:</span>
-          </span>
-          <div className="flex-1 grid grid-cols-4 gap-[0.35vw]">
+        <PropertyRow label={`Column (${colsCount})`}>
+          <div className="grid grid-cols-4 gap-[0.35vw]">
             <button
               onClick={() => handleInsertColumn('left')}
-              className="flex items-center justify-center gap-[0.2vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 active:scale-98 transition-all text-gray-700 shadow-xs"
+              className="flex items-center justify-center gap-[0.2vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 hover:border-gray-300 active:scale-98 transition-all text-gray-700 shadow-2xs"
               title={selectedCellKeys.size > 0 ? "Insert Column left of active selection" : "Insert Column at left"}
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
@@ -2383,7 +2385,7 @@ const TableProperties = ({
             </button>
             <button
               onClick={() => handleInsertColumn('right')}
-              className="flex items-center justify-center gap-[0.2vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 active:scale-98 transition-all text-gray-700 shadow-xs"
+              className="flex items-center justify-center gap-[0.2vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 hover:border-gray-300 active:scale-98 transition-all text-gray-700 shadow-2xs"
               title={selectedCellKeys.size > 0 ? "Insert Column right of active selection" : "Insert Column at right"}
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
@@ -2395,32 +2397,28 @@ const TableProperties = ({
             </button>
             <button
               onClick={handleSelectEntireCol}
-              className="flex items-center justify-center gap-[0.2vw] border border-indigo-200 rounded-[0.4vw] h-[2vw] bg-indigo-50 hover:bg-indigo-100 active:scale-98 transition-all text-indigo-700 shadow-xs font-semibold text-[0.66vw]"
+              className="flex items-center justify-center gap-[0.2vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 hover:border-[#E05638] hover:text-[#E05638] active:scale-98 transition-all text-gray-700 shadow-2xs font-semibold text-[0.66vw]"
               title="Select entire column (Excel Column Header)"
             >
               <span>Select</span>
             </button>
             <button
               onClick={handleDeleteColumn}
-              className="flex items-center justify-center gap-[0.2vw] border border-red-200 rounded-[0.4vw] h-[2vw] bg-red-50 hover:bg-red-100 active:scale-98 transition-all text-red-600 shadow-xs"
+              className="flex items-center justify-center gap-[0.2vw] border border-red-200 rounded-[0.4vw] h-[2vw] bg-red-50 hover:bg-red-100 active:scale-98 transition-all text-red-600 shadow-2xs"
               title={selectedCellKeys.size > 0 ? "Delete selected column(s)" : "Delete last column"}
             >
               <Trash2 size="0.75vw" />
               <span className="text-[0.68vw] font-medium">Delete</span>
             </button>
           </div>
-        </div>
+        </PropertyRow>
 
         {/* Row */}
-        <div className="flex items-center justify-between">
-          <span className="text-[0.78vw] text-gray-600 font-medium w-[6.5vw] flex items-center justify-between pr-[0.5vw]">
-            <span>Row ({rowsCount})</span>
-            <span>:</span>
-          </span>
-          <div className="flex-1 grid grid-cols-4 gap-[0.35vw]">
+        <PropertyRow label={`Row (${rowsCount})`}>
+          <div className="grid grid-cols-4 gap-[0.35vw]">
             <button
               onClick={() => handleInsertRow('above')}
-              className="flex items-center justify-center gap-[0.2vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 active:scale-98 transition-all text-gray-700 shadow-xs"
+              className="flex items-center justify-center gap-[0.2vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 hover:border-gray-300 active:scale-98 transition-all text-gray-700 shadow-2xs"
               title={selectedCellKeys.size > 0 ? "Insert Row above active selection" : "Insert Row at top"}
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
@@ -2432,7 +2430,7 @@ const TableProperties = ({
             </button>
             <button
               onClick={() => handleInsertRow('below')}
-              className="flex items-center justify-center gap-[0.2vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 active:scale-98 transition-all text-gray-700 shadow-xs"
+              className="flex items-center justify-center gap-[0.2vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 hover:border-gray-300 active:scale-98 transition-all text-gray-700 shadow-2xs"
               title={selectedCellKeys.size > 0 ? "Insert Row below active selection" : "Insert Row at bottom"}
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
@@ -2444,29 +2442,29 @@ const TableProperties = ({
             </button>
             <button
               onClick={handleSelectEntireRow}
-              className="flex items-center justify-center gap-[0.2vw] border border-indigo-200 rounded-[0.4vw] h-[2vw] bg-indigo-50 hover:bg-indigo-100 active:scale-98 transition-all text-indigo-700 shadow-xs font-semibold text-[0.66vw]"
+              className="flex items-center justify-center gap-[0.2vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 hover:border-[#E05638] hover:text-[#E05638] active:scale-98 transition-all text-gray-700 shadow-2xs font-semibold text-[0.66vw]"
               title="Select entire row (Excel Row Header)"
             >
               <span>Select</span>
             </button>
             <button
               onClick={handleDeleteRow}
-              className="flex items-center justify-center gap-[0.2vw] border border-red-200 rounded-[0.4vw] h-[2vw] bg-red-50 hover:bg-red-100 active:scale-98 transition-all text-red-600 shadow-xs"
+              className="flex items-center justify-center gap-[0.2vw] border border-red-200 rounded-[0.4vw] h-[2vw] bg-red-50 hover:bg-red-100 active:scale-98 transition-all text-red-600 shadow-2xs"
               title={selectedCellKeys.size > 0 ? "Delete selected row(s)" : "Delete last row"}
             >
               <Trash2 size="0.75vw" />
               <span className="text-[0.68vw] font-medium">Delete</span>
             </button>
           </div>
-        </div>
+        </PropertyRow>
 
         {/* Cell Operation */}
-        <div className="flex flex-col gap-[0.5vw] mt-[0.3vw]">
-          <span className="text-[0.78vw] text-gray-600 font-medium">Cell Operation</span>
-          <div className="grid grid-cols-2 gap-[0.6vw]">
+        <div className="flex flex-col gap-[0.4vw] mt-[0.2vw] pl-[0.5vw] pr-[0.2vw]">
+          <span className="text-[0.78vw] text-gray-700 font-medium">Cell Operation</span>
+          <div className="grid grid-cols-2 gap-[0.5vw]">
             <button
               onClick={handleMergeCells}
-              className="flex items-center justify-center gap-[0.4vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 active:scale-98 transition-all text-gray-700 shadow-xs"
+              className="flex items-center justify-center gap-[0.4vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 hover:border-[#E05638] active:scale-98 transition-all text-gray-700 shadow-2xs"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
                 <path d="M8 9l-4 3 4 3" />
@@ -2477,7 +2475,7 @@ const TableProperties = ({
             </button>
             <button
               onClick={handleUnmergeCells}
-              className="flex items-center justify-center gap-[0.4vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 active:scale-98 transition-all text-gray-700 shadow-xs"
+              className="flex items-center justify-center gap-[0.4vw] border border-gray-200 rounded-[0.4vw] h-[2vw] bg-white hover:bg-gray-50 hover:border-[#E05638] active:scale-98 transition-all text-gray-700 shadow-2xs"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
                 <path d="M14 12h7" />
@@ -2489,17 +2487,17 @@ const TableProperties = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-[0.6vw]">
+          <div className="grid grid-cols-2 gap-[0.5vw]">
             <button
               onClick={handleAddCell}
-              className="flex items-center justify-center gap-[0.4vw] border border-[#22c55e] rounded-[0.4vw] h-[2.1vw] bg-[#f0fdf4] hover:bg-[#dcfce7] text-[#16a34a] active:scale-98 transition-all shadow-xs"
+              className="flex items-center justify-center gap-[0.4vw] border border-[#22c55e]/30 rounded-[0.4vw] h-[2.1vw] bg-[#f0fdf4] hover:bg-[#dcfce7] text-[#16a34a] active:scale-98 transition-all shadow-2xs"
             >
               <Plus size="0.95vw" strokeWidth={2.5} />
               <span className="text-[0.75vw] font-semibold">Add Cell</span>
             </button>
             <button
               onClick={handleDeleteCell}
-              className="flex items-center justify-center gap-[0.4vw] border border-[#fca5a5] rounded-[0.4vw] h-[2.1vw] bg-[#fef2f2] hover:bg-[#fee2e2] text-[#ef4444] active:scale-98 transition-all shadow-xs"
+              className="flex items-center justify-center gap-[0.4vw] border border-[#fca5a5]/30 rounded-[0.4vw] h-[2.1vw] bg-[#fef2f2] hover:bg-[#fee2e2] text-[#ef4444] active:scale-98 transition-all shadow-2xs"
             >
               <Minus size="0.95vw" strokeWidth={2.5} />
               <span className="text-[0.75vw] font-semibold">Delete Cell</span>
@@ -2509,81 +2507,50 @@ const TableProperties = ({
       </div>
 
       {/* ── SECTION 4: Text & Cell Property ────────────────────────────── */}
-      <div className="flex flex-col gap-[0.8vw]">
-        <div className="flex items-center gap-[0.5vw]">
-          <span className="text-[0.85vw] font-bold text-gray-800 whitespace-nowrap">
-            Text & Cell Property
-          </span>
-          <div className="flex-1 h-[1px] bg-gray-200" />
-        </div>
+      <div className="flex flex-col gap-[0.5vw]">
+        <SectionHeader title="Text & Cell Property" />
 
         {/* Text / Cell Color */}
-        <div className="flex items-center justify-between">
-          <span className="text-[0.78vw] text-gray-600 font-medium w-[6.5vw] flex items-center justify-between pr-[0.5vw]">
-            <span>Text Color</span>
-            <span>:</span>
-          </span>
-          <div className="flex-1 flex items-center gap-[0.6vw]">
-            <button
-              onClick={() => setActiveColorPicker(activeColorPicker === 'cell' ? null : 'cell')}
-              className="w-[2vw] h-[2vw] rounded-[0.4vw] border border-gray-300 shadow-xs flex-shrink-0 cursor-pointer hover:scale-105 transition-transform"
-              style={{ backgroundColor: cellColor }}
-            />
-            <div className="flex-1 flex items-center justify-between border border-gray-200 rounded-[0.4vw] h-[2vw] px-[0.6vw] bg-white shadow-xs">
-              <input
-                type="text"
-                value={cellColor}
-                onChange={(e) => {
-                  setCellColor(e.target.value);
-                  applyTableStyles({ cellColor: e.target.value });
-                }}
-                className="w-[5vw] text-[0.75vw] font-medium text-gray-700 outline-none uppercase bg-transparent"
-              />
-              <span className="text-[0.75vw] text-gray-400 font-medium">{cellOpacity}%</span>
-            </div>
-          </div>
-        </div>
+        <PropertyRow label="Text Color">
+          <ColorInput
+            color={cellColor}
+            onChange={(val) => {
+              setCellColor(val);
+              applyTableStyles({ cellColor: val });
+            }}
+            opacity={cellOpacity}
+            onOpenPicker={() => setActiveColorPicker(activeColorPicker === 'cell' ? null : 'cell')}
+            isActive={activeColorPicker === 'cell'}
+          />
+        </PropertyRow>
 
         {/* Cell Background Color */}
-        <div className="flex items-center justify-between">
-          <span className="text-[0.78vw] text-gray-600 font-medium w-[6.5vw] flex items-center justify-between pr-[0.5vw]">
-            <span>Cell BG</span>
-            <span>:</span>
-          </span>
-          <div className="flex-1 flex items-center gap-[0.6vw]">
-            <button
-              onClick={() => setActiveColorPicker(activeColorPicker === 'cellBg' ? null : 'cellBg')}
-              className="w-[2vw] h-[2vw] rounded-[0.4vw] border border-gray-300 shadow-xs flex-shrink-0 cursor-pointer hover:scale-105 transition-transform"
-              style={{ backgroundColor: cellBgColor }}
-            />
-            <div className="flex-1 flex items-center justify-between border border-gray-200 rounded-[0.4vw] h-[2vw] px-[0.6vw] bg-white shadow-xs">
-              <input
-                type="text"
-                value={cellBgColor}
-                onChange={(e) => {
-                  setCellBgColor(e.target.value);
-                  applyCellBackground(e.target.value, cellBgOpacity);
-                }}
-                className="w-[5vw] text-[0.75vw] font-medium text-gray-700 outline-none uppercase bg-transparent"
-              />
-              <span className="text-[0.75vw] text-gray-400 font-medium">{cellBgOpacity}%</span>
-            </div>
-          </div>
-        </div>
+        <PropertyRow label="Cell BG">
+          <ColorInput
+            color={cellBgColor}
+            onChange={(val) => {
+              setCellBgColor(val);
+              applyCellBackground(val, cellBgOpacity);
+            }}
+            opacity={cellBgOpacity}
+            onOpenPicker={() => setActiveColorPicker(activeColorPicker === 'cellBg' ? null : 'cellBg')}
+            isActive={activeColorPicker === 'cellBg'}
+          />
+        </PropertyRow>
 
         {/* Font Family & Font Size */}
-        <div className="grid grid-cols-[1.6fr_1fr] gap-[0.6vw]">
+        <div className="grid grid-cols-[1.6fr_1fr] gap-[0.5vw] pl-[0.5vw] pr-[0.2vw]">
           {/* Font Family */}
           <div className="relative">
             <button
               onClick={() => setIsFontFamilyOpen(!isFontFamilyOpen)}
-              className="w-full flex items-center justify-between border border-gray-200 rounded-[0.4vw] h-[2vw] px-[0.7vw] bg-white hover:border-gray-300 transition-colors shadow-xs"
+              className="w-full flex items-center justify-between border border-gray-200 rounded-[0.5vw] h-[2.5vw] px-[0.7vw] bg-white hover:border-[#E05638] transition-colors shadow-2xs"
             >
               <span className="text-[0.78vw] font-medium text-gray-700 truncate">{fontFamily}</span>
               <ChevronDown size="0.85vw" className="text-gray-500 flex-shrink-0 ml-[0.3vw]" />
             </button>
             {isFontFamilyOpen && (
-              <div className="absolute top-[2.2vw] left-0 right-0 bg-white border border-gray-200 rounded-[0.4vw] shadow-lg z-50 py-[0.3vw] max-h-[12vw] overflow-y-auto">
+              <div className="absolute top-[2.7vw] left-0 right-0 bg-white border border-gray-200 rounded-[0.4vw] shadow-lg z-50 py-[0.3vw] max-h-[12vw] overflow-y-auto">
                 {FONT_FAMILIES.map(fam => (
                   <div
                     key={fam}
@@ -2593,7 +2560,7 @@ const TableProperties = ({
                       applyTableStyles({ fontFamily: fam });
                     }}
                     className={`px-[0.7vw] py-[0.35vw] text-[0.75vw] cursor-pointer hover:bg-gray-50 transition-colors ${
-                      fontFamily === fam ? 'bg-gray-100 font-semibold text-gray-900' : 'text-gray-700'
+                      fontFamily === fam ? 'bg-[#E05638]/10 font-semibold text-[#E05638]' : 'text-gray-700'
                     }`}
                     style={{ fontFamily: fam }}
                   >
@@ -2608,13 +2575,13 @@ const TableProperties = ({
           <div className="relative">
             <button
               onClick={() => setIsFontSizeOpen(!isFontSizeOpen)}
-              className="w-full flex items-center justify-between border border-gray-200 rounded-[0.4vw] h-[2vw] px-[0.7vw] bg-white hover:border-gray-300 transition-colors shadow-xs"
+              className="w-full flex items-center justify-between border border-gray-200 rounded-[0.5vw] h-[2.5vw] px-[0.7vw] bg-white hover:border-[#E05638] transition-colors shadow-2xs"
             >
               <span className="text-[0.78vw] font-medium text-gray-700">{fontSize}</span>
               <ChevronDown size="0.85vw" className="text-gray-500 flex-shrink-0" />
             </button>
             {isFontSizeOpen && (
-              <div className="absolute top-[2.2vw] left-0 right-0 bg-white border border-gray-200 rounded-[0.4vw] shadow-lg z-50 py-[0.3vw] max-h-[10vw] overflow-y-auto">
+              <div className="absolute top-[2.7vw] left-0 right-0 bg-white border border-gray-200 rounded-[0.4vw] shadow-lg z-50 py-[0.3vw] max-h-[10vw] overflow-y-auto">
                 {FONT_SIZES.map(sz => (
                   <div
                     key={sz}
@@ -2624,7 +2591,7 @@ const TableProperties = ({
                       applyTableStyles({ fontSize: sz });
                     }}
                     className={`px-[0.7vw] py-[0.35vw] text-[0.75vw] cursor-pointer hover:bg-gray-50 transition-colors ${
-                      fontSize === sz ? 'bg-gray-100 font-semibold text-gray-900' : 'text-gray-700'
+                      fontSize === sz ? 'bg-[#E05638]/10 font-semibold text-[#E05638]' : 'text-gray-700'
                     }`}
                   >
                     {sz}
@@ -2636,18 +2603,18 @@ const TableProperties = ({
         </div>
 
         {/* Font Weight & Auto buttons */}
-        <div className="grid grid-cols-[1.5fr_1fr_1fr] gap-[0.6vw]">
+        <div className="grid grid-cols-[1.5fr_1fr_1fr] gap-[0.5vw] pl-[0.5vw] pr-[0.2vw]">
           {/* Font Weight */}
           <div className="relative">
             <button
               onClick={() => setIsFontWeightOpen(!isFontWeightOpen)}
-              className="w-full flex items-center justify-between border border-gray-200 rounded-[0.4vw] h-[2vw] px-[0.7vw] bg-white hover:border-gray-300 transition-colors shadow-xs"
+              className="w-full flex items-center justify-between border border-gray-200 rounded-[0.5vw] h-[2.5vw] px-[0.7vw] bg-white hover:border-[#E05638] transition-colors shadow-2xs"
             >
               <span className="text-[0.78vw] font-medium text-gray-700 truncate">{fontWeight}</span>
               <ChevronDown size="0.85vw" className="text-gray-500 flex-shrink-0" />
             </button>
             {isFontWeightOpen && (
-              <div className="absolute top-[2.2vw] left-0 right-0 bg-white border border-gray-200 rounded-[0.4vw] shadow-lg z-50 py-[0.3vw]">
+              <div className="absolute top-[2.7vw] left-0 right-0 bg-white border border-gray-200 rounded-[0.4vw] shadow-lg z-50 py-[0.3vw]">
                 {FONT_WEIGHTS.map(w => (
                   <div
                     key={w}
@@ -2658,7 +2625,7 @@ const TableProperties = ({
                       applyTableStyles({ fontWeight: w, isBold: w.toLowerCase().includes('bold') });
                     }}
                     className={`px-[0.7vw] py-[0.35vw] text-[0.75vw] cursor-pointer hover:bg-gray-50 transition-colors ${
-                      fontWeight === w ? 'bg-gray-100 font-semibold text-gray-900' : 'text-gray-700'
+                      fontWeight === w ? 'bg-[#E05638]/10 font-semibold text-[#E05638]' : 'text-gray-700'
                     }`}
                   >
                     {w}
@@ -2675,8 +2642,8 @@ const TableProperties = ({
               setAutoWidth(nextAuto);
               applyTableStyles({ autoWidth: nextAuto });
             }}
-            className={`flex items-center justify-center gap-[0.3vw] border rounded-[0.4vw] h-[2vw] px-[0.4vw] transition-colors shadow-xs ${
-              autoWidth ? 'border-[#f05a35] bg-[#fff6f4] text-[#f05a35]' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+            className={`flex items-center justify-center gap-[0.3vw] border rounded-[0.5vw] h-[2.5vw] px-[0.4vw] transition-colors shadow-2xs ${
+              autoWidth ? 'border-[#E05638] bg-[#E05638]/5 text-[#E05638]' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300'
             }`}
             title="Auto Table Width"
           >
@@ -2697,8 +2664,8 @@ const TableProperties = ({
               setAutoHeight(nextAutoH);
               applyTableStyles({ autoHeight: nextAutoH });
             }}
-            className={`flex items-center justify-center gap-[0.3vw] border rounded-[0.4vw] h-[2vw] px-[0.4vw] transition-colors shadow-xs ${
-              autoHeight ? 'border-[#f05a35] bg-[#fff6f4] text-[#f05a35]' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+            className={`flex items-center justify-center gap-[0.3vw] border rounded-[0.5vw] h-[2.5vw] px-[0.4vw] transition-colors shadow-2xs ${
+              autoHeight ? 'border-[#E05638] bg-[#E05638]/5 text-[#E05638]' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300'
             }`}
             title="Auto Row Height"
           >
@@ -2714,7 +2681,7 @@ const TableProperties = ({
         </div>
 
         {/* Alignment & Format row */}
-        <div className="grid grid-cols-4 gap-[0.6vw]">
+        <div className="grid grid-cols-4 gap-[0.5vw] pl-[0.5vw] pr-[0.2vw]">
           {/* Align */}
           <button
             onClick={() => {
@@ -2722,7 +2689,7 @@ const TableProperties = ({
               setTextAlign(nextAlign);
               applyTableStyles({ textAlign: nextAlign });
             }}
-            className="flex items-center justify-center border border-gray-200 rounded-[0.4vw] h-[2.2vw] bg-white hover:bg-gray-50 text-gray-700 shadow-xs"
+            className="flex items-center justify-center border border-gray-200 rounded-[0.5vw] h-[2.5vw] bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-700 shadow-2xs transition-colors"
             title="Alignment"
           >
             {textAlign === 'center' ? (
@@ -2741,8 +2708,8 @@ const TableProperties = ({
               setIsBold(next);
               applyTableStyles({ isBold: next });
             }}
-            className={`flex items-center justify-center border rounded-[0.4vw] h-[2.2vw] shadow-xs transition-colors ${
-              isBold ? 'border-[#f05a35] bg-[#fff6f4] text-[#f05a35] font-bold' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-700'
+            className={`flex items-center justify-center border rounded-[0.5vw] h-[2.5vw] shadow-2xs transition-colors ${
+              isBold ? 'border-[#E05638] bg-[#E05638]/5 text-[#E05638] font-bold' : 'border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-700'
             }`}
             title="Bold"
           >
@@ -2756,8 +2723,8 @@ const TableProperties = ({
               setIsStrikethrough(next);
               applyTableStyles({ isStrikethrough: next });
             }}
-            className={`flex items-center justify-center border rounded-[0.4vw] h-[2.2vw] shadow-xs transition-colors ${
-              isStrikethrough ? 'border-[#f05a35] bg-[#fff6f4] text-[#f05a35]' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-700'
+            className={`flex items-center justify-center border rounded-[0.5vw] h-[2.5vw] shadow-2xs transition-colors ${
+              isStrikethrough ? 'border-[#E05638] bg-[#E05638]/5 text-[#E05638]' : 'border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-700'
             }`}
             title="Strikethrough"
           >
@@ -2771,8 +2738,8 @@ const TableProperties = ({
               setIsList(next);
               applyTableStyles({ isList: next });
             }}
-            className={`flex items-center justify-center border rounded-[0.4vw] h-[2.2vw] shadow-xs transition-colors ${
-              isList ? 'border-[#f05a35] bg-[#fff6f4] text-[#f05a35]' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-700'
+            className={`flex items-center justify-center border rounded-[0.5vw] h-[2.5vw] shadow-2xs transition-colors ${
+              isList ? 'border-[#E05638] bg-[#E05638]/5 text-[#E05638]' : 'border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-700'
             }`}
             title="List"
           >
@@ -2781,21 +2748,21 @@ const TableProperties = ({
         </div>
 
         {/* Vertical Align & Text Wrapping */}
-        <div className="grid grid-cols-2 gap-[0.6vw]">
+        <div className="grid grid-cols-2 gap-[0.5vw] pl-[0.5vw] pr-[0.2vw]">
           <button
             onClick={() => {
               const nextV = verticalAlign === 'top' ? 'middle' : verticalAlign === 'middle' ? 'bottom' : 'top';
               setVerticalAlign(nextV);
               applyTableStyles({ verticalAlign: nextV });
             }}
-            className="flex items-center justify-center gap-[0.4vw] border border-gray-200 rounded-[0.4vw] h-[2.2vw] bg-white hover:bg-gray-50 active:scale-98 transition-all text-[#f05a35] shadow-xs"
+            className="flex items-center justify-center gap-[0.4vw] border border-gray-200 rounded-[0.5vw] h-[2.5vw] bg-white hover:bg-gray-50 hover:border-[#E05638] active:scale-98 transition-all text-[#E05638] shadow-2xs"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 3v14" />
               <polyline points="7 12 12 17 17 12" />
               <line x1="4" y1="21" x2="20" y2="21" />
             </svg>
-            <span className="text-[0.74vw] font-medium text-[#f05a35] capitalize">
+            <span className="text-[0.74vw] font-medium text-[#E05638] capitalize">
               {verticalAlign} Align
             </span>
           </button>
@@ -2806,8 +2773,8 @@ const TableProperties = ({
               setTextWrapping(nextW);
               applyTableStyles({ textWrapping: nextW });
             }}
-            className={`flex items-center justify-center gap-[0.4vw] border rounded-[0.4vw] h-[2.2vw] active:scale-98 transition-all shadow-xs ${
-              textWrapping ? 'border-gray-200 bg-white text-gray-800 hover:bg-gray-50' : 'border-gray-200 bg-gray-50 text-gray-400'
+            className={`flex items-center justify-center gap-[0.4vw] border rounded-[0.5vw] h-[2.5vw] active:scale-98 transition-all shadow-2xs ${
+              textWrapping ? 'border-gray-200 bg-white text-gray-800 hover:bg-gray-50 hover:border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400'
             }`}
           >
             <WrapText size="1vw" strokeWidth={2.2} className="text-gray-600" />
@@ -2816,9 +2783,8 @@ const TableProperties = ({
         </div>
 
         {/* Left & Right Padding */}
-        <div className="flex flex-col gap-[0.3vw] mt-[0.2vw]">
-          <span className="text-[0.78vw] text-gray-600 font-medium">Left & Right Padding</span>
-          <div className="flex items-center gap-[0.8vw]">
+        <PropertyRow label="Padding X">
+          <div className="flex items-center gap-[0.5vw]">
             <input
               type="range"
               min={0}
@@ -2829,21 +2795,20 @@ const TableProperties = ({
                 setPaddingX(val);
                 applyTableStyles({ paddingX: val });
               }}
-              className="flex-1 h-[0.25vw] appearance-none cursor-pointer bg-gray-200 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[0.85vw] [&::-webkit-slider-thumb]:h-[0.85vw] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-[0.16vw] [&::-webkit-slider-thumb]:border-[#f05a35] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-xs"
+              className="flex-1 h-[0.25vw] appearance-none cursor-pointer bg-gray-200 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[0.85vw] [&::-webkit-slider-thumb]:h-[0.85vw] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-[0.16vw] [&::-webkit-slider-thumb]:border-[#E05638] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-xs"
               style={{
-                background: `linear-gradient(to right, #f05a35 0%, #f05a35 ${(paddingX / 30) * 100}%, #e5e7eb ${(paddingX / 30) * 100}%, #e5e7eb 100%)`
+                background: `linear-gradient(to right, #E05638 0%, #E05638 ${(paddingX / 30) * 100}%, #e5e7eb ${(paddingX / 30) * 100}%, #e5e7eb 100%)`
               }}
             />
-            <div className="w-[3.2vw] h-[1.8vw] flex items-center justify-center bg-white border border-gray-200 rounded-[0.4vw] shadow-xs">
+            <div className="w-[3.2vw] h-[1.8vw] flex items-center justify-center bg-white border border-gray-200 rounded-[0.4vw] shadow-2xs">
               <span className="text-[0.75vw] text-gray-700 font-medium">{paddingX}px</span>
             </div>
           </div>
-        </div>
+        </PropertyRow>
 
         {/* Top & Bottom Padding */}
-        <div className="flex flex-col gap-[0.3vw]">
-          <span className="text-[0.78vw] text-gray-600 font-medium">Top & Bottom Padding</span>
-          <div className="flex items-center gap-[0.8vw]">
+        <PropertyRow label="Padding Y">
+          <div className="flex items-center gap-[0.5vw]">
             <input
               type="range"
               min={0}
@@ -2854,43 +2819,32 @@ const TableProperties = ({
                 setPaddingY(val);
                 applyTableStyles({ paddingY: val });
               }}
-              className="flex-1 h-[0.25vw] appearance-none cursor-pointer bg-gray-200 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[0.85vw] [&::-webkit-slider-thumb]:h-[0.85vw] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-[0.16vw] [&::-webkit-slider-thumb]:border-[#f05a35] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-xs"
+              className="flex-1 h-[0.25vw] appearance-none cursor-pointer bg-gray-200 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[0.85vw] [&::-webkit-slider-thumb]:h-[0.85vw] [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-[0.16vw] [&::-webkit-slider-thumb]:border-[#E05638] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-xs"
               style={{
-                background: `linear-gradient(to right, #f05a35 0%, #f05a35 ${(paddingY / 30) * 100}%, #e5e7eb ${(paddingY / 30) * 100}%, #e5e7eb 100%)`
+                background: `linear-gradient(to right, #E05638 0%, #E05638 ${(paddingY / 30) * 100}%, #e5e7eb ${(paddingY / 30) * 100}%, #e5e7eb 100%)`
               }}
             />
-            <div className="w-[3.2vw] h-[1.8vw] flex items-center justify-center bg-white border border-gray-200 rounded-[0.4vw] shadow-xs">
+            <div className="w-[3.2vw] h-[1.8vw] flex items-center justify-center bg-white border border-gray-200 rounded-[0.4vw] shadow-2xs">
               <span className="text-[0.75vw] text-gray-700 font-medium">{paddingY}px</span>
             </div>
           </div>
-        </div>
+        </PropertyRow>
       </div>
 
       {/* ── SECTION 5: Effects ─────────────────────────────────────────── */}
-      <div className="flex flex-col gap-[0.8vw]">
-        <div className="flex items-center gap-[0.5vw]">
-          <span className="text-[0.85vw] font-bold text-gray-800 whitespace-nowrap">
-            Effects
-          </span>
-          <div className="flex-1 h-[1px] bg-gray-200" />
-        </div>
+      <div className="flex flex-col gap-[0.5vw]">
+        <SectionHeader title="Effects" />
 
-        {/* Drop Shadow card */}
-        <div className="flex items-center justify-between border border-gray-200 rounded-[0.4vw] px-[0.8vw] h-[2.5vw] bg-white shadow-xs">
-          <span className="text-[0.78vw] font-medium text-gray-800">
-            {hasDropShadow ? 'Drop Shadow' : 'No Effects'}
-          </span>
-          <button
-            onClick={() => {
-              const next = !hasDropShadow;
+        {/* Drop Shadow toggle */}
+        <div className="flex items-center justify-between pl-[0.5vw] pr-[0.2vw] h-[2.2vw]">
+          <span className="text-[0.78vw] font-medium text-gray-700">Drop Shadow</span>
+          <Toggle
+            checked={hasDropShadow}
+            onChange={(next) => {
               setHasDropShadow(next);
               applyTableStyles({ hasDropShadow: next });
             }}
-            className="p-[0.3vw] hover:bg-red-50 rounded-[0.3vw] transition-colors"
-            title="Delete / Toggle Effect"
-          >
-            <Trash2 size="0.95vw" className="text-[#ef4444] hover:text-[#dc2626]" />
-          </button>
+          />
         </div>
       </div>
 

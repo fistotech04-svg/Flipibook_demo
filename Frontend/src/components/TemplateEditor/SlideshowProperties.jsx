@@ -116,7 +116,7 @@ const RadioGroup = ({ options, value, onChange }) => (
 const SectionHeader = ({ title }) => (
   <div className="flex items-center gap-[0.5vw] py-[0.25vw] mt-[0.25vw]">
     <span className="text-[0.8vw] font-semibold text-gray-800 whitespace-nowrap">{title}</span>
-    <div className="h-[0.0925vw] bg-gray-200 flex-1" style={{ marginRight: '-2vw' }}> </div>
+    <div className="h-[0.0925vw] bg-gray-200 flex-1"> </div>
   </div>
 );
 
@@ -1566,7 +1566,7 @@ const SlideshowProperties = ({ selectedElement, activePageIndex, onUpdate, isOpe
   }, [activePageIndex]);
 
   return (
-    <div className="space-y-[1vw]">
+    <div className="space-y-[1vw] overflow-x-hidden">
       <style>{`
         .ss-slider { -webkit-appearance: none; width: 100%; background: transparent; position: relative; }
         .ss-slider::before { content: ""; position: absolute; top: -0.75vw; bottom: -0.75vw; left: 0; right: 0; cursor: pointer; z-index: 1; }
@@ -1601,7 +1601,7 @@ const SlideshowProperties = ({ selectedElement, activePageIndex, onUpdate, isOpe
       {/* ── Slideshow header ── */}
       <div className="flex items-center gap-[0.5vw]">
         <span className="text-[0.9vw] font-semibold text-gray-900 whitespace-nowrap">Slideshow Properties</span>
-        <div className="h-[0.0925vw] bg-gray-200 flex-1" style={{ marginRight: '-1.6vw' }}> </div>
+        <div className="h-[0.0925vw] bg-gray-200 flex-1"> </div>
       </div>
 
       {/* ── Slideshow Mode Toggle ── */}
